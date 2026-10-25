@@ -127,6 +127,10 @@ function buildSteps2386(input, params = {}) {
   let answer = maximum;
   let nextId = 1;
   let traceTruncated = false;
+  let heapInitialized = false;
+  let lossVariable;
+  let indexVariable;
+  let children = {};
 
   const selectedIndicesFor = (chosen) => {
     if (!includeWitness) return [];
@@ -159,7 +163,7 @@ function buildSteps2386(input, params = {}) {
     }));
   };
 
-  const emit = ({ phase, title, note, codeLines, rank = history.at(-1).rank, final = false }) => {
+  const emit = ({ phase, title = bi("Theo dõi từng dòng", "Follow each line"), note = bi("", ""), codeLines, rank = history.at(-1).rank, final = false, condition = null }) => {
     if (!final && steps.length >= MAX_TRACE_STEPS - 1) {
       traceTruncated = true;
       return;
@@ -175,6 +179,19 @@ function buildSteps2386(input, params = {}) {
     }));
     const frontier = heap.data.slice(0, 40).map((state, position) => stateView(state, position));
     const loss = current?.loss ?? history.at(-1).loss;
+    const nextIndex = current ? current.index + 1 : values.length;
+    const expansion = nextIndex < values.length ? {
+      parent: stateView(current),
+      next: { sortedIndex: nextIndex, ...values[nextIndex] },
+      add: { queued: Boolean(children.add), state: stateView(children.add || {
+        id: null, loss: current.loss + values[nextIndex].value, index: nextIndex,
+        chosen: [...current.chosen, nextIndex], origin: "add",
+      }) },
+      replace: { queued: Boolean(children.replace), state: stateView(children.replace || {
+        id: null, loss: current.loss - values[current.index].value + values[nextIndex].value, index: nextIndex,
+        chosen: [...current.chosen.slice(0, -1), nextIndex], origin: "replace",
+      }) },
+    } : null;
     steps.push({
       title,
       note,
@@ -186,13 +203,16 @@ function buildSteps2386(input, params = {}) {
       mark: numberPreview.filter((item) => item.selected).map((item) => item.index),
       vars: [
         { name: "maximum", value: maximum },
+        { name: "k", value: k },
         { name: "rank", value: rank },
-        { name: "loss", value: loss },
-        { name: "candidate", value: maximum - loss },
-        { name: "heap size", value: heap.data.length },
+        { name: "loss", value: lossVariable ?? "—" },
+        { name: "index", value: indexVariable ?? "—" },
+        { name: "heap size", value: heapInitialized ? heap.data.length : "—" },
       ],
       kSum2386View: {
         phase,
+        source: { line: codeLines[0], text: SOURCE[codeLines[0] - 1], timing: "after" },
+        condition,
         n: nums.length,
         k,
         maximum,
@@ -205,6 +225,7 @@ function buildSteps2386(input, params = {}) {
         normalizedTruncated: values.length > 48,
         current: stateView(current),
         branch: branch ? { type: branch.type, parent: stateView(branch.parent), child: stateView(branch.child) } : null,
+        expansion,
         frontier,
         frontierSize: heap.data.length,
         history: compactHistory(),
@@ -219,18 +240,19 @@ function buildSteps2386(input, params = {}) {
 
   emit({
     phase: "maximum",
-    title: bi(`Maximum subsequence sum = ${maximum}`, `Maximum subsequence sum = ${maximum}`),
+    title: bi("Chọn các số dương", "Select the positive values"),
     note: bi("Lấy mọi số dương, bỏ mọi số âm. Đây là subsequence sum lớn nhất và là rank 1.", "Take every positive value and skip every negative value. This is the largest subsequence sum and rank 1."),
-    codeLines: [1, 2, 4, 5, 6],
+    codeLines: [6],
     rank: 1,
   });
   emit({
     phase: "normalize",
-    title: bi("Đổi mọi quyết định thành một “loss” không âm", "Convert every decision into a non-negative loss"),
+    title: bi("Mỗi lần đổi chọn làm giảm |x|", "Each flipped choice loses |x|"),
     note: bi("Bỏ số dương x hoặc thêm số âm −x đều làm maximum giảm đúng |x|. Vì vậy chỉ cần sort |nums|.", "Removing a positive x or adding a negative −x both reduce maximum by exactly |x|. Therefore only sorted |nums| matters."),
     codeLines: [7],
     rank: 1,
   });
+  emit({ phase: "inspect", title: bi("Kiểm tra k = 1", "Check k = 1"), codeLines: [8], condition: k === 1 });
 
   if (k === 1) {
     answer = maximum;
@@ -238,7 +260,7 @@ function buildSteps2386(input, params = {}) {
       phase: "done",
       title: bi(`k = 1 nên đáp án là ${answer}`, `k = 1, so the answer is ${answer}`),
       note: bi("Không cần mở heap: loss nhỏ nhất đầu tiên là 0.", "No heap is needed: the first smallest loss is 0."),
-      codeLines: [8, 9],
+      codeLines: [9],
       rank: 1,
       final: true,
     });
@@ -247,18 +269,25 @@ function buildSteps2386(input, params = {}) {
 
   const seed = { id: nextId++, loss: values[0].value, index: 0, chosen: [0], origin: "seed" };
   heap.push(seed);
+  heapInitialized = true;
   branch = { type: "seed", parent: null, child: seed };
   emit({
     phase: "seed",
-    title: bi(`Seed heap với loss ${seed.loss}`, `Seed the heap with loss ${seed.loss}`),
+    title: bi("Đưa loss đầu tiên vào heap", "Queue the first loss"),
     note: bi("Rank 1 dùng loss 0. Ứng viên tiếp theo flip trị tuyệt đối nhỏ nhất.", "Rank 1 uses loss 0. The next candidate flips the smallest absolute value."),
-    codeLines: [10, 11],
+    codeLines: [10],
     rank: 1,
   });
+  lossVariable = 0;
+  emit({ phase: "inspect", title: bi("Khởi tạo loss = 0", "Initialize loss = 0"), codeLines: [11] });
 
   for (let rank = 2; rank <= k; rank += 1) {
+    emit({ phase: "inspect", title: bi("Lượt lấy hạng tiếp theo", "Advance to the next rank"), codeLines: [12], condition: true });
     branch = null;
+    children = {};
     current = heap.pop();
+    lossVariable = current.loss;
+    indexVariable = current.index;
     answer = maximum - current.loss;
     history.push({
       rank,
@@ -269,14 +298,16 @@ function buildSteps2386(input, params = {}) {
     });
     emit({
       phase: "pop",
-      title: bi(`Pop loss nhỏ nhất ${current.loss} → rank ${rank} là ${answer}`, `Pop minimum loss ${current.loss} → rank ${rank} is ${answer}`),
+      title: bi(`Lấy min · hạng ${rank}`, `Pop minimum · rank ${rank}`),
       note: bi("Min-heap đưa loss tăng dần, nên maximum − loss xuất hiện theo thứ tự không tăng. Tổng trùng nhau vẫn là các rank riêng.", "The min-heap emits losses in ascending order, so maximum − loss is non-increasing. Equal sums still occupy separate ranks."),
-      codeLines: [12, 13],
+      codeLines: [13],
       rank,
     });
 
     const nextIndex = current.index + 1;
+    emit({ phase: "inspect", title: bi("Còn phần tử kế tiếp?", "Is there a next value?"), codeLines: [14], condition: nextIndex < values.length });
     if (nextIndex < values.length) {
+      emit({ phase: "inspect", title: bi("Chọn index kế tiếp", "Select the next index"), codeLines: [15] });
       const addChild = {
         id: nextId++,
         loss: current.loss + values[nextIndex].value,
@@ -285,12 +316,13 @@ function buildSteps2386(input, params = {}) {
         origin: "add",
       };
       heap.push(addChild);
+      children.add = addChild;
       branch = { type: "add", parent: current, child: addChild };
       emit({
         phase: "branch-add",
-        title: bi(`Nhánh ADD: ${current.loss} + ${values[nextIndex].value} = ${addChild.loss}`, `ADD branch: ${current.loss} + ${values[nextIndex].value} = ${addChild.loss}`),
+        title: bi("ADD · giữ và thêm", "ADD · keep and append"),
         note: bi("Giữ mọi flip hiện tại rồi thêm phần tử kế tiếp trong dãy |nums| đã sort.", "Keep every current flip and add the next item in sorted |nums|."),
-        codeLines: [14, 15, 16],
+        codeLines: [16],
         rank,
       });
 
@@ -302,16 +334,18 @@ function buildSteps2386(input, params = {}) {
         origin: "replace",
       };
       heap.push(replaceChild);
+      children.replace = replaceChild;
       branch = { type: "replace", parent: current, child: replaceChild };
       emit({
         phase: "branch-replace",
-        title: bi(`Nhánh REPLACE: ${current.loss} − ${values[current.index].value} + ${values[nextIndex].value} = ${replaceChild.loss}`, `REPLACE branch: ${current.loss} − ${values[current.index].value} + ${values[nextIndex].value} = ${replaceChild.loss}`),
+        title: bi("REPLACE · đổi phần tử cuối", "REPLACE · swap the last value"),
         note: bi("Thay flip cuối bằng phần tử kế tiếp. Cặp ADD/REPLACE chia toàn bộ state con thành hai nhóm, không bỏ sót subset.", "Replace the last flip with the next item. ADD/REPLACE partition all child states into two groups without missing a subset."),
         codeLines: [17],
         rank,
       });
     }
   }
+  emit({ phase: "inspect", title: bi("Đủ k − 1 lần lấy min", "Completed k − 1 minimum pops"), codeLines: [12], condition: false });
 
   branch = null;
   emit({

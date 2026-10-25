@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
+const fs = require('node:fs');
+const vm = require('node:vm');
 
 const problem = require('../problems').SUPPORTED[2386];
 const {
@@ -135,8 +137,119 @@ test('2386 detailed renderer and responsive assets are wired before script.js', 
   const styles = readFrontendStyles();
   const index = readFrontendIndex();
   assert.match(javascript, /function renderKSum2386View\(step\)/);
-  assert.match(javascript, /Why are exactly two ADD \/ REPLACE branches enough/);
+  assert.match(javascript, /ks2386-fork/);
+  assert.match(javascript, /ks2386-heap/);
   assert.match(styles, /\.ks2386-state\.root/);
   assert.match(styles, /@container \(max-width:480px\)/);
   assert.ok(index.indexOf('renderer-k-sum-2386.js') < index.indexOf('script.js?'));
+});
+
+test('2386 debug lines and six watches agree with CPython, including duplicate heap tuples', () => {
+  const cases = [
+    { nums: [2, 4, -2], k: 5 }, { nums: [1, -2, 3, 4, -10, 12], k: 16 },
+    { nums: [0, 0, 0], k: 8 }, { nums: [-4, -1, 7, 7], k: 11 },
+    { nums: [3], k: 1 }, { nums: [-3], k: 2 }, { nums: [1e9, -1e9, 0], k: 8 },
+  ];
+  const source = problem.code.join('\n') + `
+import copy, json, sys
+cases = json.load(sys.stdin)
+runs = []
+for case in cases:
+    events, returned = [], []
+    def trace(frame, event, arg):
+        if frame.f_code.co_name == 'kSum':
+            state = frame.f_locals
+            snapshot = {
+                'maximum': state.get('maximum', '—'), 'k': state['k'],
+                'loss': state.get('loss', '—'), 'index': state.get('index', '—'),
+                'size': len(state['heap']) if 'heap' in state else '—',
+                'heap': sorted(state.get('heap', [])),
+            }
+            if event == 'line':
+                events.append({'line': frame.f_lineno, 'state': copy.deepcopy(snapshot)})
+            elif event == 'return':
+                returned.append(copy.deepcopy(snapshot))
+        return trace
+    sys.settrace(trace)
+    answer = Solution().kSum(case['nums'], case['k'])
+    sys.settrace(None)
+    runs.append({'answer': answer, 'events': [
+        {'line': before['line'], 'state': events[index + 1]['state'] if index + 1 < len(events) else returned[0]}
+        for index, before in enumerate(events)
+    ]})
+print(json.dumps(runs))
+`;
+  const python = spawnSync('python3', ['-c', source], { input: JSON.stringify(cases), encoding: 'utf8' });
+  assert.equal(python.status, 0, python.stderr);
+  JSON.parse(python.stdout).forEach((expected, index) => {
+    const run = problem.builder(cases[index].nums, { k: cases[index].k });
+    assert.equal(run.answer, expected.answer);
+    assert.deepEqual(run.steps.map(step => step.codeLines), expected.events.map(event => [event.line]));
+    let rank = 1;
+    run.steps.forEach((step, eventIndex) => {
+      const event = expected.events[eventIndex], s = event.state, v = step.kSum2386View;
+      if (event.line === 13) rank++;
+      assert.deepEqual(step.vars.map(variable => variable.name), ['maximum', 'k', 'rank', 'loss', 'index', 'heap size']);
+      assert.deepEqual(step.vars.map(variable => variable.value), [s.maximum, s.k, rank, s.loss, s.index, s.size]);
+      assert.deepEqual(v.frontier.map(entry => [entry.loss, entry.index]).sort((a, b) => a[0] - b[0] || a[1] - b[1]), s.heap);
+      assert.equal(v.source.text, problem.code[event.line - 1]);
+    });
+  });
+});
+
+test('2386 branch previews become queued only on their own heappush line', () => {
+  const run = problem.builder([2, 4, -2], { k: 5 });
+  for (let index = 0; index < run.steps.length; index++) {
+    const v = run.steps[index].kSum2386View;
+    if (v.expansion) {
+      const x = v.expansion;
+      assert.deepEqual(x.add.state.chosen, [...x.parent.chosen, x.next.sortedIndex]);
+      assert.deepEqual(x.replace.state.chosen, [...x.parent.chosen.slice(0, -1), x.next.sortedIndex]);
+      for (const child of [x.add, x.replace]) assert.equal(child.state.chosenValues.reduce((sum, value) => sum + value, 0), child.state.loss);
+    }
+    if (v.phase === 'branch-add') {
+      assert.equal(v.source.line, 16);
+      assert.equal(v.frontierSize, run.steps[index - 1].kSum2386View.frontierSize + 1);
+      assert.equal(v.expansion.add.queued, true);
+      assert.equal(v.expansion.replace.queued, false);
+    }
+    if (v.phase === 'branch-replace') {
+      assert.equal(v.source.line, 17);
+      assert.equal(v.frontierSize, run.steps[index - 1].kSum2386View.frontierSize + 1);
+      assert.equal(v.expansion.add.queued, true);
+      assert.equal(v.expansion.replace.queued, true);
+    }
+  }
+});
+
+test('2386 pictures show the heap tree, two branches, signed flips and separate duplicate ranks', () => {
+  const host = { innerHTML: '' };
+  const context = { lang: 'vi', $: () => host, escapeHtml: value => String(value).replace(/[&<>"']/g, '_') };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-k-sum-2386.js'), 'utf8'), context);
+  const cases = [
+    { nums: [2, 4, -2], k: 5 }, { nums: [-2, 2], k: 4 }, { nums: [-5], k: 1 }, { nums: [0, 0], k: 4 },
+    { nums: Array(201).fill(0), k: 2 },
+  ];
+  for (const language of ['vi', 'en']) for (const item of cases) {
+    context.lang = language;
+    const run = problem.builder(item.nums, { k: item.k });
+    for (const step of run.steps) {
+      context.renderKSum2386View(step);
+      const html = host.innerHTML, v = step.kSum2386View;
+      assert.doesNotMatch(html, /undefined|NaN|Infinity|object Object|<p[ >]|<table|<details/);
+      if (v.expansion) assert.match(html, /class="ks2386-fork"/);
+      if (v.frontierSize) assert.match(html, /class="ks2386-state root/);
+      for (const number of v.numbers.slice(0, 12)) if (number.flipped) {
+        const classes = number.value > 0 ? 'skipped removed' : 'selected added';
+        assert.ok(html.includes(`class="ks2386-number ${classes}" data-original-index="${number.index}"`));
+      }
+    }
+    if (item.k === 5) assert.equal((host.innerHTML.match(/data-rank="/g) || []).length, 5);
+    context.renderKSum2386View(run.steps[0]);
+    const first = host.innerHTML;
+    context.renderKSum2386View(run.steps.at(-1));
+    context.renderKSum2386View(run.steps[0]);
+    assert.equal(host.innerHTML, first);
+  }
 });
