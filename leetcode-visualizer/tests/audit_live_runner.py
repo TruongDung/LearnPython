@@ -55,12 +55,19 @@ class Node:
 
 class CategoryHandler:
     def __init__(self, categories):
-        if not isinstance(categories, list) or not 1 <= len(categories) <= 100 or any(type(value) is not int for value in categories):
+        if (
+            not isinstance(categories, list)
+            or not 1 <= len(categories) <= 100
+            or any(not isinstance(value, int) or isinstance(value, bool) for value in categories)
+        ):
             raise ValueError("CategoryHandler requires 1..100 integer labels.")
         self._categories = tuple(categories)
 
     def haveSameCategory(self, left, right):
-        if any(type(index) is not int or not 0 <= index < len(self._categories) for index in (left, right)):
+        if any(
+            not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(self._categories)
+            for index in (left, right)
+        ):
             raise ValueError("CategoryHandler indices must be in [0, n).")
         return self._categories[left] == self._categories[right]
 

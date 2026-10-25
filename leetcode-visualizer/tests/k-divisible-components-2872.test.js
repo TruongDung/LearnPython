@@ -61,8 +61,9 @@ test("2872 pictures and six fixed watches follow merges, cuts, and zero contribu
   for (const step of run.steps) {
     const v = step.kDivisible2872View;
     assert.deepEqual(step.vars.map(variable => variable.name), watchNames);
-    assert.ok(step.codeLines.every(line => line > 0 && line <= problem.code.length));
-    assert.equal(v.components, v.closedGroups.length);
+    assert.equal(step.codeLines.length, 1);
+    assert.ok(step.codeLines[0] > 0 && step.codeLines[0] <= problem.code.length);
+    assert.equal(v.components, v.closedGroups.length + (v.phase === "count" ? 1 : 0));
     for (const group of v.closedGroups) assert.ok(group.members.every(node => v.processed.includes(node)));
     if (v.transfer) {
       assert.equal(v.transfer.before + v.transfer.amount, v.transfer.after);
@@ -83,14 +84,19 @@ test("2872 pictures and six fixed watches follow merges, cuts, and zero contribu
   assert.deepEqual(run.steps.at(-1).vars.map(variable => variable.value), [0, 6, 6, 0, 0, 2]);
 });
 
-test("2872 keeps complete results when a 96-node trace is condensed", () => {
+test("2872 retains every executed line even for 96 nodes", () => {
   for (const star of [false, true]) {
     const item = { values: Array(96).fill(1), k: star ? 1 : 3, edges: Array.from({ length: 95 }, (_, i) => [star ? 0 : i, i + 1]) };
     const run = solve(item);
     assert.equal(run.answer, star ? 96 : 32);
     assert.ok(run.steps.length <= problem.visualizationLimits.maxTraceSteps);
+    assert.ok(run.steps.length > 220);
+    for (const step of run.steps) {
+      assert.equal(step.codeLines.length, 1);
+      assert.equal(step.kDivisible2872View.traceTruncated, false);
+    }
     const last = run.steps.at(-1).kDivisible2872View;
-    assert.equal(last.traceTruncated, true);
+    assert.equal(last.traceTruncated, false);
     assert.equal(last.processed.length, 96);
     assert.equal(last.closedGroups.length, run.answer);
     assert.equal(last.cuts.length, run.answer - 1);
@@ -109,6 +115,14 @@ test("2872 renderer shows a tree, transfers, severed edges, and separate compone
       context.renderKDivisibleComponents2872View(step);
       assert.doesNotMatch(host.innerHTML, /undefined|NaN|Infinity|object Object/);
       assert.equal((host.innerHTML.match(/class="kd2872-node[ "]/g) || []).length, 5);
+      assert.match(host.innerHTML, /class="kd2872-debugger"/);
+      const v = step.kDivisible2872View;
+      if (v.source.line === 7) assert.equal((host.innerHTML.match(/ pending/g) || []).length, 4);
+      if (v.source.line === 9) {
+        assert.match(host.innerHTML, /kd2872-indexed/);
+        assert.match(host.innerHTML, / partial/);
+      }
+      if (v.stage === "dfs" && v.traversalParent) assert.match(host.innerHTML, /<code>parent<\/code>/);
       if (step.kDivisible2872View.phase === "carry") assert.match(host.innerHTML, /kd2872-flow/);
       if (step.kDivisible2872View.phase === "cut") assert.match(host.innerHTML, /class="kd2872-cut"/);
       if (step.kDivisible2872View.transfer?.amount === 0) assert.doesNotMatch(host.innerHTML, /<g class="kd2872-flow">/);
@@ -127,17 +141,73 @@ test("2872 renderer shows a tree, transfers, severed edges, and separate compone
   assert.doesNotMatch(host.innerHTML, /class="kd2872-cut"/);
 });
 
-test("2872 displayed Python and live arguments produce the same results", () => {
+test("2872 checks, increments, and cuts are separate reversible steps", () => {
+  const run = solve(examples[0]);
+  const cutIndex = run.steps.findIndex(step => step.kDivisible2872View.phase === "cut");
+  const [check, count, cut] = run.steps.slice(cutIndex - 2, cutIndex + 1);
+  assert.deepEqual([check, count, cut].map(step => step.codeLines), [[31], [32], [33]]);
+  assert.equal(check.kDivisible2872View.condition, true);
+  assert.equal(count.kDivisible2872View.components, check.kDivisible2872View.components + 1);
+  assert.deepEqual(count.kDivisible2872View.cuts, check.kDivisible2872View.cuts);
+  assert.equal(cut.kDivisible2872View.cuts.length, count.kDivisible2872View.cuts.length + 1);
+  assert.equal(cut.kDivisible2872View.components, count.kDivisible2872View.components);
+  assert.deepEqual(check.kDivisible2872View.closedGroups, []);
+  assert.deepEqual(count.kDivisible2872View.closedGroups, []);
+  assert.equal(cut.kDivisible2872View.closedGroups.length, 1);
+  assert.equal(check.kDivisible2872View.cuts.length, 0);
+});
+
+test("2872 matches CPython line events and all local variables after every line", () => {
   const program = problem.code.join("\n") + `
-import json, sys
+import copy, json, sys
 cases = json.load(sys.stdin)
-print(json.dumps([Solution().maxKDivisibleComponents(*args) for args in cases]))
+runs = []
+for args in cases:
+    events = []
+    returned = []
+    def trace(frame, event, arg):
+        if frame.f_code.co_name == 'maxKDivisibleComponents':
+            state = copy.deepcopy({name: value for name, value in frame.f_locals.items() if name != 'self'})
+            if event == 'line':
+                events.append({'line': frame.f_lineno, 'locals': state})
+            elif event == 'return':
+                returned.append(state)
+        return trace
+    sys.settrace(trace)
+    answer = Solution().maxKDivisibleComponents(*args)
+    sys.settrace(None)
+    runs.append({'answer': answer, 'steps': [
+        {'line': before['line'], 'locals': events[index + 1]['locals'] if index + 1 < len(events) else returned[0]}
+        for index, before in enumerate(events)
+    ]})
+print(json.dumps(runs))
 `;
+  // Unsorted, reversed edges catch accidental use of the layout's sorted DFS order.
+  const cases = [...examples, { edges: [[3, 0], [1, 0], [4, 1], [2, 0]], values: [2, 3, 4, 5, 6], k: 5 }];
   const run = spawnSync(process.env.PYTHON || (process.platform === "win32" ? "python" : "python3"), ["-c", program], {
-    input: JSON.stringify(examples.map(item => problem.liveArgs(item.edges, { values: item.values, k: item.k }))), encoding: "utf8",
+    input: JSON.stringify(cases.map(item => problem.liveArgs(item.edges, { values: item.values, k: item.k }))), encoding: "utf8",
   });
   assert.equal(run.status, 0, run.stderr);
-  assert.deepEqual(JSON.parse(run.stdout), examples.map(item => item.answer));
+  const expectedRuns = JSON.parse(run.stdout);
+  cases.forEach((item, index) => {
+    const actual = solve(item), expected = expectedRuns[index];
+    assert.equal(actual.answer, expected.answer);
+    assert.deepEqual(actual.steps.map(step => step.codeLines[0]), expected.steps.map(step => step.line));
+    actual.steps.forEach((step, eventIndex) => {
+      const v = step.kDivisible2872View, line = step.codeLines[0];
+      assert.deepEqual(v.locals, expected.steps[eventIndex].locals, `case ${index}, event ${eventIndex}, line ${line}`);
+      assert.equal(v.source.line, line);
+      assert.equal(v.source.text, problem.code[line - 1]);
+      assert.equal(v.source.timing, "after");
+      assert.equal(v.nextLine, expected.steps[eventIndex + 1]?.line ?? null);
+      assert.equal(v.nextSource, v.nextLine === null ? null : problem.code[v.nextLine - 1]);
+      const state = v.locals;
+      assert.deepEqual(step.vars.map(variable => variable.value), [
+        state.node ?? "—", state.k, state.subtotal ?? "—", state.subtotal === undefined ? "—" : state.subtotal % state.k,
+        state.contribution?.[state.node] ?? "—", state.components ?? "—",
+      ]);
+    });
+  });
 });
 
 test("2872 dedicated renderer is selected before the generic text-heavy view", () => {

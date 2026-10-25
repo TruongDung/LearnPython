@@ -23,22 +23,6 @@ const LIMITS = Object.freeze({
   maxTraceSteps: 4000,
 });
 
-const PHASES = Object.freeze([
-  bi("Kiểm tra và định hướng cây", "Validate and orient the tree"),
-  bi("Lập thứ tự hậu tự DFS", "Build DFS postorder"),
-  bi("Gộp tổng cây con", "Merge subtree totals"),
-  bi("Cắt component chia hết", "Cut divisible components"),
-  bi("Kết quả", "Result"),
-]);
-
-const LEGEND = Object.freeze([
-  { label: bi("Node/cạnh đang xử lý", "Active node/edge"), state: "active" },
-  { label: bi("Đang chờ trong DFS", "Waiting in DFS"), state: "queued" },
-  { label: bi("Đã tính subtotal", "Subtotal computed"), state: "computed" },
-  { label: bi("Gốc component hoàn tất", "Completed component root"), state: "success" },
-  { label: bi("Cạnh đã cắt", "Cut edge"), state: "danger" },
-]);
-
 const SOURCE = Object.freeze([
   "from typing import List",
   "",

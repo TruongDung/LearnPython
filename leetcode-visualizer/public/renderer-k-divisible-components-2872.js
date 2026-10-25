@@ -24,10 +24,15 @@ function renderKDivisibleComponents2872View(step) {
   const key = (a, b) => [Math.min(a, b), Math.max(a, b)].join(":");
   const cuts = new Set(v.cuts.map(cut => key(cut.parent, cut.child)));
   const processed = new Set(v.processed);
+  const queued = new Set(v.stack || []);
+  const visited = new Set(v.order || []);
   const tone = id => id < 0 ? "" : ` tone-${id % 6}`;
   const lines = v.edges.map(([a, b]) => {
     const from = position[a], to = position[b];
-    if (!cuts.has(key(a, b))) return `<line class="kd2872-edge${tone(owner[a])}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"/>`;
+    const directions = Number(v.graph[a].includes(b)) + Number(v.graph[b].includes(a));
+    const focused = v.edgeFocus && key(...v.edgeFocus) === key(a, b);
+    const state = directions === 0 ? " pending" : directions === 1 ? " partial" : "";
+    if (!cuts.has(key(a, b))) return `<line class="kd2872-edge${tone(owner[a])}${state}${focused ? " focused" : ""}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"/>`;
     const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
     const length = Math.hypot(to.x - from.x, to.y - from.y), dx = (to.x - from.x) / length * 14, dy = (to.y - from.y) / length * 14;
     return `<g class="kd2872-cut"><path d="M${from.x},${from.y} L${mx - dx},${my - dy} M${mx + dx},${my + dy} L${to.x},${to.y}"/><text x="${mx}" y="${my + 5}" aria-label="${esc(t("Cạnh đã cắt", "Removed edge"))}">✂</text></g>`;
@@ -43,9 +48,10 @@ function renderKDivisibleComponents2872View(step) {
   const nodes = position.map((p, node) => {
     const active = node === v.activeNode && !step.final;
     const group = v.closedGroups.find(group => group.root === node);
-    return `<g class="kd2872-node${tone(owner[node])}${active ? " active" : ""}${processed.has(node) ? " processed" : ""}${owner[node] >= 0 ? " closed" : ""}" role="img" aria-label="${esc(`${t("Nút", "Node")} ${node}: ${v.values[node]}${owner[node] >= 0 ? `, C${owner[node] + 1}` : ""}`)}"><title>#${node} · ${v.values[node]}</title><circle cx="${p.x}" cy="${p.y}" r="25"/><text class="kd2872-value" x="${p.x}" y="${p.y + 5}">${esc(shortNumber(v.values[node]))}</text><text class="kd2872-id" x="${p.x}" y="${p.y - 32}">#${node}</text>${group ? `<text class="kd2872-node-status" x="${p.x}" y="${p.y + 43}">✓ C${group.id + 1}</text>` : processed.has(node) && owner[node] < 0 ? `<text class="kd2872-node-status" x="${p.x}" y="${p.y + 43}">↑${esc(shortNumber(v.contribution[node]))}</text>` : ""}</g>`;
+    const status = group ? `✓ C${group.id + 1}` : processed.has(node) && owner[node] < 0 ? `↑${shortNumber(v.contribution[node])}` : v.stage === "dfs" ? queued.has(node) ? "stack" : visited.has(node) ? "✓ order" : "" : "";
+    return `<g class="kd2872-node${tone(owner[node])}${queued.has(node) && v.stage === "dfs" ? " queued" : ""}${active ? " active" : ""}${processed.has(node) ? " processed" : ""}${owner[node] >= 0 ? " closed" : ""}" role="img" aria-label="${esc(`${t("Nút", "Node")} ${node}: ${v.values[node]}${owner[node] >= 0 ? `, C${owner[node] + 1}` : ""}`)}"><title>#${node} · ${v.values[node]}</title><circle cx="${p.x}" cy="${p.y}" r="25"/><text class="kd2872-value" x="${p.x}" y="${p.y + 5}">${esc(shortNumber(v.values[node]))}</text><text class="kd2872-id" x="${p.x}" y="${p.y - 32}">#${node}</text>${status ? `<text class="kd2872-node-status" x="${p.x}" y="${p.y + 43}">${esc(status)}</text>` : ""}</g>`;
   }).join("");
-  const activeSum = v.activeNode === null ? null : v.subtotal[v.activeNode];
+  const activeSum = v.activeSum;
   const remainder = activeSum === null ? null : activeSum % v.k;
   function bucket(filled, full) {
     const small = v.k <= 12;
@@ -58,8 +64,9 @@ function renderKDivisibleComponents2872View(step) {
     const quotient = Math.floor(activeSum / v.k);
     const buckets = Array.from({ length: Math.min(quotient, 3) }, () => bucket(v.k, true)).join("");
     const math = v.transfer ? `${v.transfer.before} + ${v.transfer.amount} = ${v.transfer.after}` : `${activeSum} mod ${v.k} = ${remainder}`;
-    const action = v.phase === "merge" ? (v.transfer.amount === 0 ? "✂ +0" : `↑ +${v.transfer.amount}`) : remainder === 0 ? (v.parent[v.activeNode] === -1 ? "✓" : "✂") : `↑ ${activeSum}`;
-    work = `<div class="kd2872-work${remainder === 0 ? " divisible" : ""}"><div class="kd2872-math"><span>#${v.activeNode} · Σ ${activeSum}</span><strong>${esc(math)}</strong><b aria-label="${esc(remainder === 0 ? t("Chia hết", "Divisible") : t("Chuyển lên cha", "Send upward"))}">${esc(action)}</b></div><div class="kd2872-buckets">${buckets}${quotient > 3 ? `<span class="kd2872-more">… ${quotient} × ${v.k}</span>` : ""}${remainder > 0 ? bucket(remainder, false) : ""}</div></div>`;
+    const actions = { merge: `+${v.transfer?.amount ?? 0}`, check: v.condition ? "True ✓" : "False", count: "components +1", cut: "✂ → 0", close: "✓ → 0", carry: `↑ ${activeSum}` };
+    const action = actions[v.phase] || "…";
+    work = `<div class="kd2872-work${remainder === 0 ? " divisible" : ""}"><div class="kd2872-math"><span>#${v.activeNode} · Σ ${activeSum}</span><strong>${esc(math)}</strong><b>${esc(action)}</b></div><div class="kd2872-buckets">${buckets}${quotient > 3 ? `<span class="kd2872-more">… ${quotient} × ${v.k}</span>` : ""}${remainder > 0 ? bucket(remainder, false) : ""}</div></div>`;
   }
   const memberDots = group => `<div class="kd2872-member-dots">${group.members.slice(0, 12).map(node => `<span title="#${node}: ${v.values[node]}">${esc(shortNumber(v.values[node]))}</span>`).join("")}${group.members.length > 12 ? `<small>+${group.members.length - 12}</small>` : ""}</div>`;
   function componentPicture(group) {
@@ -77,13 +84,29 @@ function renderKDivisibleComponents2872View(step) {
   const shownGroups = v.closedGroups.slice(-8);
   const components = shownGroups.map(group => `<div class="kd2872-component${tone(group.id)}"><header><strong>C${group.id + 1}</strong><span>✓ Σ ${group.sum}</span></header>${group.members.length <= 12 ? componentPicture(group) : memberDots(group)}<small>${group.sum} = ${group.sum / v.k} × ${v.k}</small></div>`).join("");
   const focusNode = v.activeNode ?? 0;
-  const orderStart = Math.max(0, Math.min(v.postorder.indexOf(focusNode) - 8, v.n - 18));
+  function sequence(label, items, stack = false) {
+    if (!items) return "";
+    const start = Math.max(0, Math.min(stack ? items.length - 18 : items.indexOf(focusNode) - 8, items.length - 18));
+    return `<div class="kd2872-sequence"><code>${label}</code><div class="kd2872-order">${start > 0 ? `<span>… ${start}</span>` : ""}${items.length ? items.slice(start, start + 18).map((node, index) => `<span class="${stack && start + index === items.length - 1 ? "top" : node === v.activeNode && !step.final ? "active" : processed.has(node) ? "done" : ""}">#${node}${stack && start + index === items.length - 1 ? " ← top" : ""}</span>`).join("") : "<span>∅</span>"}${items.length > start + 18 ? `<span>… +${items.length - start - 18}</span>` : ""}</div></div>`;
+  }
+  function indexedArray(label, items, changed) {
+    if (!items) return "";
+    const start = Math.max(0, Math.min((changed ?? focusNode) - 5, items.length - 12));
+    return `<div class="kd2872-sequence kd2872-indexed"><code>${label}</code><div>${start ? "<small>…</small>" : ""}${items.slice(start, start + 12).map((value, offset) => `<span class="${start + offset === changed ? "changed" : ""}"><small>#${start + offset}</small><b>${esc(Array.isArray(value) ? `[${value.join(",")}]` : value)}</b></span>`).join("")}${items.length > start + 12 ? "<small>…</small>" : ""}</div></div>`;
+  }
+  const array = v.stage === "graph" ? indexedArray("graph", v.graph, v.source.line === 9 ? v.locals.u : v.source.line === 10 ? v.locals.v : null)
+    : v.stage === "dfs" ? indexedArray("parent", v.traversalParent, v.source.line === 13 ? 0 : v.source.line === 21 ? v.locals.neighbor : null) : "";
+  const condition = v.condition === null ? "" : `<b class="kd2872-condition ${v.condition ? "true" : "false"}">${v.exhausted ? t("Hết vòng lặp", "Loop exhausted") : String(v.condition ? "True" : "False")}</b>`;
+  const cursor = Object.entries(v.cursor).map(([name, value]) => `<span><code>${esc(name)}</code> = <b>${esc(value)}</b></span>`).join("");
   $("treeView").innerHTML = `<section class="kd2872-viz" aria-label="${esc(t("Cộng tổng từ lá; cắt phần chia hết cho k", "Accumulate from the leaves and separate components divisible by k"))}">
+    <div class="kd2872-debugger"><div><strong>${t("Đã chạy dòng", "Executed line")} ${v.source.line}</strong>${condition}<small>→ ${v.nextLine === null ? t("Trả kết quả", "Returned") : `${t("Tiếp", "Next")} L${v.nextLine}`}</small></div><code>${esc(v.source.text.trim())}</code><small>${t("Biến bên dưới là giá trị sau dòng này", "Variables show their values after this line")}</small></div>
     <div class="kd2872-heading"><span>🍃 ↑ 🌳</span><span>k = <b>${v.k}</b></span><strong>🌳 ${v.components} ${t("nhóm", v.components === 1 ? "group" : "groups")}</strong></div>
     <small class="kd2872-caption kd2872-legend">● values[node] · ↑ contribution · ✂ ${t("cắt", "cut")}</small>
-    <div class="kd2872-order" aria-label="${esc(t("Thứ tự từ lá lên", "Bottom-up processing order"))}">${orderStart > 0 ? `<span>… ${orderStart}</span>` : ""}${v.postorder.slice(orderStart, orderStart + 18).map(node => `<span class="${node === v.activeNode && !step.final ? "active" : processed.has(node) ? "done" : ""}">#${node}${processed.has(node) ? " ✓" : ""}</span>`).join("")}${v.n > orderStart + 18 ? `<span>… +${v.n - orderStart - 18}</span>` : ""}</div>
+    ${cursor ? `<div class="kd2872-cursor">${cursor}</div>` : ""}
+    ${v.stage === "dfs" ? sequence("stack", v.stack, true) + sequence("order", v.order) : v.stage === "postorder" || v.stage === "done" ? sequence("reversed(order)", v.postorder) : ""}
+    ${array}
     <div class="kd2872-canvas"><svg class="kd2872-tree" viewBox="0 0 ${width} ${height}" style="width:${width}px;height:${height}px" role="img" aria-label="${esc(t("Số trong nút là giá trị; mũi tên là tổng chuyển lên; kéo là cạnh cắt", "Circles show values, arrows carry totals, and scissors mark removed edges"))}"><defs><marker id="kd2872-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z"/></marker></defs>${lines}${flow}${nodes}</svg></div>
-    ${step.final ? "" : work}
+    ${step.final || v.stage === "graph" || v.stage === "dfs" ? "" : work}
     <div class="kd2872-groups">${components || `<div class="kd2872-no-groups" aria-label="${esc(t("Chưa tách nhóm nào", "No components separated yet"))}">✂ → 🌳 🌳</div>`}</div>
     ${v.closedGroups.length > shownGroups.length ? `<small class="kd2872-caption">+${v.closedGroups.length - shownGroups.length} ${t("nhóm khác", "other groups")}</small>` : ""}
     ${v.traceTruncated ? `<small class="kd2872-caption">${t("Đã rút gọn bước · vẫn tính đủ toàn bộ cây", "Condensed steps · the entire tree was computed")}</small>` : ""}
