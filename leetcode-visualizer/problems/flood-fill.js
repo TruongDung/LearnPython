@@ -1878,7 +1878,9 @@ function buildSteps1568(input) {
       },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      vars: [],
+      // Keep the map picture-first, while preserving the algorithm state in
+      // the shared Variables panel below it (r/c, stack, count, and checks).
+      vars: o.vars || [],
       note: compact.note,
     });
   }

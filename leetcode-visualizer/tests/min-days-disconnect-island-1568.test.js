@@ -38,7 +38,7 @@ test("1568 uses an illustrative bridge input and still returns the correct 0/1/2
     assert.equal(run.answer, answer);
     assert.ok(run.steps.length > 0);
     assert.ok(run.steps.every((step) => step.disconnect1568View));
-    assert.ok(run.steps.every((step) => step.vars.length === 0));
+    assert.ok(run.steps.some((step) => step.vars.some((variable) => variable.name === "count")));
     assert.equal(run.steps.at(-1).disconnect1568View.answer, answer);
   }
 
