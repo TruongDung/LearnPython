@@ -9,7 +9,7 @@ const SOURCE = [
   "        for i in range(n):",
   "            same = False",
   "            for rep in reps:",
-  "                same = categoryHandler.haveTheSameCategory(i, rep)",
+  "                same = categoryHandler.haveSameCategory(i, rep)",
   "                if same:",
   "                    break",
   "            if not same:",
@@ -28,7 +28,7 @@ function parseCategories(input) {
 function buildSteps(input) {
   const categories = parseCategories(input);
   // The solver can only ask this oracle; category labels never enter its state.
-  const haveTheSameCategory = (left, right) => categories[left] === categories[right];
+  const haveSameCategory = (left, right) => categories[left] === categories[right];
   const n = categories.length, detailed = n <= 18;
   const reps = [], groups = [], owners = Array(n).fill(-1), steps = [];
   let i = null, rep = null, same = null, count = null, feedback = null, calls = 0, processed = 0;
@@ -73,7 +73,7 @@ function buildSteps(input) {
     for (const representative of reps) {
       rep = representative; feedback = null;
       emit(7, "ask");
-      same = haveTheSameCategory(i, rep); feedback = same; calls++;
+      same = haveSameCategory(i, rep); feedback = same; calls++;
       emit(8, "reply");
       emit(9, "reply");
       if (same) {
@@ -102,7 +102,7 @@ module.exports = { 2782: {
   tags: [{ key: "interactive", vi: "Tương tác", en: "Interactive" }, { key: "array", vi: "Mảng", en: "Array" }],
   title: bi("Number of Unique Categories", "Number of Unique Categories"),
   titleVi: bi("Đếm nhóm bằng cách hỏi từng cặp", "Discover groups by comparing pairs"),
-  statement: bi("Mỗi phần tử thuộc một nhóm bí mật. Chỉ được hỏi haveTheSameCategory(i, rep). Tìm số nhóm khác nhau; nhãn nhập vào chỉ dùng để mô phỏng API.", "Each item has a hidden category. Ask only haveTheSameCategory(i, rep) and count distinct categories. Input labels configure the simulated API."),
+  statement: bi("Mỗi phần tử thuộc một nhóm bí mật. Chỉ được hỏi haveSameCategory(i, rep). Tìm số nhóm khác nhau; nhãn nhập vào chỉ dùng để mô phỏng API.", "Each item has a hidden category. Ask only haveSameCategory(i, rep) and count distinct categories. Input labels configure the simulated API."),
   defaultInput: [1, 2, 1, 3, 2, 3], inputKind: "array",
   inputLabel: bi("categoryHandler · nhãn giả lập (1–100 phần tử)", "categoryHandler · simulation labels (1–100 items)"),
   approach: [

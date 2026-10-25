@@ -59,7 +59,7 @@ class CategoryHandler:
             raise ValueError("CategoryHandler requires 1..100 integer labels.")
         self._categories = tuple(categories)
 
-    def haveTheSameCategory(self, left, right):
+    def haveSameCategory(self, left, right):
         if any(type(index) is not int or not 0 <= index < len(self._categories) for index in (left, right)):
             raise ValueError("CategoryHandler indices must be in [0, n).")
         return self._categories[left] == self._categories[right]

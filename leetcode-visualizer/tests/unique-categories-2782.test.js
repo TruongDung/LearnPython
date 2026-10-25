@@ -109,8 +109,8 @@ for case in payload['cases']:
     assert result['trace']
     results.append(result['result'])
 assert '8123' not in repr(CategoryHandler([8123, 4567]))
-assert CategoryHandler([1, 2, 1]).haveTheSameCategory(0, 2)
-assert not CategoryHandler([1, 2, 1]).haveTheSameCategory(0, 1)
+assert CategoryHandler([1, 2, 1]).haveSameCategory(0, 2)
+assert not CategoryHandler([1, 2, 1]).haveSameCategory(0, 1)
 ordinary = __viz_run_trace('class Solution:\\n    def twice(self, n):\\n        return n * 2', 'twice', [4])
 assert ordinary['result'] == 8
 guess = __viz_run_trace('class Solution:\\n    def probe(self, n):\\n        return guess(n)', 'probe', [6], None, {'type':'guess-number', 'n':10, 'pick':6})
@@ -120,6 +120,26 @@ print(json.dumps(results))
   const run = spawnSync(process.env.PYTHON || (process.platform === "win32" ? "python" : "python3"), ["-c", program], { input: JSON.stringify(payload), encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
   assert.deepEqual(JSON.parse(run.stdout), cases.map(input => new Set(input).size));
+});
+
+test("2782 copied code works with an independent haveSameCategory-only handler", () => {
+  // Keep this fixture independent of the visualizer's helper, so a shared
+  // typo in both the solution and the simulator cannot make the test pass.
+  const program = problem.code.join("\n") + `
+import json, sys
+class LeetCodeHandler:
+    __slots__ = ('__labels',)
+    def __init__(self, labels):
+        self.__labels = labels
+    def haveSameCategory(self, a, b):
+        return self.__labels[a] == self.__labels[b]
+inputs = json.load(sys.stdin)
+print(json.dumps([Solution().numberOfCategories(len(labels), LeetCodeHandler(labels)) for labels in inputs]))
+`;
+  const run = spawnSync(process.env.PYTHON || (process.platform === "win32" ? "python" : "python3"), ["-c", program], { input: JSON.stringify(cases), encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(JSON.parse(run.stdout), cases.map(input => new Set(input).size));
+  assert.match(problem.code.join("\n"), /categoryHandler\.haveSameCategory\(/);
 });
 
 test("2782 is registered with dedicated lazy assets and a renderer", () => {

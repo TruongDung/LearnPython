@@ -25,7 +25,7 @@ function renderUniqueCategories2782View(step) {
     ? `<div class="uc2782-complete" aria-live="polite"><span aria-hidden="true">${shapes.slice(0, Math.min(6, view.groups.length)).join(" ")}</span><strong>${view.count}</strong><small>${t("nhóm khác nhau", "distinct categories")}</small></div>`
     : `<div class="uc2782-comparison is-${outcome}" aria-label="${esc(labels[outcome])}">
         ${view.i === null ? `<div class="uc2782-ghost" aria-hidden="true">?</div>` : tile(view.i, "i")}
-        <div class="uc2782-oracle"><small>haveTheSameCategory</small><div class="uc2782-link" aria-hidden="true"><i></i><b>${result}</b><i></i></div><span aria-live="polite">${labels[outcome]}</span></div>
+        <div class="uc2782-oracle"><small>haveSameCategory</small><div class="uc2782-link" aria-hidden="true"><i></i><b>${result}</b><i></i></div><span aria-live="polite">${labels[outcome]}</span></div>
         ${view.rep === null || outcome === "new" ? `<div class="uc2782-ghost" aria-hidden="true">${outcome === "new" ? "+" : "?"}</div>` : tile(view.rep, "rep")}
       </div>`;
   const activeGroup = view.i === null ? -1 : view.owners[view.i];
