@@ -1785,7 +1785,8 @@ function buildSteps1905v2(input) {
 function buildSteps1568(input) {
   const { valid, grid } = parseBinary(input, false);
   const steps = [];
-  // Keep every watch in the same position, including before it is assigned.
+  // Keep the essential watches in fixed positions throughout the trace.
+  const visibleVariableNames = ["r", "c", "count", "stack", "cr, cc", "removed cell", "disconnects?", "answer"];
   const variableValues = {
     rows: valid ? grid.length : "—",
     cols: valid ? grid[0].length : "—",
@@ -1810,7 +1811,7 @@ function buildSteps1568(input) {
     "disconnects?": "—",
     answer: "—",
   };
-  const snapshotVariables = () => Object.entries(variableValues).map(([name, value]) => ({ name, value }));
+  const snapshotVariables = () => visibleVariableNames.map(name => ({ name, value: variableValues[name] }));
   if (!valid) {
     variableValues.answer = 0;
     steps.push({
