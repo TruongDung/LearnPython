@@ -67,3 +67,31 @@ test("1568 renders a picture-first cut-and-split map", () => {
   assert.match(css, /\.ci1568-cell\.component-2/);
   assert.match(css, /#vizPanel:has\(\.ci1568-viz\) #stepNote/);
 });
+
+test("1568 keeps the same watches visible for every frame and snapshots their changing values", () => {
+  const names = problem.builder(problem.defaultInput).steps[0].vars.map(variable => variable.name);
+  for (const name of ["rows", "cols", "count", "r", "c", "stack", "cr, cc", "dr, dc", "nr, nc", "removed cell", "disconnects?", "answer"]) {
+    assert.ok(names.includes(name), `${name} must be visible before it is assigned`);
+  }
+  for (const input of [problem.defaultInput, "000|000", "10|00", "0110|0110|0000", "invalid"]) {
+    const run = problem.builder(input);
+    for (const step of run.steps) assert.deepEqual(step.vars.map(variable => variable.name), names);
+    assert.equal(run.steps.at(-1).vars.find(variable => variable.name === "answer").value, run.answer);
+  }
+
+  const steps = problem.builder(problem.defaultInput).steps;
+  const values = step => Object.fromEntries(step.vars.map(variable => [variable.name, variable.value]));
+  assert.equal(values(steps[0]).count, "—");
+  assert.equal(values(steps.find(step => step.codeLines[0] === 14)).count, 0);
+  const seedIndex = steps.findIndex(step => step.codeLines[0] === 7);
+  assert.equal(values(steps[seedIndex]).stack, "[(0,0)]");
+  assert.equal(values(steps[seedIndex + 2]).stack, "[]");
+  const restore = steps.find(step => step.codeLines[0] === 29);
+  assert.equal(values(restore)["removed cell"], "—");
+  assert.equal(values(restore)["g[r][c]"], 1);
+  assert.equal(values(steps.at(-1))["count_islands after removal"], 2);
+  assert.equal(values(steps.at(-1))["disconnects?"], true);
+  assert.equal(values(steps.at(-1))["r"], 0);
+  assert.equal(values(steps.at(-1))["c"], 1);
+  assert.equal(values(steps.at(-1))["visited[r][c]"], "—");
+});

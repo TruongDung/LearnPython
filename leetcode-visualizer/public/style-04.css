@@ -6580,16 +6580,44 @@ body:has(.rp1786-viz) #stepNote { display: none; }
 .ci1568-viz.is-split .ci1568-answer { border-color: rgba(244, 63, 94, 0.68); background: rgba(244, 63, 94, 0.1); color: #fecdd3; }
 
 #vizPanel:has(.ci1568-viz) #stepNote { display: none; }
+#vizPanel.ci1568-daylight {
+  color-scheme: light;
+  color: #1e293b;
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+#vizPanel.ci1568-daylight #bfsGridView {
+  color: #1e293b;
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+#vizPanel.ci1568-daylight #varsPanel.vars-panel {
+  display: block;
+  max-height: none;
+  overflow: visible;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+#vizPanel.ci1568-daylight #varsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+#vizPanel.ci1568-daylight .var-item { align-content: center; min-height: 42px; }
+#vizPanel.ci1568-daylight .var-name { color: #4338ca; }
 [data-theme="light"] .ci1568-viz { color: #1e293b; }
 [data-theme="light"] .ci1568-phases > span { color: #64748b; background: #f8fafc; }
 [data-theme="light"] .ci1568-phases > span.is-active { color: #92400e; background: #fffbeb; }
 [data-theme="light"] .ci1568-phases > span.is-done { color: #047857; }
 [data-theme="light"] .ci1568-cell.is-water { background: linear-gradient(145deg, #cffafe, #dbeafe); }
+[data-theme="light"] .ci1568-cell.is-water .ci1568-mark::before,
+[data-theme="light"] .ci1568-cell.is-water .ci1568-mark::after { border-color: #0284c7; }
 [data-theme="light"] .ci1568-cell.is-land,
 [data-theme="light"] .ci1568-cell.is-fragment { background: linear-gradient(145deg, #dcfce7, #bbf7d0); }
 [data-theme="light"] .ci1568-cell.component-2 { background: linear-gradient(145deg, #ede9fe, #ddd6fe); }
 [data-theme="light"] .ci1568-cell.component-3 { background: linear-gradient(145deg, #fef3c7, #fde68a); }
 [data-theme="light"] .ci1568-cell.is-removed { background: #fff1f2; }
+[data-theme="light"] .ci1568-cell.is-removed .ci1568-mark::before,
+[data-theme="light"] .ci1568-cell.is-removed .ci1568-mark::after { background: #e11d48; box-shadow: none; }
 [data-theme="light"] .ci1568-answer { color: #92400e; }
 [data-theme="light"] .ci1568-viz.is-split .ci1568-answer { color: #be123c; }
 

@@ -1691,6 +1691,9 @@ function renderStep() {
   if (!step) return;
 
   const panel = $("vizPanel");
+  panel.classList.toggle("ci1568-daylight", Boolean(step.disconnect1568View));
+  if (step.disconnect1568View) panel.dataset.theme = "light";
+  else delete panel.dataset.theme;
   const preserveViewport = Boolean(step.prefixSuffix745View || step.prefixSuffix745TrieView || step.multiSlotPodiumView);
   const viewport = { left: window.scrollX, top: window.scrollY };
   panel.classList.toggle("ps745-stable-viewport", Boolean(step.prefixSuffix745View || step.prefixSuffix745TrieView));

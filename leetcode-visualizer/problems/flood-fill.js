@@ -1785,11 +1785,38 @@ function buildSteps1905v2(input) {
 function buildSteps1568(input) {
   const { valid, grid } = parseBinary(input, false);
   const steps = [];
+  // Keep every watch in the same position, including before it is assigned.
+  const variableValues = {
+    rows: valid ? grid.length : "—",
+    cols: valid ? grid[0].length : "—",
+    "rows,cols": valid ? `${grid.length},${grid[0].length}` : "—",
+    count: "—",
+    r: "—",
+    c: "—",
+    "g[r][c]": "—",
+    "visited[r][c]": "—",
+    "is new land?": "—",
+    stack: "—",
+    "cr, cc": "—",
+    "dr, dc": "—",
+    "nr, nc": "—",
+    "in bounds?": "—",
+    "g[nr][nc]": "—",
+    "can visit?": "—",
+    "count_islands(grid)": "—",
+    "is land?": "—",
+    "removed cell": "—",
+    "count_islands after removal": "—",
+    "disconnects?": "—",
+    answer: "—",
+  };
+  const snapshotVariables = () => Object.entries(variableValues).map(([name, value]) => ({ name, value }));
   if (!valid) {
+    variableValues.answer = 0;
     steps.push({
       title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
       arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
-      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      final: true, codeLines: [3], vars: snapshotVariables(),
       note: { vi: "Grid phải gồm 0/1. Ví dụ: 0110|0110|0000.", en: "Grid must contain 0/1. Example: 0110|0110|0000." },
     });
     return { original: [], answer: 0, steps };
@@ -1847,6 +1874,10 @@ function buildSteps1568(input) {
   }
 
   function snap(o) {
+    for (const variable of o.vars || []) variableValues[variable.name] = variable.value;
+    if (o.visited && Number.isInteger(variableValues.r) && Number.isInteger(variableValues.c)) {
+      variableValues["visited[r][c]"] = o.visited[variableValues.r][variableValues.c];
+    }
     const removed = o.removed || null;
     const components = findComponents(removed);
     const cells = makeCells(o.visited || null, o.cur || null, removed, components);
@@ -1878,9 +1909,7 @@ function buildSteps1568(input) {
       },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      // Keep the map picture-first, while preserving the algorithm state in
-      // the shared Variables panel below it (r/c, stack, count, and checks).
-      vars: o.vars || [],
+      vars: snapshotVariables(),
       note: compact.note,
     });
   }
@@ -1890,6 +1919,9 @@ function buildSteps1568(input) {
   // contextLabel + removedCell let the viewer see WHICH call this is.
   function countIslands(contextLabel, removedCell) {
     const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+    for (const name of ["count", "r", "c", "g[r][c]", "visited[r][c]", "is new land?", "stack", "cr, cc", "dr, dc", "nr, nc", "in bounds?", "g[nr][nc]", "can visit?"]) {
+      variableValues[name] = "—";
+    }
 
     snap({
       title: { vi: `${contextLabel} — line 5: visited = ma trận False`, en: `${contextLabel} — line 5: visited = all-False grid` },
@@ -1914,7 +1946,8 @@ function buildSteps1568(input) {
       for (let c = 0; c < cols; c++) {
         snap({
           title: { vi: `${contextLabel} — line 16: for c in range(cols) → c = ${c}`, en: `${contextLabel} — line 16: for c in range(cols) → c = ${c}` },
-          removed: removedCell, visited, cur: [r, c], codeLines: [16], vars: [{ name: "c", value: c }, { name: "count", value: count }],
+          removed: removedCell, visited, cur: [r, c], codeLines: [16],
+          vars: [{ name: "r", value: r }, { name: "c", value: c }, { name: "count", value: count }, { name: "g[r][c]", value: work[r][c] }, { name: "visited[r][c]", value: visited[r][c] }, { name: "is new land?", value: "—" }],
           note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
         });
         const isNewLand = work[r][c] === 1 && !visited[r][c];
@@ -1941,10 +1974,11 @@ function buildSteps1568(input) {
         callStack.push(`dfs(${r},${c})`);
         const stack = [[r, c]];
         visited[r][c] = true;
+        for (const name of ["cr, cc", "dr, dc", "nr, nc", "in bounds?", "g[nr][nc]", "can visit?"]) variableValues[name] = "—";
         snap({
           title: { vi: `dfs(${r},${c}) — line 7: stack=[(${r},${c})]; visited[${r}][${c}]=True`, en: `dfs(${r},${c}) — line 7: stack=[(${r},${c})]; visited[${r}][${c}]=True` },
           removed: removedCell, visited, cur: [r, c], codeLines: [7],
-          vars: [{ name: "stack", value: `[(${r},${c})]` }],
+          vars: [{ name: "stack", value: `[(${r},${c})]` }, { name: "visited[r][c]", value: true }],
           note: { vi: `Khởi tạo stack với ô gốc, đánh dấu đã thăm.`, en: `Seed the stack with the root cell, mark it visited.` },
         });
 
@@ -1960,7 +1994,7 @@ function buildSteps1568(input) {
           snap({
             title: { vi: `dfs(${r},${c}) — line 9: cr,cc = stack.pop() → (${cr},${cc})`, en: `dfs(${r},${c}) — line 9: cr,cc = stack.pop() → (${cr},${cc})` },
             removed: removedCell, visited, cur: [cr, cc], codeLines: [9],
-            vars: [{ name: "cr, cc", value: `${cr}, ${cc}` }],
+            vars: [{ name: "cr, cc", value: `${cr}, ${cc}` }, { name: "stack", value: `[${stack.map(([a, b]) => `(${a},${b})`).join(", ")}]` }],
             note: { vi: `Lấy (${cr},${cc}) khỏi đỉnh stack.`, en: `Pop (${cr},${cc}) off the top of the stack.` },
           });
           for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -1969,7 +2003,7 @@ function buildSteps1568(input) {
             snap({
               title: { vi: `dfs(${r},${c}) — line 10-11: dr,dc=(${dr},${dc}) → next=(${nr},${nc})`, en: `dfs(${r},${c}) — line 10-11: dr,dc=(${dr},${dc}) → next=(${nr},${nc})` },
               removed: removedCell, visited, cur: [cr, cc], codeLines: [10, 11],
-              vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }, { name: "nr, nc", value: `${nr}, ${nc}` }],
+              vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }, { name: "nr, nc", value: `${nr}, ${nc}` }, { name: "in bounds?", value: "—" }, { name: "g[nr][nc]", value: "—" }, { name: "can visit?", value: "—" }],
               note: { vi: `Xét hàng xóm (${nr},${nc}).`, en: `Check neighbor (${nr},${nc}).` },
             });
             const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
@@ -1997,7 +2031,7 @@ function buildSteps1568(input) {
         }
         snap({
           title: { vi: `dfs(${r},${c}) — line 8: while stack → False (rỗng)`, en: `dfs(${r},${c}) — line 8: while stack → False (empty)` },
-          removed: removedCell, visited, codeLines: [8], vars: [],
+          removed: removedCell, visited, codeLines: [8], vars: [{ name: "stack", value: "[]" }],
           note: { vi: `Đảo #${count} đã được tô hết. Quay lại vòng lặp chính.`, en: `Island #${count} fully flooded. Return to the main loop.` },
         });
         callStack.pop();
@@ -2033,7 +2067,7 @@ function buildSteps1568(input) {
   snap({
     title: { vi: `line 20: count_islands(grid) != 1 → ${initialCount !== 1}`, en: `line 20: count_islands(grid) != 1 → ${initialCount !== 1}` },
     codeLines: [20],
-    vars: [{ name: "count_islands(grid)", value: initialCount }],
+    vars: [{ name: "count_islands(grid)", value: initialCount }, { name: "r", value: "—" }, { name: "c", value: "—" }, { name: "g[r][c]", value: "—" }, { name: "visited[r][c]", value: "—" }, { name: "is new land?", value: "—" }],
     note: {
       vi: initialCount !== 1
         ? `Grid có ${initialCount} đảo (0 hoặc ≥2) → đã rời sẵn → line 21 return 0.`
@@ -2064,7 +2098,7 @@ function buildSteps1568(input) {
     for (let c = 0; c < cols; c++) {
       snap({
         title: { vi: `line 23: for c in range(cols) → c = ${c}`, en: `line 23: for c in range(cols) → c = ${c}` },
-        cur: [r, c], codeLines: [23], vars: [{ name: "c", value: c }],
+        cur: [r, c], codeLines: [23], vars: [{ name: "r", value: r }, { name: "c", value: c }, { name: "g[r][c]", value: work[r][c] }],
         note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
       });
       const isLand = work[r][c] === 1;
@@ -2078,10 +2112,12 @@ function buildSteps1568(input) {
       });
       if (!isLand) continue;
 
+      variableValues["count_islands after removal"] = "—";
+      variableValues["disconnects?"] = "—";
       work[r][c] = 0;
       snap({
         title: { vi: `line 25: grid[${r}][${c}] = 0 (thử xóa)`, en: `line 25: grid[${r}][${c}] = 0 (trial removal)` },
-        removed: [r, c], codeLines: [25], vars: [{ name: "removed cell", value: `(${r},${c})` }],
+        removed: [r, c], codeLines: [25], vars: [{ name: "removed cell", value: `(${r},${c})` }, { name: "g[r][c]", value: 0 }],
         note: { vi: `Tạm xóa (${r},${c}) để kiểm tra.`, en: `Temporarily remove (${r},${c}) to test.` },
       });
 
@@ -2090,7 +2126,7 @@ function buildSteps1568(input) {
       snap({
         title: { vi: `line 26: count_islands(grid) != 1 → ${disconnects} (count=${afterCount})`, en: `line 26: count_islands(grid) != 1 → ${disconnects} (count=${afterCount})` },
         removed: [r, c], codeLines: [26],
-        vars: [{ name: "count_islands after removal", value: afterCount }, { name: "disconnects?", value: disconnects }],
+        vars: [{ name: "r", value: r }, { name: "c", value: c }, { name: "g[r][c]", value: 0 }, { name: "visited[r][c]", value: "—" }, { name: "is new land?", value: "—" }, { name: "count_islands after removal", value: afterCount }, { name: "disconnects?", value: disconnects }],
         note: {
           vi: disconnects
             ? `Xóa (${r},${c}) làm số đảo = ${afterCount} (khác 1) → lưới bị RỜI chỉ với 1 ngày!`
@@ -2107,7 +2143,7 @@ function buildSteps1568(input) {
           title: { vi: "line 27-28: phục hồi ô rồi return 1", en: "line 27-28: restore cell then return 1" },
           removed: [r, c], final: true, codeLines: [27, 28],
           answer: 1,
-          vars: [{ name: "answer", value: 1 }],
+          vars: [{ name: "g[r][c]", value: 1 }, { name: "answer", value: 1 }],
           note: { vi: `Phục hồi grid[${r}][${c}]=1 (không sửa đổi grid đầu vào), trả về 1.`, en: `Restore grid[${r}][${c}]=1 (don't mutate the input), return 1.` },
         });
         return { original: grid, answer: 1, steps };
@@ -2115,7 +2151,7 @@ function buildSteps1568(input) {
       work[r][c] = 1;
       snap({
         title: { vi: `line 29: grid[${r}][${c}] = 1 (phục hồi)`, en: `line 29: grid[${r}][${c}] = 1 (restore)` },
-        cur: [r, c], codeLines: [29], vars: [],
+        cur: [r, c], codeLines: [29], vars: [{ name: "r", value: r }, { name: "c", value: c }, { name: "g[r][c]", value: 1 }, { name: "removed cell", value: "—" }],
         note: { vi: `Không đủ để rời lưới → phục hồi và thử ô tiếp theo.`, en: `Not enough to disconnect → restore and try the next cell.` },
       });
     }
