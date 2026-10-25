@@ -802,3 +802,26 @@ body.light .mbi2070-viz,
     transition: none;
   }
 }
+
+#vizPanel:has(.mbi2070-prefix-viz[data-approach="3"]) #codePanel {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  position: static;
+  transform: none;
+  white-space: pre-wrap;
+}
+
+#vizPanel:has(.mbi2070-prefix-viz[data-approach="3"]) .code-section,
+#vizPanel:has(.mbi2070-prefix-viz[data-approach="3"]) .code-line {
+  min-width: 0;
+  width: 100%;
+  white-space: pre-wrap;
+}
+
+#vizPanel:has(.mbi2070-prefix-viz[data-approach="3"]) .code-line .txt {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

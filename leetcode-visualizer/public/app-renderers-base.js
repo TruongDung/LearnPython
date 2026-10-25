@@ -970,6 +970,48 @@ function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
   el.style.textAlign = "center";
+  if (step.closedIsland1254View) {
+    el.classList.remove("distinct-islands-host", "sr130-host");
+    const view = step.closedIsland1254View;
+    const vi = lang === "vi";
+    const countPhase = view.phase === "count";
+    const phaseHtml = [
+      { icon: "🌊", label: vi ? "Tràn từ bờ" : "Flood from edge", active: !countPhase, done: countPhase },
+      { icon: "🏝️", label: vi ? "Đếm đảo kín" : "Count closed", active: countPhase, done: view.done },
+    ].map((phase) => `<span class="${phase.active ? "is-active" : ""} ${phase.done ? "is-done" : ""}"><b>${phase.icon}</b><small>${escapeHtml(phase.label)}</small></span>`).join("");
+    const cellIcons = { water: "🌊", flooded: "💧", land: "🌿", island: "🏝️" };
+    const cellsHtml = cells.map((row, r) => row.map((cell, c) => {
+      const kind = cell.kind || "water";
+      const name = {
+        water: vi ? "nước" : "water",
+        flooded: vi ? "đất nối bờ đã ngập" : "flooded edge land",
+        land: vi ? "đất chưa thăm" : "unvisited land",
+        island: vi ? `đảo kín ${cell.meta || ""}` : `closed island ${cell.meta || ""}`,
+      }[kind];
+      const classes = ["ci1254-cell", `is-${kind}`];
+      if (cell.isBorder) classes.push("is-edge");
+      if (cell.isCurrent) classes.push("is-current");
+      return `<div class="${classes.join(" ")}" aria-label="${escapeXml(`${name}, ${r},${c}`)}" title="${escapeXml(`${name} (${r}, ${c})`)}">
+        <span class="ci1254-icon">${cellIcons[kind]}</span>
+        ${cell.meta ? `<small>${escapeXml(cell.meta)}</small>` : ""}
+        ${cell.isCurrent ? `<b class="ci1254-current-tag">DFS</b>` : ""}
+      </div>`;
+    }).join("")).join("");
+    el.innerHTML = `<section class="ci1254-viz" role="img" aria-label="${vi ? "Đất chạm bờ bị ngập, các đảo kín được đếm" : "Flood edge-connected land, then count closed islands"}">
+      <div class="ci1254-phases">${phaseHtml}</div>
+      <div class="ci1254-board-scroll"><div class="ci1254-board" style="--ci-cols:${cols}">${cellsHtml}</div></div>
+      <div class="ci1254-footer">
+        <div class="ci1254-legend">
+          <span><i class="is-land">🌿</i>${vi ? "đất" : "land"}</span>
+          <span><i class="is-water">🌊</i>${vi ? "nước" : "water"}</span>
+          <span><i class="is-flooded">💧</i>${vi ? "đất chạm bờ" : "edge land"}</span>
+          <span><i class="is-island">🏝️</i>${vi ? "đảo kín" : "closed island"}</span>
+        </div>
+        <div class="ci1254-count"><span>🏝️</span><strong>${view.count}</strong></div>
+      </div>
+    </section>`;
+    return;
+  }
   const isTicTacToe = variant === "tic-tac-toe";
   const isPhonePath = variant === "phone-path";
   const isEffortGrid = variant === "effort-grid";
