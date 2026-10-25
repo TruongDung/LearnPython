@@ -1230,14 +1230,19 @@ function buildSteps1254(input) {
     return grid.map((row, r) => row.map((orig, c) => {
       const live = String(work[r][c]);
       const isBorder = r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+      const kind = orig === "1"
+        ? "water"
+        : consumed[r][c]
+          ? islandId[r][c] ? "island" : "flooded"
+          : "land";
       let cls = orig === "1" ? "wall" : isBorder ? "queued" : "empty";
       let meta = "";
       if (consumed[r][c]) {
-        cls = work[r][c] === 1 ? "wall" : "visited";
+        cls = islandId[r][c] ? "visited" : "filled";
         meta = islandId[r][c] ? `#${islandId[r][c]}` : "";
       }
       if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      return { label: live, meta, cls };
+      return { label: live, meta, cls, kind, isBorder, isCurrent: Boolean(cur && cur[0] === r && cur[1] === c) };
     }));
   }
 
@@ -1245,6 +1250,11 @@ function buildSteps1254(input) {
     steps.push({
       title: o.title, arr: [], codeBlock: 1,
       bfsGrid: { rows, cols, cells: makeCells(o.cur || null) },
+      closedIsland1254View: {
+        phase: (o.codeLines || []).some((line) => line >= 20) || o.final ? "count" : "flood",
+        count: closedCount,
+        done: Boolean(o.final),
+      },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
       vars: [
