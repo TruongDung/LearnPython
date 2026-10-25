@@ -970,6 +970,47 @@ function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
   el.style.textAlign = "center";
+  if (step.disconnect1568View) {
+    el.classList.remove("distinct-islands-host", "sr130-host");
+    const view = step.disconnect1568View;
+    const vi = lang === "vi";
+    const phaseHtml = [
+      { icon: "🏝", label: vi ? "Đếm các mảng đất" : "Count land groups", active: view.phase === "count", done: view.phase !== "count" },
+      { icon: "✂", label: vi ? "Gỡ thử một ô đất" : "Try removing one land cell", active: view.phase === "pick" || view.phase === "trial", done: view.phase === "result" },
+      { icon: "⌁", label: vi ? "Kiểm tra đảo đã tách" : "Check whether the island splits", active: view.phase === "result", done: view.phase === "result" },
+    ].map((phase) => `<span class="${phase.active ? "is-active" : ""} ${phase.done ? "is-done" : ""}" title="${escapeXml(phase.label)}" aria-label="${escapeXml(phase.label)}"><b aria-hidden="true">${phase.icon}</b></span>`).join("");
+    const cellsHtml = view.cells.map((row, r) => row.map((cell, c) => {
+      const kind = cell.kind || "water";
+      const name = {
+        water: vi ? "nước" : "water",
+        land: vi ? "đất" : "land",
+        fragment: vi ? `mảnh đảo ${cell.component}` : `island fragment ${cell.component}`,
+        removed: vi ? "ô đất đang gỡ" : "land cell being removed",
+      }[kind];
+      const classes = ["ci1568-cell", `is-${kind}`];
+      if (cell.component) classes.push(`component-${Math.min(cell.component, 3)}`);
+      if (cell.isVisited) classes.push("is-seen");
+      if (cell.isCurrent) classes.push("is-current");
+      return `<div class="${classes.join(" ")}" aria-label="${escapeXml(`${name}, ${r},${c}`)}" title="${escapeXml(`${name} (${r}, ${c})`)}">
+        <i class="ci1568-mark" aria-hidden="true"></i>
+        ${cell.isCurrent ? `<b class="ci1568-current" aria-hidden="true">✦</b>` : ""}
+      </div>`;
+    }).join("")).join("");
+    const visibleComponents = Array.from({ length: Math.min(view.componentCount, 3) }, (_, index) => `<i class="component-${index + 1}"></i>`).join("");
+    const answerIcon = view.answer === 0 ? "⌀" : view.answer === 1 ? "✂" : "✂✂";
+    const answerLabel = view.answer === null
+      ? (vi ? `${view.componentCount} mảnh đất` : `${view.componentCount} land group${view.componentCount === 1 ? "" : "s"}`)
+      : (vi ? `${view.answer} ngày` : `${view.answer} day${view.answer === 1 ? "" : "s"}`);
+    el.innerHTML = `<section class="ci1568-viz is-${view.phase}${view.isDisconnected ? " is-split" : ""}" role="img" aria-label="${vi ? "Bản đồ đảo: thử gỡ từng ô để tìm điểm làm đảo tách rời" : "Island map: remove one cell at a time to find a split point"}">
+      <div class="ci1568-phases">${phaseHtml}</div>
+      <div class="ci1568-board-scroll"><div class="ci1568-scene"><div class="ci1568-ripples" aria-hidden="true"><i></i><i></i><i></i></div><div class="ci1568-board" style="--ci1568-cols:${view.cols}">${cellsHtml}</div></div></div>
+      <div class="ci1568-footer">
+        <div class="ci1568-components" title="${vi ? "Các mảnh đất hiện có" : "Current land groups"}" aria-label="${vi ? `${view.componentCount} mảnh đất` : `${view.componentCount} land groups`}">${visibleComponents}</div>
+        <div class="ci1568-answer" title="${escapeXml(answerLabel)}" aria-label="${escapeXml(answerLabel)}" aria-live="polite"><span aria-hidden="true">${answerIcon}</span>${view.answer !== null ? `<strong>${view.answer}</strong>` : ""}</div>
+      </div>
+    </section>`;
+    return;
+  }
   if (step.closedIsland1254View) {
     el.classList.remove("distinct-islands-host", "sr130-host");
     const view = step.closedIsland1254View;

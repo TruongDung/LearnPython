@@ -1801,28 +1801,85 @@ function buildSteps1568(input) {
   const callStack = [];
   const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
 
+  function findComponents(removedCell) {
+    const ids = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let count = 0;
+    const isRemoved = (r, c) => removedCell && removedCell[0] === r && removedCell[1] === c;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (work[r][c] !== 1 || isRemoved(r, c) || ids[r][c]) continue;
+        count += 1;
+        const stack = [[r, c]];
+        ids[r][c] = count;
+        while (stack.length) {
+          const [cr, cc] = stack.pop();
+          for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nr = cr + dr;
+            const nc = cc + dc;
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || work[nr][nc] !== 1 || isRemoved(nr, nc) || ids[nr][nc]) continue;
+            ids[nr][nc] = count;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+    }
+    return { ids, count };
+  }
+
   // Renders the live `work` grid, overlaying the current DFS `visited` set
-  // (if provided) and marking the trial-removed cell in a distinct color.
-  function makeCells(visited, cur, removedCell) {
+  // and showing the components produced by the trial removal as distinct shapes.
+  function makeCells(visited, cur, removedCell, components) {
     return work.map((row, r) => row.map((v, c) => {
+      const isRemoved = removedCell && removedCell[0] === r && removedCell[1] === c;
+      const component = components.ids[r][c];
       let cls = v === 0 ? "wall" : (visited && visited[r][c]) ? "visited" : "empty";
-      if (removedCell && removedCell[0] === r && removedCell[1] === c) cls = "queued";
+      if (isRemoved) cls = "queued";
       if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      return { label: String(v), cls };
+      return {
+        label: String(v),
+        cls,
+        kind: isRemoved ? "removed" : v === 0 ? "water" : component > 1 ? "fragment" : "land",
+        component,
+        isVisited: Boolean(visited && visited[r][c]),
+        isCurrent: Boolean(cur && cur[0] === r && cur[1] === c),
+      };
     }));
   }
 
   function snap(o) {
+    const removed = o.removed || null;
+    const components = findComponents(removed);
+    const cells = makeCells(o.visited || null, o.cur || null, removed, components);
+    const line = (o.codeLines || [])[0];
+    const at = o.cur ? `(${o.cur[0]}, ${o.cur[1]})` : "";
+    const compact = o.final
+      ? { title: tr(`🏁 ${o.answer} ngày`, `🏁 ${o.answer} day${o.answer === 1 ? "" : "s"}`), note: tr("", "") }
+      : removed && line === 26
+        ? { title: tr(components.count !== 1 ? "💥 Đảo đã tách" : "↩ Chưa tách", components.count !== 1 ? "💥 Island disconnected" : "↩ Still connected"), note: tr("", "") }
+        : removed
+          ? { title: tr("✂️ Thử gỡ ô đất", "✂️ Try removing land"), note: tr(`ô ${removed[0]}, ${removed[1]}`, `cell ${removed[0]}, ${removed[1]}`) }
+          : line === 3
+            ? { title: tr("🗺️ Bản đồ đảo", "🗺️ Island map"), note: tr("", "") }
+            : line <= 21
+              ? { title: tr("🔎 Đếm các mảng đất", "🔎 Count land groups"), note: tr(at, at) }
+              : { title: tr("⌕ Chọn ô đất", "⌕ Pick a land cell"), note: tr(at, at) };
     steps.push({
-      title: o.title, arr: [],
-      bfsGrid: { rows, cols, cells: makeCells(o.visited || null, o.cur || null, o.removed || null) },
+      title: compact.title, arr: [],
+      bfsGrid: { rows, cols, cells },
+      disconnect1568View: {
+        rows,
+        cols,
+        cells,
+        phase: o.final ? "result" : removed ? "trial" : line >= 22 ? "pick" : "count",
+        componentCount: components.count,
+        removed,
+        answer: o.answer ?? null,
+        isDisconnected: components.count !== 1,
+      },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      vars: [
-        ...(o.vars || []),
-        { name: "call stack", value: stackText() },
-      ],
-      note: o.note,
+      vars: [],
+      note: compact.note,
     });
   }
 
@@ -1988,6 +2045,7 @@ function buildSteps1568(input) {
     snap({
       title: { vi: "line 21: return 0", en: "line 21: return 0" },
       final: true, codeLines: [21],
+      answer: 0,
       vars: [{ name: "answer", value: 0 }],
       note: { vi: "Đã rời sẵn → 0 ngày.", en: "Already disconnected → 0 days." },
     });
@@ -2045,7 +2103,8 @@ function buildSteps1568(input) {
         work[r][c] = 1;
         snap({
           title: { vi: "line 27-28: phục hồi ô rồi return 1", en: "line 27-28: restore cell then return 1" },
-          final: true, codeLines: [27, 28],
+          removed: [r, c], final: true, codeLines: [27, 28],
+          answer: 1,
           vars: [{ name: "answer", value: 1 }],
           note: { vi: `Phục hồi grid[${r}][${c}]=1 (không sửa đổi grid đầu vào), trả về 1.`, en: `Restore grid[${r}][${c}]=1 (don't mutate the input), return 1.` },
         });
@@ -2064,6 +2123,7 @@ function buildSteps1568(input) {
   snap({
     title: { vi: "line 30: return 2", en: "line 30: return 2" },
     final: true, codeLines: [30],
+    answer: 2,
     vars: [{ name: "answer", value: 2 }],
     note: {
       vi: "Không ô đơn lẻ nào làm rời lưới được → cần đúng 2 ngày (luôn khả thi: xóa 2 ô liền kề trên 1 đường đi bất kỳ).",
@@ -2950,7 +3010,7 @@ const problems = {
       "Mỗi ngày xóa 1 ô đất. Trả về số ngày tối thiểu để lưới bị rời (0 hoặc ≥2 đảo, hoặc rỗng). Nhập grid: hàng cách '|'.",
       "Each day you may remove one land cell. Return the minimum number of days until the grid becomes disconnected (0 or ≥2 islands, or empty). Enter grid: rows separated by '|'."
     ),
-    defaultInput: "0110|0110|0000",
+    defaultInput: "110|010|011",
     inputKind: "string",
     inputLabel: tr("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
     approach: [
