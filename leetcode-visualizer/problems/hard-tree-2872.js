@@ -17,7 +17,7 @@ const DEFAULT_K = 6;
 const LIMITS = Object.freeze({
   minNodes: 1,
   maxNodes: 96,
-  minValue: 1,
+  minValue: 0,
   maxValue: 1_000_000_000,
   maxK: 1_000_000_000,
   maxTraceSteps: 4000,
@@ -59,6 +59,42 @@ const SOURCE = Object.freeze([
   "                contribution[node] = 0",
   "            else:",
   "                contribution[node] = subtotal",
+  "        return components",
+]);
+
+const BFS_SOURCE = Object.freeze([
+  "from collections import deque",
+  "from typing import List",
+  "",
+  "class Solution:",
+  "    def maxKDivisibleComponents(",
+  "        self, n: int, edges: List[List[int]], values: List[int], k: int",
+  "    ) -> int:",
+  "        graph = [[] for _ in range(n)]",
+  "        degree = [0] * n",
+  "        for u, v in edges:",
+  "            graph[u].append(v)",
+  "            graph[v].append(u)",
+  "            degree[u] += 1",
+  "            degree[v] += 1",
+  "",
+  "        subtotal = values[:]",
+  "        queue = deque(node for node in range(n) if degree[node] <= 1)",
+  "        components = 0",
+  "        while queue:",
+  "            node = queue.popleft()",
+  "            carry = subtotal[node]",
+  "            if carry % k == 0:",
+  "                components += 1",
+  "                carry = 0",
+  "            degree[node] = 0",
+  "            for neighbor in graph[node]:",
+  "                if degree[neighbor] == 0:",
+  "                    continue",
+  "                subtotal[neighbor] += carry",
+  "                degree[neighbor] -= 1",
+  "                if degree[neighbor] == 1:",
+  "                    queue.append(neighbor)",
   "        return components",
 ]);
 
@@ -443,6 +479,152 @@ function buildSteps2872(input, params = {}) {
   };
 }
 
+function buildBfsSteps2872(input, params = {}) {
+  const { n, edges, values, k, total, tree } = parseMaximumKDivisibleComponents2872Input(input, params);
+  const steps = [];
+  const locals = { n, edges: edges.map(edge => [...edge]), values: [...values], k };
+  const removed = new Set(), cutEdges = new Set(), cuts = [], completed = [];
+  const contribution = Array(n).fill(null);
+  let previousVars = watches(locals);
+
+  function watches(state) {
+    return [
+      { name: "node", value: state.node ?? "—" },
+      { name: "k", value: k },
+      { name: "subtotal[node]", value: state.subtotal?.[state.node] ?? "—" },
+      { name: "carry", value: state.carry ?? "—" },
+      { name: "degree[node]", value: state.degree?.[state.node] ?? "—" },
+      { name: "components", value: state.components ?? "—" },
+    ];
+  }
+
+  function emit(line, detail = {}) {
+    if (steps.length >= LIMITS.maxTraceSteps) throw new Error("#2872: full BFS line trace exceeded its bound");
+    const state = Object.fromEntries(Object.entries(locals).map(([name, value]) => [
+      name, Array.isArray(value) ? value.map(item => Array.isArray(item) ? [...item] : item) : value,
+    ]));
+    const stage = line <= 14 ? "graph" : line === 33 ? "done" : "bfs";
+    const activeNode = stage === "graph" ? state.u ?? null : stage === "done" ? null : state.node ?? null;
+    const phase = detail.phase || (stage === "graph" ? "graph" : stage === "done" ? "done" : "inspect");
+    const cursor = {};
+    let edgeFocus = null;
+    if (line >= 10 && line <= 14 && state.u !== undefined && !detail.exhausted) {
+      cursor.u = state.u; cursor.v = state.v; edgeFocus = [state.u, state.v];
+    } else if (line >= 26 && line <= 32 && state.neighbor !== undefined && !detail.exhausted) {
+      cursor.neighbor = state.neighbor;
+      cursor["degree[neighbor]"] = state.degree[state.neighbor];
+      cursor["subtotal[neighbor]"] = state.subtotal[state.neighbor];
+      edgeFocus = [state.node, state.neighbor];
+    }
+    const pieces = collectFinalComponents(tree, values, cutEdges);
+    const closedGroups = completed.map((component, id) => ({
+      id, ...component, members: [...pieces.find(piece => piece.members.includes(component.root)).members],
+    }));
+    const labels = {
+      graph: bi("Dựng cây và bậc", "Build the tree and degrees"),
+      inspect: bi("BFS · xử lý lá", "BFS · process a leaf"),
+      queue: bi("Đưa các lá vào queue", "Queue the leaves"),
+      pop: bi("Lấy đầu queue", "Pop the queue front"),
+      check: bi("Kiểm tra chia hết", "Check divisibility"),
+      count: bi("Tăng components", "Increment components"),
+      cut: bi("Tách nhóm, gửi 0", "Separate a component and send 0"),
+      close: bi("Khép nhóm cuối", "Complete the last component"),
+      remove: bi("Gỡ lá khỏi cây", "Remove the leaf"),
+      merge: bi("Cộng carry sang nút kề", "Add carry to the neighbor"),
+      degree: bi("Giảm bậc nút kề", "Decrease the neighbor's degree"),
+      enqueue: bi("Thêm lá mới vào cuối queue", "Append the new leaf to the queue"),
+      done: bi("Trả kết quả BFS", "Return the BFS result"),
+    };
+    const vars = watches(state), label = labels[phase];
+    steps.push({
+      title: bi(`Dòng ${line} · ${label.vi}`, `Line ${line} · ${label.en}`),
+      note: bi("", ""), arr: [...values], sub: values.map(() => ""),
+      highlight: activeNode === null ? [] : [activeNode], mark: [...removed],
+      codeLines: [line], codeBlock: 2, vars, final: line === 33,
+      kDivisible2872View: {
+        n, k, algorithm: "bfs", stage, phase, activeNode,
+        source: { line, text: BFS_SOURCE[line - 1], timing: "after" },
+        locals: state, beforeVars: previousVars,
+        condition: typeof detail.condition === "boolean" ? detail.condition : null,
+        exhausted: Boolean(detail.exhausted), nextLine: null, nextSource: null,
+        cursor, edgeFocus, graph: state.graph, queue: state.queue ?? null, degree: state.degree ?? null,
+        arrayChanges: detail.arrayChanges || {},
+        components: state.components ?? 0,
+        values: [...values], edges: edges.map(edge => [...edge]),
+        parent: [...tree.parent], children: tree.children.map(children => [...children]),
+        processed: [...removed], subtotal: state.subtotal ?? Array(n).fill(null),
+        activeSum: activeNode === null ? null : state.subtotal?.[activeNode] ?? null,
+        contribution: [...contribution], cuts: cuts.map(cut => ({ ...cut })), closedGroups,
+        transfer: detail.transfer || null, traceTruncated: false,
+      },
+    });
+    previousVars = vars.map(variable => ({ ...variable }));
+  }
+
+  locals.graph = Array.from({ length: n }, () => []); emit(8);
+  locals.degree = Array(n).fill(0); emit(9);
+  for (const [u, v] of edges) {
+    locals.u = u; locals.v = v; emit(10, { condition: true });
+    locals.graph[u].push(v); emit(11, { arrayChanges: { graph: u } });
+    locals.graph[v].push(u); emit(12, { arrayChanges: { graph: v } });
+    locals.degree[u]++; emit(13, { arrayChanges: { degree: u } });
+    locals.degree[v]++; emit(14, { arrayChanges: { degree: v } });
+  }
+  emit(10, { condition: false, exhausted: true });
+  locals.subtotal = [...values]; emit(16);
+  locals.queue = values.flatMap((_, node) => locals.degree[node] <= 1 ? [node] : []); emit(17, { phase: "queue" });
+  locals.components = 0; emit(18);
+  while (true) {
+    const more = locals.queue.length > 0;
+    emit(19, { condition: more });
+    if (!more) break;
+    locals.node = locals.queue.shift(); emit(20, { phase: "pop" });
+    const node = locals.node;
+    locals.carry = locals.subtotal[node]; contribution[node] = locals.carry; emit(21);
+    const divisible = locals.carry % k === 0;
+    emit(22, { phase: "check", condition: divisible });
+    if (divisible) {
+      locals.components++; emit(23, { phase: "count" });
+      locals.carry = 0; contribution[node] = 0;
+      const neighbor = locals.graph[node].find(other => locals.degree[other] > 0);
+      if (neighbor !== undefined) {
+        cutEdges.add(undirectedKey(node, neighbor));
+        cuts.push({ parent: neighbor, child: node, sum: locals.subtotal[node] });
+      }
+      completed.push({ root: node, sum: locals.subtotal[node] });
+      emit(24, { phase: neighbor === undefined ? "close" : "cut" });
+    }
+    locals.degree[node] = 0; removed.add(node); emit(25, { phase: "remove", arrayChanges: { degree: node } });
+    for (const neighbor of locals.graph[node]) {
+      locals.neighbor = neighbor; emit(26, { condition: true });
+      const gone = locals.degree[neighbor] === 0;
+      emit(27, { condition: gone });
+      if (gone) { emit(28); continue; }
+      const before = locals.subtotal[neighbor];
+      locals.subtotal[neighbor] += locals.carry;
+      emit(29, { phase: "merge", arrayChanges: { subtotal: neighbor }, transfer: { from: node, to: neighbor, amount: locals.carry, before, after: locals.subtotal[neighbor] } });
+      locals.degree[neighbor]--; emit(30, { phase: "degree", arrayChanges: { degree: neighbor } });
+      const leaf = locals.degree[neighbor] === 1;
+      emit(31, { condition: leaf });
+      if (leaf) { locals.queue.push(neighbor); emit(32, { phase: "enqueue" }); }
+    }
+    emit(26, { condition: false, exhausted: true });
+  }
+  const finalComponents = collectFinalComponents(tree, values, cutEdges);
+  if (removed.size !== n || cutEdges.size !== locals.components - 1
+    || finalComponents.length !== locals.components || finalComponents.some(component => component.sum % k !== 0)
+    || finalComponents.reduce((sum, component) => sum + component.sum, 0) !== total) {
+    throw new Error("#2872: BFS components violate the divisibility invariant");
+  }
+  emit(33);
+  steps.forEach((step, index) => {
+    const nextLine = steps[index + 1]?.codeLines[0] ?? null;
+    step.kDivisible2872View.nextLine = nextLine;
+    step.kDivisible2872View.nextSource = nextLine === null ? null : BFS_SOURCE[nextLine - 1];
+  });
+  return { original: { n, edges: edges.map(edge => [...edge]), values: [...values], k }, answer: locals.components, steps };
+}
+
 module.exports = {
   2872: {
     id: 2872,
@@ -452,6 +634,7 @@ module.exports = {
     tags: [
       { key: "tree", vi: "Cây", en: "Tree" },
       { key: "dfs", vi: "DFS", en: "DFS" },
+      { key: "bfs", vi: "BFS", en: "BFS" },
       { key: "postorder", vi: "Hậu tự", en: "Postorder" },
       { key: "greedy", vi: "Tham lam", en: "Greedy" },
     ],
@@ -468,13 +651,20 @@ module.exports = {
       "Given an undirected n-node tree, a value at each node, and positive k, remove edges to maximize the number of components whose value sums are all divisible by k.",
     ),
     defaultInput: DEFAULT_EDGES,
-    defaults: { input: DEFAULT_EDGES, values: DEFAULT_VALUES, k: DEFAULT_K },
+    defaults: { input: DEFAULT_EDGES, values: DEFAULT_VALUES, k: DEFAULT_K, approach: "1" },
     inputKind: "string",
     inputLabel: bi(
       "edges [u,v] (JSON hoặc u,v;u,v)",
       "edges [u,v] (JSON or u,v;u,v)",
     ),
     extraParams: [
+      {
+        key: "approach", type: "select", default: "1", label: bi("Cách giải", "Approach"),
+        options: [
+          { value: "1", label: bi("Cách 1 · DFS hậu tự", "Approach 1 · Postorder DFS") },
+          { value: "2", label: bi("Cách 2 · BFS tỉa lá", "Approach 2 · BFS leaf pruning") },
+        ],
+      },
       {
         key: "values",
         type: "string",
@@ -493,16 +683,16 @@ module.exports = {
     visualizationLimits: { ...LIMITS },
     approach: [
       bi(
-        "Đi từ lá lên. Mỗi nút cộng giá trị riêng và phần các con gửi lên.",
-        "Work upward from the leaves. Add each node's value and its children's contributions.",
+        "DFS: duyệt hậu tự, cộng giá trị riêng và phần các con gửi lên.",
+        "DFS: process in postorder, adding each node's value and its children's contributions.",
       ),
       bi(
-        "Tổng chia hết cho k → tách nhóm, gửi 0. Còn dư → gửi tổng lên cha.",
-        "A divisible total forms a component and sends 0. Otherwise, send the total upward.",
+        "Tổng chia hết cho k → tách nhóm, gửi 0. Còn dư → gửi tổng sang nút kề chưa xử lý.",
+        "A divisible total forms a component and sends 0. Otherwise, pass the total to the unprocessed neighbor.",
       ),
       bi(
-        "Đếm cả nhóm cuối chứa gốc; gốc không có cạnh cha để cắt.",
-        "Count the final root component too; the root has no parent edge to cut.",
+        "BFS: đưa các lá vào queue. Gỡ từng lá, chuyển carry sang nút kề; bậc còn 1 thì thêm lá mới vào queue.",
+        "BFS: queue the leaves. Remove each leaf and pass its contribution to its neighbor; enqueue a neighbor when its degree becomes 1.",
       ),
     ],
     complexity: {
@@ -513,7 +703,10 @@ module.exports = {
         "Each node and edge is processed a constant number of times. Line-by-line debugging retains every step, including conditions and loop exhaustion.",
       ),
     },
+    codeLabel: bi("Cách 1 · DFS hậu tự", "Approach 1 · Postorder DFS"),
+    code2Label: bi("Cách 2 · BFS tỉa lá", "Approach 2 · BFS leaf pruning"),
     code: SOURCE,
+    code2: BFS_SOURCE,
     debugMode: "line-by-line",
     parser: parseMaximumKDivisibleComponents2872Input,
     parseMaximumKDivisibleComponents2872Input,
@@ -526,6 +719,8 @@ module.exports = {
         parsed.k,
       ];
     },
-    builder: buildSteps2872,
+    builder(input, params = {}) {
+      return Number(params.approach) === 2 ? buildBfsSteps2872(input, params) : buildSteps2872(input, params);
+    },
   },
 };

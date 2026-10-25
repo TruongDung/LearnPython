@@ -48,6 +48,7 @@
 .kd2872-edge.pending { opacity: .25; stroke-dasharray: 3 6; }
 .kd2872-edge.partial { stroke: var(--kd-gold); stroke-dasharray: 7 5; }
 .kd2872-edge.focused { stroke: var(--kd-gold); stroke-width: 4; opacity: 1; }
+.kd2872-edge.pruned { stroke-dasharray: 3 5; opacity: .45; }
 .kd2872-cut path { fill: none; stroke: var(--kd-line); stroke-width: 1.5; stroke-dasharray: 4 5; opacity: .6; }
 .kd2872-cut text { fill: var(--kd-red); font-size: 24px; }
 .kd2872-node circle { fill: var(--kd-node); stroke: var(--kd-blue); stroke-width: 1.5; }
@@ -57,6 +58,8 @@
 .kd2872-value { fill: var(--kd-text); font-size: 15px; }
 .kd2872-id { fill: var(--kd-muted); font-size: 12px; }
 .kd2872-node-status { fill: var(--kd-tone, var(--kd-blue)); font-size: 12px; }
+.kd2872-degree rect { fill: var(--kd-panel); stroke: var(--kd-line); stroke-width: 1px; }
+.kd2872-degree text { fill: var(--kd-gold); font-size: 10px; }
 .kd2872-id, .kd2872-node-status { paint-order: stroke; stroke: var(--kd-panel); stroke-width: 4px; stroke-linejoin: round; }
 .kd2872-legend { text-align: center; }
 .kd2872-flow path { fill: none; stroke: var(--kd-gold); stroke-width: 3; }

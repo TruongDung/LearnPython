@@ -7,13 +7,18 @@ const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const problem = require("../problems").SUPPORTED[2872];
 const watchNames = ["node", "k", "subtotal", "subtotal % k", "contribution[node]", "components"];
+const bfsWatchNames = ["node", "k", "subtotal[node]", "carry", "degree[node]", "components"];
 const examples = [
   { edges: [[0, 2], [1, 2], [1, 3], [2, 4]], values: [1, 8, 1, 4, 4], k: 6, answer: 2 },
   { edges: [], values: [6], k: 3, answer: 1 },
   { edges: [[0, 1], [1, 2], [2, 3]], values: [1, 1, 1, 1], k: 4, answer: 1 },
   { edges: [[0, 1], [0, 2], [0, 3], [0, 4]], values: [3, 3, 3, 3, 3], k: 3, answer: 5 },
+  { edges: [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]], values: [3, 0, 6, 1, 5, 2, 1], k: 3, answer: 3 },
+  { edges: [], values: [0], k: 7, answer: 1 },
+  { edges: [[1, 0]], values: [0, 0], k: 5, answer: 2 },
+  { edges: [[0, 1]], values: [1e9, 1e9], k: 1e9, answer: 2 },
 ];
-const solve = item => problem.builder(item.edges, { values: item.values, k: item.k });
+const solve = (item, approach = 1) => problem.builder(item.edges, { values: item.values, k: item.k, approach });
 
 function exhaustive(edges, values, k) {
   let best = 0;
@@ -30,19 +35,19 @@ function exhaustive(edges, values, k) {
   return best;
 }
 
-test("2872 still maximizes the number of components, checked against every possible cut", () => {
+test("2872 DFS and BFS maximize components, checked against every possible cut", () => {
   let seed = 2872;
   const random = bound => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % bound; };
   const cases = [...examples];
   for (let trial = 0; trial < 100; trial++) {
     const n = random(7) + 1, k = random(6) + 1;
     const edges = Array.from({ length: n - 1 }, (_, i) => [i + 1, random(i + 1)]);
-    const values = Array.from({ length: n }, () => random(9) + 1);
+    const values = Array.from({ length: n }, () => random(10));
     values[n - 1] += (k - values.reduce((sum, value) => sum + value, 0) % k) % k;
     cases.push({ edges, values, k });
   }
-  for (const item of cases) {
-    const run = solve(item);
+  for (const item of cases) for (const approach of [1, 2]) {
+    const run = solve(item, approach);
     assert.equal(run.answer, exhaustive(item.edges, item.values, item.k));
     if (item.answer !== undefined) assert.equal(run.answer, item.answer);
     const last = run.steps.at(-1).kDivisible2872View;
@@ -85,9 +90,9 @@ test("2872 pictures and six fixed watches follow merges, cuts, and zero contribu
 });
 
 test("2872 retains every executed line even for 96 nodes", () => {
-  for (const star of [false, true]) {
+  for (const star of [false, true]) for (const approach of [1, 2]) {
     const item = { values: Array(96).fill(1), k: star ? 1 : 3, edges: Array.from({ length: 95 }, (_, i) => [star ? 0 : i, i + 1]) };
-    const run = solve(item);
+    const run = solve(item, approach);
     assert.equal(run.answer, star ? 96 : 32);
     assert.ok(run.steps.length <= problem.visualizationLimits.maxTraceSteps);
     assert.ok(run.steps.length > 220);
@@ -157,9 +162,11 @@ test("2872 checks, increments, and cuts are separate reversible steps", () => {
   assert.equal(check.kDivisible2872View.cuts.length, 0);
 });
 
-test("2872 matches CPython line events and all local variables after every line", () => {
-  const program = problem.code.join("\n") + `
+for (const approach of [1, 2]) test(`2872 approach ${approach} matches CPython events and locals after every line`, () => {
+  const code = approach === 2 ? problem.code2 : problem.code;
+  const program = code.join("\n") + `
 import copy, json, sys
+from collections import deque
 cases = json.load(sys.stdin)
 runs = []
 for args in cases:
@@ -167,7 +174,8 @@ for args in cases:
     returned = []
     def trace(frame, event, arg):
         if frame.f_code.co_name == 'maxKDivisibleComponents':
-            state = copy.deepcopy({name: value for name, value in frame.f_locals.items() if name != 'self'})
+            state = copy.deepcopy({name: list(value) if isinstance(value, deque) else value
+                                   for name, value in frame.f_locals.items() if name != 'self'})
             if event == 'line':
                 events.append({'line': frame.f_lineno, 'locals': state})
             elif event == 'return':
@@ -190,24 +198,88 @@ print(json.dumps(runs))
   assert.equal(run.status, 0, run.stderr);
   const expectedRuns = JSON.parse(run.stdout);
   cases.forEach((item, index) => {
-    const actual = solve(item), expected = expectedRuns[index];
+    const actual = solve(item, approach), expected = expectedRuns[index];
     assert.equal(actual.answer, expected.answer);
     assert.deepEqual(actual.steps.map(step => step.codeLines[0]), expected.steps.map(step => step.line));
     actual.steps.forEach((step, eventIndex) => {
       const v = step.kDivisible2872View, line = step.codeLines[0];
       assert.deepEqual(v.locals, expected.steps[eventIndex].locals, `case ${index}, event ${eventIndex}, line ${line}`);
       assert.equal(v.source.line, line);
-      assert.equal(v.source.text, problem.code[line - 1]);
+      assert.equal(v.source.text, code[line - 1]);
+      assert.equal(step.codeBlock ?? 1, approach);
       assert.equal(v.source.timing, "after");
       assert.equal(v.nextLine, expected.steps[eventIndex + 1]?.line ?? null);
-      assert.equal(v.nextSource, v.nextLine === null ? null : problem.code[v.nextLine - 1]);
+      assert.equal(v.nextSource, v.nextLine === null ? null : code[v.nextLine - 1]);
       const state = v.locals;
-      assert.deepEqual(step.vars.map(variable => variable.value), [
+      assert.deepEqual(step.vars.map(variable => variable.value), approach === 2 ? [
+        state.node ?? "—", state.k, state.subtotal?.[state.node] ?? "—", state.carry ?? "—",
+        state.degree?.[state.node] ?? "—", state.components ?? "—",
+      ] : [
         state.node ?? "—", state.k, state.subtotal ?? "—", state.subtotal === undefined ? "—" : state.subtotal % state.k,
         state.contribution?.[state.node] ?? "—", state.components ?? "—",
       ]);
     });
   });
+});
+
+test("2872 BFS queues leaves FIFO and separates counting, cutting, merging, and degree updates", () => {
+  const run = solve(examples[0], 2);
+  assert.deepEqual(run.steps.find(step => step.codeLines[0] === 17).kDivisible2872View.queue, [0, 3, 4]);
+  assert.deepEqual(run.steps.filter(step => step.codeLines[0] === 20).map(step => step.kDivisible2872View.locals.node), [0, 3, 4, 1, 2]);
+  for (let index = 0; index < run.steps.length; index++) {
+    const step = run.steps[index], v = step.kDivisible2872View;
+    assert.deepEqual(step.vars.map(variable => variable.name), bfsWatchNames);
+    assert.equal(step.codeBlock, 2);
+    assert.equal(step.codeLines.length, 1);
+    if (v.phase === "merge") {
+      const before = run.steps[index - 1].kDivisible2872View;
+      assert.equal(v.transfer.after, v.transfer.before + v.locals.carry);
+      assert.equal(v.locals.subtotal[v.locals.neighbor], v.transfer.after);
+      assert.deepEqual(v.degree, before.degree);
+      const next = run.steps[index + 1].kDivisible2872View;
+      assert.equal(next.degree[v.locals.neighbor], v.degree[v.locals.neighbor] - 1);
+      assert.deepEqual(next.locals.subtotal, v.locals.subtotal);
+    }
+  }
+  const cutIndex = run.steps.findIndex(step => step.kDivisible2872View.phase === "cut");
+  const [check, count, cut] = run.steps.slice(cutIndex - 2, cutIndex + 1).map(step => step.kDivisible2872View);
+  assert.deepEqual([check, count, cut].map(v => v.source.line), [22, 23, 24]);
+  assert.equal(check.condition, true);
+  assert.equal(count.components, check.components + 1);
+  assert.deepEqual(count.cuts, check.cuts);
+  assert.equal(count.locals.carry, 12);
+  assert.equal(cut.locals.carry, 0);
+  assert.equal(cut.cuts.length, count.cuts.length + 1);
+  assert.deepEqual(cut.degree, count.degree);
+  assert.deepEqual(run.steps.at(-1).vars.map(variable => variable.value), [2, 6, 6, 0, 0, 2]);
+});
+
+test("2872 BFS pictures show queue, degrees and subtotals, including transfers toward a descendant", () => {
+  const host = { innerHTML: "", querySelector: () => null };
+  const context = { lang: "vi", $: () => host, escapeHtml: value => String(value).replace(/[&<>"']/g, "_") };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-k-divisible-components-2872.js"), "utf8"), context);
+  for (const language of ["vi", "en"]) for (const item of [examples[0], examples[5]]) {
+    context.lang = language;
+    const run = solve(item, 2);
+    for (const step of run.steps) {
+      context.renderKDivisibleComponents2872View(step);
+      const html = host.innerHTML, v = step.kDivisible2872View;
+      assert.doesNotMatch(html, /undefined|NaN|Infinity|object Object/);
+      assert.equal((html.match(/class="kd2872-node[ "]/g) || []).length, item.values.length);
+      if (v.queue) assert.match(html, /<code>queue<\/code>/);
+      if (v.degree) assert.match(html, /class="kd2872-degree"/);
+      if (v.locals.subtotal) assert.match(html, /<code>subtotal<\/code>/);
+      if (v.transfer?.amount > 0) assert.match(html, /<g class="kd2872-flow">/);
+      if (v.transfer?.amount === 0) assert.doesNotMatch(html, /<g class="kd2872-flow">/);
+      if (v.phase === "cut") assert.match(html, /class="kd2872-cut"/);
+    }
+    context.renderKDivisibleComponents2872View(run.steps[0]);
+    const first = host.innerHTML;
+    context.renderKDivisibleComponents2872View(run.steps.at(-1));
+    context.renderKDivisibleComponents2872View(run.steps[0]);
+    assert.equal(host.innerHTML, first);
+  }
 });
 
 test("2872 dedicated renderer is selected before the generic text-heavy view", () => {
