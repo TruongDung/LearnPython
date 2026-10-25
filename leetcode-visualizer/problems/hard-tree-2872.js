@@ -7,7 +7,6 @@ const {
   parseInteger,
   parseIntegerArray,
   parseRows,
-  createTracer,
 } = require("./hard-viz-shared");
 
 const PROBLEM_ID = 2872;
@@ -21,9 +20,7 @@ const LIMITS = Object.freeze({
   minValue: 1,
   maxValue: 1_000_000_000,
   maxK: 1_000_000_000,
-  maxTraceSteps: 220,
-  maxDetailedTraceEvents: 176,
-  maxQueueItems: 40,
+  maxTraceSteps: 4000,
 });
 
 const PHASES = Object.freeze([
@@ -284,496 +281,181 @@ function collectFinalComponents(tree, values, cutEdges) {
 
 function buildSteps2872(input, params = {}) {
   const parsed = parseMaximumKDivisibleComponents2872Input(input, params);
-  const {
-    n, edges, values, k, total, tree,
-  } = parsed;
-  const postorder = [...tree.order].reverse();
-  const subtotal = Array(n).fill(null);
-  const remainder = Array(n).fill(null);
-  const contribution = Array(n).fill(null);
+  const { n, edges, values, k, total, tree } = parsed;
+  const steps = [];
+  const locals = { n, edges: edges.map(edge => [...edge]), values: [...values], k };
+  const sums = Array(n).fill(null);
   const processed = new Set();
-  const componentRoots = new Set();
-  const cutEdges = new Set();
+  const completed = [];
   const cutRecords = [];
-  const completedComponents = [];
-  let componentCount = 0;
-  let detailedEvents = 0;
-  let detailTraceStopped = false;
-  let finalComponents = null;
+  const cutEdges = new Set();
+  let previousVars = watches(locals);
 
-  const tracer = createTracer({
-    problemId: PROBLEM_ID,
-    source: SOURCE,
-    phases: PHASES,
-    maxSteps: LIMITS.maxTraceSteps,
-    baseArray: values,
-    legend: LEGEND,
-  });
-
-  function nodeState(node, activeNodes, queuedNodes) {
-    if (activeNodes.has(node)) return "active";
-    if (componentRoots.has(node)) return "success";
-    if (processed.has(node)) return "computed";
-    if (queuedNodes.has(node)) return "queued";
-    return "idle";
+  function snapshotLocals() {
+    return Object.fromEntries(Object.entries(locals).map(([name, value]) => [
+      name, Array.isArray(value) ? value.map(item => Array.isArray(item) ? [...item] : item) : value,
+    ]));
   }
 
-  function makeGraph(options) {
-    const activeNodes = new Set(options.activeNodes || []);
-    if (options.activeNode !== null && options.activeNode !== undefined) {
-      activeNodes.add(options.activeNode);
-    }
-    const queuedNodes = new Set(options.queue || []);
-    const activeEdgeKey = options.activeEdge
-      ? undirectedKey(options.activeEdge[0], options.activeEdge[1])
-      : null;
-    const nodes = Array.from({ length: n }, (_, node) => ({
-      id: node,
-      label: `u${node}`,
-      sub: subtotal[node] === null
-        ? `v=${values[node]} · r=?`
-        : `sum=${subtotal[node]} · r=${remainder[node]}`,
-      state: nodeState(node, activeNodes, queuedNodes),
-    }));
-    const graphEdges = [];
-    for (let child = 0; child < n; child += 1) {
-      const parent = tree.parent[child];
-      if (parent === -1) continue;
-      const key = undirectedKey(parent, child);
-      let state = "idle";
-      if (cutEdges.has(key)) state = "danger";
-      else if (key === activeEdgeKey) state = "active";
-      else if (processed.has(child)) state = "visited";
-      else if (queuedNodes.has(child)) state = "queued";
-      graphEdges.push({
-        u: parent,
-        v: child,
-        directed: true,
-        state,
-        label: cutEdges.has(key) ? bi("CẮT", "CUT") : `${parent}→${child}`,
-      });
-    }
-    return {
-      layout: "tree",
-      nodes,
-      edges: graphEdges,
-      levels: tree.levels.map((level) => [...level]),
-    };
-  }
-
-  function makeTable(options) {
-    const activeNodes = new Set(options.activeNodes || []);
-    if (options.activeNode !== null && options.activeNode !== undefined) {
-      activeNodes.add(options.activeNode);
-    }
-    return {
-      title: bi("Bảng subtotal hậu tự", "Postorder subtotal table"),
-      columns: [
-        bi("parent", "parent"),
-        bi("value", "value"),
-        bi("subtotal", "subtotal"),
-        bi("subtotal mod k", "subtotal mod k"),
-        bi("đẩy lên parent", "sent to parent"),
-        bi("kết quả", "result"),
-      ],
-      rows: Array.from({ length: n }, (_, node) => {
-        let result = "pending";
-        let state = "pending";
-        if (processed.has(node)) {
-          if (componentRoots.has(node)) {
-            result = tree.parent[node] === -1 ? "component" : "cut";
-            state = "success";
-          } else {
-            result = "carry";
-            state = "computed";
-          }
-        }
-        if (activeNodes.has(node)) state = "active";
-        return {
-          label: `u${node}`,
-          state,
-          cells: [
-            tree.parent[node],
-            values[node],
-            subtotal[node] === null ? "—" : subtotal[node],
-            remainder[node] === null ? "—" : remainder[node],
-            contribution[node] === null ? "—" : contribution[node],
-            { value: result, state },
-          ],
-        };
-      }),
-    };
-  }
-
-  function makeQueue(queue, activeNode) {
-    const visible = queue.slice(0, LIMITS.maxQueueItems);
-    const items = visible.map((node, index) => ({
-      label: `u${node}`,
-      sub: node === activeNode
-        ? bi("đang xử lý", "processing")
-        : bi(`chờ hậu tự ${index + 1}`, `postorder wait ${index + 1}`),
-      state: node === activeNode ? "active" : "queued",
-    }));
-    if (queue.length > visible.length) {
-      items.push({
-        label: `… +${queue.length - visible.length}`,
-        sub: bi("node đang chờ", "waiting nodes"),
-        state: "muted",
-      });
-    }
-    return items;
-  }
-
-  function makeGroups(options) {
-    const componentItems = finalComponents === null
-      ? completedComponents.map((component, index) => ({
-        label: `C${index + 1} · root u${component.root}`,
-        value: `sum=${component.sum} ≡ 0 (mod ${k})`,
-        state: "success",
-      }))
-      : finalComponents.map((component, index) => ({
-        label: `C${index + 1} · root u${component.root}`,
-        value: `{${component.members.join(",")}} · sum=${component.sum}`,
-        state: "success",
-      }));
+  function watches(state) {
     return [
-      {
-        title: finalComponents === null
-          ? bi("Component đã khép", "Completed components")
-          : bi("Các component cuối", "Final components"),
-        items: componentItems,
-      },
-      {
-        title: bi("Cạnh đã cắt", "Cut edges"),
-        items: cutRecords.map((record) => ({
-          label: `u${record.parent}—u${record.child}`,
-          value: `child sum=${record.sum}`,
-          state: "danger",
-        })),
-      },
-      {
-        title: bi("Đóng góp các cây con hiện tại", "Current child contributions"),
-        items: (options.childContributions || []).map((item, index, items) => ({
-          label: `u${item.child} → u${item.parent}`,
-          value: `up=${item.value}`,
-          state: index === items.length - 1 ? "active" : "visited",
-        })),
-      },
-    ];
-  }
-
-  function makeSequence(activeNode) {
-    return postorder.map((node, index) => ({
-      label: `#${index + 1} · u${node}`,
-      value: remainder[node] === null ? "r=?" : `r=${remainder[node]}`,
-      state: node === activeNode
-        ? "active"
-        : processed.has(node) ? (componentRoots.has(node) ? "success" : "computed") : "queued",
-    }));
-  }
-
-  function emit(config) {
-    const activeNode = config.activeNode ?? null;
-    const activeNodes = config.activeNodes || [];
-    const queue = config.queue || [];
-    const currentSubtotal = activeNode === null || subtotal[activeNode] === null
-      ? "—"
-      : subtotal[activeNode];
-    const currentRemainder = activeNode === null || remainder[activeNode] === null
-      ? "—"
-      : remainder[activeNode];
-    const recorded = tracer.emit({
-      phaseIndex: config.phaseIndex,
-      title: config.title,
-      note: config.note,
-      action: config.action,
-      formula: config.formula,
-      codeLines: config.codeLines,
-      vars: [
-        { name: bi("node", "node"), value: activeNode === null ? "—" : activeNode },
-        { name: bi("subtotal", "subtotal"), value: currentSubtotal },
-        { name: bi("phần dư", "remainder"), value: currentRemainder },
-        { name: bi("số component", "components"), value: componentCount },
-        { name: bi("cạnh đã cắt", "cut edges"), value: cutEdges.size },
-      ],
-      arr: values,
-      sub: values.map((value, node) => {
-        if (subtotal[node] === null) return `u${node}: v=${value}, pending`;
-        if (componentRoots.has(node)) return `u${node}: sum=${subtotal[node]}, cut/up=0`;
-        return `u${node}: sum=${subtotal[node]}, r=${remainder[node]}, up=${contribution[node] ?? "?"}`;
-      }),
-      highlight: [...new Set([...activeNodes, ...(activeNode === null ? [] : [activeNode])])],
-      mark: [...processed],
-      metrics: [
-        { label: bi("Số node", "Nodes"), value: `${n}/${LIMITS.maxNodes}` },
-        { label: bi("k", "k"), value: k },
-        { label: bi("Tổng values", "Values total"), value: total, state: "info" },
-        { label: bi("Đã xử lý", "Processed"), value: `${processed.size}/${n}` },
-        { label: bi("Component", "Components"), value: componentCount, state: componentCount ? "success" : "muted" },
-        { label: bi("Cạnh cắt", "Cut edges"), value: cutEdges.size, state: cutEdges.size ? "danger" : "muted" },
-        { label: bi("Subtotal hiện tại", "Current subtotal"), value: currentSubtotal },
-        { label: bi("Phần dư hiện tại", "Current remainder"), value: currentRemainder },
-      ],
-      graph: makeGraph({
-        activeNode,
-        activeNodes,
-        activeEdge: config.activeEdge,
-        queue,
-      }),
-      table: makeTable({ activeNode, activeNodes }),
-      queue: makeQueue(queue, activeNode),
-      groups: makeGroups(config),
-      sequence: makeSequence(activeNode),
-      final: Boolean(config.final),
-      answer: config.final ? componentCount : null,
-    });
-    if (!recorded) return false;
-
-    const step = tracer.steps.at(-1);
-    const phase = config.final ? "done"
-      : config.phaseIndex === 0 ? "start"
-        : config.phaseIndex === 1 ? "order"
-          : config.phaseIndex === 3 ? (tree.parent[activeNode] === -1 ? "close" : "cut")
-            : config.activeEdge ? "merge" : "carry";
-    const transfer = phase === "merge" ? config.childContributions.at(-1) : null;
-    const pieces = collectFinalComponents(tree, values, cutEdges);
-    const closedGroups = completedComponents.map((component, index) => ({
-      id: index,
-      root: component.root,
-      sum: component.sum,
-      members: [...pieces.find(piece => piece.root === component.root).members],
-    }));
-    const watchNode = config.final ? tree.root : activeNode;
-    step.vars = [
-      { name: "node", value: watchNode ?? "—" },
+      { name: "node", value: state.node ?? "—" },
       { name: "k", value: k },
-      { name: "subtotal", value: watchNode === null ? "—" : subtotal[watchNode] ?? "—" },
-      { name: "subtotal % k", value: watchNode === null ? "—" : remainder[watchNode] ?? "—" },
-      { name: "contribution[node]", value: watchNode === null ? "—" : contribution[watchNode] ?? "—" },
-      { name: "components", value: componentCount },
+      { name: "subtotal", value: state.subtotal ?? "—" },
+      { name: "subtotal % k", value: state.subtotal === undefined ? "—" : state.subtotal % k },
+      { name: "contribution[node]", value: state.contribution?.[state.node] ?? "—" },
+      { name: "components", value: state.components ?? "—" },
     ];
-    const captions = {
-      start: bi("🌳 Cây ban đầu", "🌳 The starting tree"),
-      order: bi("🍃 Từ lá lên gốc", "🍃 Leaves toward the root"),
-      merge: transfer?.value === 0 ? bi("✂ Nhóm đã tách · +0", "✂ Already separated · +0") : bi("↑ Cộng từ cây con", "↑ Add the child total"),
-      carry: bi("↑ Chuyển tổng lên cha", "↑ Send the total upward"),
-      cut: bi("✂ Tách một nhóm", "✂ Separate a component"),
-      close: bi("✓ Chốt nhóm gốc", "✓ Complete the root component"),
-      done: bi(`🏁 ${componentCount} nhóm`, `🏁 ${componentCount} component${componentCount === 1 ? "" : "s"}`),
-    };
-    step.title = captions[phase];
-    step.note = bi("", "");
-    step.kDivisible2872View = {
-      n, k, phase, activeNode, components: componentCount,
-      values: [...values], edges: edges.map(edge => [...edge]),
-      parent: [...tree.parent], children: tree.children.map(children => [...children]),
-      postorder: [...postorder], processed: [...processed],
-      subtotal: [...subtotal], remainder: [...remainder], contribution: [...contribution],
-      cuts: cutRecords.map(cut => ({ ...cut })), closedGroups,
-      transfer: transfer ? { from: transfer.child, to: transfer.parent, amount: transfer.value, before: subtotal[activeNode] - transfer.value, after: subtotal[activeNode] } : null,
-      traceTruncated: tracer.truncated,
-    };
-    return true;
   }
 
-  function emitDetail(config) {
-    if (detailedEvents >= LIMITS.maxDetailedTraceEvents) {
-      if (!detailTraceStopped) {
-        tracer.truncate();
-        detailTraceStopped = true;
-      }
-      return false;
+  function emit(line, detail = {}) {
+    if (steps.length >= LIMITS.maxTraceSteps) throw new Error("#2872: full line trace exceeded its bound");
+    const stage = line <= 10 ? "graph" : line <= 22 ? "dfs" : line === 36 ? "done" : "postorder";
+    const phase = detail.phase || (stage === "graph" ? "graph" : stage === "dfs" ? "dfs" : stage === "done" ? "done" : "inspect");
+    const state = snapshotLocals();
+    let activeNode = stage === "graph" ? state.u ?? null
+      : stage === "dfs" ? state.node ?? (line === 13 ? 0 : null)
+        : line >= 26 && line < 36 ? state.node ?? null : null;
+    if (line === 26 && detail.exhausted) activeNode = null;
+    const cursor = {};
+    let edgeFocus = null;
+    if ([8, 9, 10].includes(line) && state.u !== undefined && !detail.exhausted) {
+      cursor.u = state.u; cursor.v = state.v;
+      edgeFocus = [state.u, state.v];
+    } else if ([18, 19, 20, 21, 22, 28, 29, 30].includes(line) && state.neighbor !== undefined && !detail.exhausted) {
+      cursor.neighbor = state.neighbor;
+      cursor["parent[neighbor]"] = state.parent[state.neighbor];
+      if (line >= 28) cursor["contribution[neighbor]"] = state.contribution[state.neighbor];
+      edgeFocus = [state.node, state.neighbor];
     }
-    detailedEvents += 1;
-    return emit(config);
+    const pieces = new Map(collectFinalComponents(tree, values, cutEdges).map(piece => [piece.root, piece]));
+    const closedGroups = completed.map((component, id) => ({
+      id, ...component, members: [...pieces.get(component.root).members],
+    }));
+    const vars = watches(state);
+    const labels = {
+      graph: bi("Dựng cạnh", "Build edges"), dfs: bi("Duyệt DFS", "Traverse with DFS"),
+      inspect: bi("Duyệt cây từ dưới lên", "Process the tree bottom-up"),
+      merge: bi("Cộng contribution", "Add the contribution"),
+      check: bi("Kiểm tra chia hết", "Check divisibility"),
+      count: bi("Tăng components", "Increment components"),
+      cut: bi("Cắt cạnh, gửi 0", "Cut the edge and send 0"),
+      close: bi("Khép nhóm gốc", "Complete the root component"),
+      carry: bi("Lưu tổng gửi lên cha", "Save the parent contribution"),
+      done: bi("Trả kết quả", "Return the result"),
+    };
+    const label = labels[phase];
+    steps.push({
+      title: bi("Dòng " + line + " · " + label.vi, "Line " + line + " · " + label.en),
+      note: bi("", ""), arr: [...values], sub: values.map(() => ""),
+      highlight: activeNode === null ? [] : [activeNode], mark: [...processed],
+      codeLines: [line], vars, final: line === 36,
+      kDivisible2872View: {
+        n, k, stage, phase, activeNode,
+        source: { line, text: SOURCE[line - 1], timing: "after" },
+        locals: state, beforeVars: previousVars,
+        condition: typeof detail.condition === "boolean" ? detail.condition : null,
+        exhausted: Boolean(detail.exhausted), nextLine: null, nextSource: null,
+        cursor, edgeFocus, graph: state.graph,
+        stack: state.stack ?? null, order: state.order ?? null,
+        components: state.components ?? 0,
+        values: [...values], edges: edges.map(edge => [...edge]),
+        parent: [...tree.parent], children: tree.children.map(children => [...children]),
+        traversalParent: state.parent ?? null,
+        postorder: state.order ? [...state.order].reverse() : [],
+        processed: [...processed], subtotal: [...sums],
+        activeSum: activeNode === null ? null : sums[activeNode],
+        remainder: sums.map(sum => sum === null ? null : sum % k),
+        contribution: state.contribution ? [...state.contribution] : Array(n).fill(null),
+        cuts: cutRecords.map(cut => ({ ...cut })), closedGroups,
+        transfer: detail.transfer || null, traceTruncated: false,
+      },
+    });
+    previousVars = vars.map(variable => ({ ...variable }));
   }
 
-  emit({
-    phaseIndex: 0,
-    title: bi("Cây đầu vào hợp lệ", "The input tree is valid"),
-    note: bi(
-      "Parser đã xác nhận n=values.length, đúng n−1 cạnh, mọi endpoint hợp lệ, không chu trình, liên thông, k>0 và tổng values chia hết cho k.",
-      "The parser verified n=values.length, exactly n−1 edges, valid endpoints, acyclicity, connectivity, k>0, and a values total divisible by k.",
-    ),
-    action: bi("Định hướng cây tổng quát từ gốc u0.", "Orient the general tree from root u0."),
-    formula: bi(`|V|=${n}; |E|=${edges.length}; Σvalues=${total}`, `|V|=${n}; |E|=${edges.length}; Σvalues=${total}`),
-    codeLines: [7, 8, 9, 10, 12, 13],
-    activeNode: 0,
-    activeNodes: [0],
-    queue: tree.order,
-  });
-
-  emit({
-    phaseIndex: 1,
-    title: bi("Đã tạo thứ tự hậu tự", "Built the postorder"),
-    note: bi(
-      "DFS dùng stack để tạo thứ tự parent-trước-child; đảo thứ tự đó bảo đảm mọi child được tính trước parent.",
-      "Stack-based DFS creates parent-before-child order; reversing it guarantees every child is computed before its parent.",
-    ),
-    action: bi("Đảo DFS order để xử lý từ lá lên gốc.", "Reverse DFS order to process leaves toward the root."),
-    formula: bi(`postorder = [${postorder.join(", ")}]`, `postorder = [${postorder.join(", ")}]`),
-    codeLines: [14, 15, 16, 17, 18, 19, 20, 21, 22, 26],
-    activeNode: postorder[0],
-    activeNodes: [postorder[0]],
-    queue: postorder,
-  });
-
-  for (let orderIndex = 0; orderIndex < postorder.length; orderIndex += 1) {
-    const node = postorder[orderIndex];
-    let runningSubtotal = values[node];
-    subtotal[node] = runningSubtotal;
-    remainder[node] = runningSubtotal % k;
-    const childContributions = [];
-
-    for (const child of tree.children[node]) {
-      if (contribution[child] === null) {
-        throw new Error(`#${PROBLEM_ID}: child u${child} must be complete before parent u${node}`);
-      }
-      const before = runningSubtotal;
-      runningSubtotal += contribution[child];
-      subtotal[node] = runningSubtotal;
-      remainder[node] = runningSubtotal % k;
-      childContributions.push({ parent: node, child, value: contribution[child] });
-      emitDetail({
-        phaseIndex: 2,
-        title: bi(`Gộp u${child} vào u${node}`, `Merge u${child} into u${node}`),
-        note: contribution[child] === 0
-          ? bi(
-            `Subtree tại u${child} đã tạo component chia hết nên cạnh phía trên bị cắt và đóng góp 0.`,
-            `The subtree at u${child} already formed a divisible component, so its parent edge is cut and it contributes 0.`,
-          )
-          : bi(
-            `Component mở tại u${child} chưa chia hết; đẩy toàn bộ subtotal ${contribution[child]} lên parent.`,
-            `The open component at u${child} is not yet divisible; send its full subtotal ${contribution[child]} to the parent.`,
-          ),
-        action: bi("Cộng contribution của child vào subtotal.", "Add the child contribution to the subtotal."),
-        formula: bi(
-          `subtotal[${node}] = ${before} + ${contribution[child]} = ${runningSubtotal}`,
-          `subtotal[${node}] = ${before} + ${contribution[child]} = ${runningSubtotal}`,
-        ),
-        codeLines: [27, 28, 29, 30],
-        activeNode: node,
-        activeNodes: [node, child],
-        activeEdge: [node, child],
-        queue: [node, ...postorder.slice(orderIndex + 1)],
-        childContributions,
-      });
+  // Each emit follows one executed Python line, including loop exhaustion.
+  locals.graph = Array.from({ length: n }, () => []);
+  emit(7);
+  for (const [u, v] of edges) {
+    locals.u = u; locals.v = v; emit(8, { condition: true });
+    locals.graph[u].push(v); emit(9);
+    locals.graph[v].push(u); emit(10);
+  }
+  emit(8, { condition: false, exhausted: true });
+  locals.parent = Array(n).fill(-2); emit(12);
+  locals.parent[0] = -1; emit(13);
+  locals.order = []; locals.stack = [0]; emit(14);
+  while (true) {
+    const more = locals.stack.length > 0;
+    emit(15, { condition: more });
+    if (!more) break;
+    locals.node = locals.stack.pop(); emit(16);
+    locals.order.push(locals.node); emit(17);
+    for (const neighbor of locals.graph[locals.node]) {
+      locals.neighbor = neighbor; emit(18, { condition: true });
+      const isParent = neighbor === locals.parent[locals.node];
+      emit(19, { condition: isParent });
+      if (isParent) { emit(20); continue; }
+      locals.parent[neighbor] = locals.node; emit(21);
+      locals.stack.push(neighbor); emit(22);
     }
+    emit(18, { condition: false, exhausted: true });
+  }
 
-    const divisible = runningSubtotal % k === 0;
-    remainder[node] = runningSubtotal % k;
-    contribution[node] = divisible ? 0 : runningSubtotal;
-    processed.add(node);
-
+  locals.contribution = Array(n).fill(0); emit(24);
+  locals.components = 0; emit(25);
+  for (const node of [...locals.order].reverse()) {
+    locals.node = node; emit(26, { condition: true });
+    locals.subtotal = values[node]; sums[node] = locals.subtotal; emit(27);
+    for (const neighbor of locals.graph[node]) {
+      locals.neighbor = neighbor; emit(28, { condition: true });
+      const isChild = locals.parent[neighbor] === node;
+      emit(29, { condition: isChild });
+      if (isChild) {
+        const before = locals.subtotal;
+        locals.subtotal += locals.contribution[neighbor];
+        sums[node] = locals.subtotal;
+        emit(30, { phase: "merge", transfer: { from: neighbor, to: node, amount: locals.contribution[neighbor], before, after: locals.subtotal } });
+      }
+    }
+    emit(28, { condition: false, exhausted: true });
+    const divisible = locals.subtotal % k === 0;
+    emit(31, { phase: "check", condition: divisible });
     if (divisible) {
-      componentCount += 1;
-      componentRoots.add(node);
-      completedComponents.push({ root: node, sum: runningSubtotal });
-      const parent = tree.parent[node];
+      locals.components++; emit(32, { phase: "count" });
+      locals.contribution[node] = 0;
+      processed.add(node); completed.push({ root: node, sum: locals.subtotal });
+      const parent = locals.parent[node];
       if (parent !== -1) {
-        const key = undirectedKey(parent, node);
-        cutEdges.add(key);
-        cutRecords.push({ parent, child: node, sum: runningSubtotal });
+        cutEdges.add(undirectedKey(parent, node));
+        cutRecords.push({ parent, child: node, sum: locals.subtotal });
       }
-      emitDetail({
-        phaseIndex: 3,
-        title: parent === -1
-          ? bi(`Khép component gốc tại u${node}`, `Close the root component at u${node}`)
-          : bi(`Cắt cạnh u${parent}—u${node}`, `Cut edge u${parent}—u${node}`),
-        note: parent === -1
-          ? bi(
-            "Component còn lại chứa gốc cũng chia hết cho k; không có cạnh cha để cắt.",
-            "The remaining root component is also divisible by k; it has no parent edge to cut.",
-          )
-          : bi(
-            "Subtotal chia hết cho k tạo một component độc lập; gửi 0 lên parent để loại component này khỏi các tổng phía trên.",
-            "A subtotal divisible by k forms an independent component; send 0 upward to remove it from ancestor totals.",
-          ),
-        action: bi("Tăng components và cắt contribution lên parent.", "Increment components and cut the contribution to the parent."),
-        formula: bi(
-          `${runningSubtotal} mod ${k} = 0 ⇒ components=${componentCount}, up[${node}]=0`,
-          `${runningSubtotal} mod ${k} = 0 ⇒ components=${componentCount}, up[${node}]=0`,
-        ),
-        codeLines: [31, 32, 33],
-        activeNode: node,
-        activeNodes: [node],
-        activeEdge: parent === -1 ? null : [parent, node],
-        queue: [node, ...postorder.slice(orderIndex + 1)],
-        childContributions,
-      });
+      emit(33, { phase: parent === -1 ? "close" : "cut" });
     } else {
-      emitDetail({
-        phaseIndex: 2,
-        title: bi(`Giữ component mở tại u${node}`, `Keep the component at u${node} open`),
-        note: bi(
-          `Subtotal còn dư ${remainder[node]}, nên toàn bộ ${runningSubtotal} tiếp tục được đẩy lên parent.`,
-          `The subtotal leaves remainder ${remainder[node]}, so the full ${runningSubtotal} continues to the parent.`,
-        ),
-        action: bi("Lưu subtotal làm contribution lên parent.", "Store the subtotal as the parent contribution."),
-        formula: bi(
-          `${runningSubtotal} mod ${k} = ${remainder[node]} ⇒ up[${node}]=${runningSubtotal}`,
-          `${runningSubtotal} mod ${k} = ${remainder[node]} ⇒ up[${node}]=${runningSubtotal}`,
-        ),
-        codeLines: [31, 34, 35],
-        activeNode: node,
-        activeNodes: [node],
-        queue: [node, ...postorder.slice(orderIndex + 1)],
-        childContributions,
-      });
+      locals.contribution[node] = locals.subtotal;
+      processed.add(node);
+      emit(35, { phase: "carry" });
     }
   }
+  emit(26, { condition: false, exhausted: true });
 
-  if (contribution[0] !== 0 || remainder[0] !== 0) {
-    throw new Error(`#${PROBLEM_ID}: divisible total must close the root component`);
-  }
-  if (cutEdges.size !== componentCount - 1) {
-    throw new Error(`#${PROBLEM_ID}: component and cut counts are inconsistent`);
-  }
-
-  finalComponents = collectFinalComponents(tree, values, cutEdges);
-  if (finalComponents.length !== componentCount
-    || finalComponents.some((component) => component.sum % k !== 0)
+  const finalComponents = collectFinalComponents(tree, values, cutEdges);
+  if (locals.contribution[0] !== 0 || cutEdges.size !== locals.components - 1
+    || finalComponents.length !== locals.components
+    || finalComponents.some(component => component.sum % k !== 0)
     || finalComponents.reduce((sum, component) => sum + component.sum, 0) !== total) {
-    throw new Error(`#${PROBLEM_ID}: reconstructed components violate the divisibility invariant`);
+    throw new Error("#2872: reconstructed components violate the divisibility invariant");
   }
-
-  emit({
-    phaseIndex: 4,
-    title: bi(
-      `Số component lớn nhất = ${componentCount}`,
-      `Maximum component count = ${componentCount}`,
-    ),
-    note: tracer.truncated
-      ? bi(
-        `Trace chi tiết đã được giới hạn ở ${LIMITS.maxDetailedTraceEvents} sự kiện, nhưng DFS, mọi subtotal, mọi cạnh cắt và đáp án vẫn được tính đầy đủ.`,
-        `Detailed tracing was capped at ${LIMITS.maxDetailedTraceEvents} events, but DFS, every subtotal, every cut, and the answer were still computed in full.`,
-      )
-      : bi(
-        "Mỗi component dựng lại đều có tổng chia hết cho k. Cắt thêm cạnh sẽ phá ít nhất một component hợp lệ, nên postorder greedy đạt cực đại.",
-        "Every reconstructed component has a sum divisible by k. Any extra cut would break at least one valid component, so the postorder greedy result is maximal.",
-      ),
-    action: bi("Trả về số component đã khép.", "Return the number of closed components."),
-    formula: bi(
-      `answer=${componentCount}; cuts=${cutEdges.size}; components=cuts+1`,
-      `answer=${componentCount}; cuts=${cutEdges.size}; components=cuts+1`,
-    ),
-    codeLines: [36],
-    activeNode: null,
-    activeNodes: [],
-    queue: [],
-    childContributions: [],
-    final: true,
+  emit(36, { phase: "done" });
+  steps.forEach((step, index) => {
+    const nextLine = steps[index + 1]?.codeLines[0] ?? null;
+    step.kDivisible2872View.nextLine = nextLine;
+    step.kDivisible2872View.nextSource = nextLine === null ? null : SOURCE[nextLine - 1];
   });
-
   return {
-    original: {
-      n,
-      edges: edges.map((edge) => [...edge]),
-      values: [...values],
-      k,
-    },
-    answer: componentCount,
-    steps: tracer.finish(),
+    original: { n, edges: edges.map(edge => [...edge]), values: [...values], k },
+    answer: locals.components, steps,
   };
 }
 
@@ -843,12 +525,12 @@ module.exports = {
       time: "O(n)",
       space: "O(n)",
       note: bi(
-        "Mỗi node và cạnh được xử lý số lần hằng số. Trace semantic bị giới hạn, nhưng toàn bộ DFS và phép tính đáp án luôn hoàn tất.",
-        "Each node and edge is processed a constant number of times. Semantic tracing is bounded, while the full DFS and answer computation always complete.",
+        "Mỗi node và cạnh được xử lý số lần hằng số. Debug từng dòng giữ đủ mọi bước, kể cả điều kiện và lần kết thúc vòng lặp.",
+        "Each node and edge is processed a constant number of times. Line-by-line debugging retains every step, including conditions and loop exhaustion.",
       ),
     },
     code: SOURCE,
-    debugMode: "semantic",
+    debugMode: "line-by-line",
     parser: parseMaximumKDivisibleComponents2872Input,
     parseMaximumKDivisibleComponents2872Input,
     liveArgs(input, params = {}) {
