@@ -482,7 +482,7 @@ function buildSteps2872(input, params = {}) {
     const currentRemainder = activeNode === null || remainder[activeNode] === null
       ? "—"
       : remainder[activeNode];
-    return tracer.emit({
+    const recorded = tracer.emit({
       phaseIndex: config.phaseIndex,
       title: config.title,
       note: config.note,
@@ -527,6 +527,53 @@ function buildSteps2872(input, params = {}) {
       final: Boolean(config.final),
       answer: config.final ? componentCount : null,
     });
+    if (!recorded) return false;
+
+    const step = tracer.steps.at(-1);
+    const phase = config.final ? "done"
+      : config.phaseIndex === 0 ? "start"
+        : config.phaseIndex === 1 ? "order"
+          : config.phaseIndex === 3 ? (tree.parent[activeNode] === -1 ? "close" : "cut")
+            : config.activeEdge ? "merge" : "carry";
+    const transfer = phase === "merge" ? config.childContributions.at(-1) : null;
+    const pieces = collectFinalComponents(tree, values, cutEdges);
+    const closedGroups = completedComponents.map((component, index) => ({
+      id: index,
+      root: component.root,
+      sum: component.sum,
+      members: [...pieces.find(piece => piece.root === component.root).members],
+    }));
+    const watchNode = config.final ? tree.root : activeNode;
+    step.vars = [
+      { name: "node", value: watchNode ?? "—" },
+      { name: "k", value: k },
+      { name: "subtotal", value: watchNode === null ? "—" : subtotal[watchNode] ?? "—" },
+      { name: "subtotal % k", value: watchNode === null ? "—" : remainder[watchNode] ?? "—" },
+      { name: "contribution[node]", value: watchNode === null ? "—" : contribution[watchNode] ?? "—" },
+      { name: "components", value: componentCount },
+    ];
+    const captions = {
+      start: bi("🌳 Cây ban đầu", "🌳 The starting tree"),
+      order: bi("🍃 Từ lá lên gốc", "🍃 Leaves toward the root"),
+      merge: transfer?.value === 0 ? bi("✂ Nhóm đã tách · +0", "✂ Already separated · +0") : bi("↑ Cộng từ cây con", "↑ Add the child total"),
+      carry: bi("↑ Chuyển tổng lên cha", "↑ Send the total upward"),
+      cut: bi("✂ Tách một nhóm", "✂ Separate a component"),
+      close: bi("✓ Chốt nhóm gốc", "✓ Complete the root component"),
+      done: bi(`🏁 ${componentCount} nhóm`, `🏁 ${componentCount} component${componentCount === 1 ? "" : "s"}`),
+    };
+    step.title = captions[phase];
+    step.note = bi("", "");
+    step.kDivisible2872View = {
+      n, k, phase, activeNode, components: componentCount,
+      values: [...values], edges: edges.map(edge => [...edge]),
+      parent: [...tree.parent], children: tree.children.map(children => [...children]),
+      postorder: [...postorder], processed: [...processed],
+      subtotal: [...subtotal], remainder: [...remainder], contribution: [...contribution],
+      cuts: cutRecords.map(cut => ({ ...cut })), closedGroups,
+      transfer: transfer ? { from: transfer.child, to: transfer.parent, amount: transfer.value, before: subtotal[activeNode] - transfer.value, after: subtotal[activeNode] } : null,
+      traceTruncated: tracer.truncated,
+    };
+    return true;
   }
 
   function emitDetail(config) {
@@ -747,8 +794,8 @@ module.exports = {
       "Maximum Number of K-Divisible Components",
     ),
     titleVi: bi(
-      "Cắt cây tối đa bằng tổng cây con chia hết",
-      "Maximize tree cuts with divisible subtree sums",
+      "Cộng từ lá · chia hết thì cắt",
+      "Accumulate from leaves · cut divisible totals",
     ),
     statement: bi(
       "Cho cây vô hướng n node, values[u] tại mỗi node và số dương k. Cắt một số cạnh để tối đa hóa số component sao cho tổng values trong mọi component đều chia hết cho k.",
@@ -780,20 +827,16 @@ module.exports = {
     visualizationLimits: { ...LIMITS },
     approach: [
       bi(
-        "Dùng DFS stack từ gốc 0 để định hướng cây tổng quát và lấy thứ tự parent-trước-child; đảo thứ tự thành postorder.",
-        "Use stack-based DFS from root 0 to orient the general tree and obtain parent-before-child order; reverse it into postorder.",
+        "Đi từ lá lên. Mỗi nút cộng giá trị riêng và phần các con gửi lên.",
+        "Work upward from the leaves. Add each node's value and its children's contributions.",
       ),
       bi(
-        "Tại u, cộng values[u] với contribution của mọi child đã xử lý; child component đã cắt đóng góp 0.",
-        "At u, add values[u] and every processed child's contribution; an already cut child component contributes 0.",
+        "Tổng chia hết cho k → tách nhóm, gửi 0. Còn dư → gửi tổng lên cha.",
+        "A divisible total forms a component and sends 0. Otherwise, send the total upward.",
       ),
       bi(
-        "Nếu subtotal chia hết cho k, tăng số component và trả contribution 0; ngược lại đẩy toàn bộ subtotal lên parent.",
-        "If the subtotal is divisible by k, increment the component count and return contribution 0; otherwise send the full subtotal to the parent.",
-      ),
-      bi(
-        "Vì tổng toàn cây chia hết cho k, component chứa gốc luôn khép. Mỗi lần khép sớm tạo thêm một component hợp lệ nên kết quả là lớn nhất.",
-        "Because the whole-tree total is divisible by k, the root component always closes. Every earliest closure creates one additional valid component, making the result maximal.",
+        "Đếm cả nhóm cuối chứa gốc; gốc không có cạnh cha để cắt.",
+        "Count the final root component too; the root has no parent edge to cut.",
       ),
     ],
     complexity: {
