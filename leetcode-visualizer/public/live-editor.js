@@ -779,6 +779,20 @@ class Node:
     def __repr__(self):
         return f"Node(val={self.val})"
 
+class CategoryHandler:
+    def __init__(self, categories):
+        if not isinstance(categories, list) or not 1 <= len(categories) <= 100 or any(type(value) is not int for value in categories):
+            raise ValueError("CategoryHandler requires 1..100 integer labels.")
+        self._categories = tuple(categories)
+
+    def haveTheSameCategory(self, left, right):
+        if any(type(index) is not int or not 0 <= index < len(self._categories) for index in (left, right)):
+            raise ValueError("CategoryHandler indices must be in [0, n).")
+        return self._categories[left] == self._categories[right]
+
+    def __repr__(self):
+        return f"CategoryHandler({len(self._categories)} hidden items)"
+
 class HtmlParser:
     def __init__(self, edges):
         self.graph = defaultdict(list)
@@ -913,6 +927,8 @@ def __viz_materialize(value, context=None, namespace=None):
         return top[0] if top else None
     if isinstance(value, dict) and value.get("__viz_type") == "html_parser":
         return HtmlParser(value.get("edges", []))
+    if isinstance(value, dict) and value.get("__viz_type") == "category_handler":
+        return CategoryHandler(value.get("categories", []))
     if isinstance(value, dict) and value.get("__viz_type") == "parent_tree_ref":
         root, nodes = __viz_build_node_tree(value.get("values", []), True)
         context["tree:" + value.get("tree_id", "parent_tree")] = (root, nodes)
@@ -1074,6 +1090,7 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracl
         "ListNode": ListNode,
         "Node": Node,
         "HtmlParser": HtmlParser,
+        "CategoryHandler": CategoryHandler,
         "Employee": Employee,
     }
     if oracle_config is not None:

@@ -1,0 +1,70 @@
+.uc2782-viz {
+  --uc-text: #e2e8f0; --uc-muted: #a9b8cf; --uc-surface: #152238; --uc-line: #41516a;
+  --uc-box: #293b55; --uc-lid: #354e6d; --uc-blue: #7db6ff; --uc-gold: #fbbf24;
+  --uc-green: #6ee7b7; --uc-red: #fda4af; --uc-purple: #c4b5fd; --uc-cyan: #67e8f9;
+  display: grid; gap: 14px; min-width: 0; color: var(--uc-text); text-align: left;
+}
+[data-theme="light"] .uc2782-viz {
+  --uc-text: #172339; --uc-muted: #52627a; --uc-surface: #f1f6fc; --uc-line: #c9d4e3;
+  --uc-box: #d6e5f5; --uc-lid: #e7f1fc; --uc-blue: #2563eb; --uc-gold: #a55a00;
+  --uc-green: #047857; --uc-red: #be123c; --uc-purple: #7c3aed; --uc-cyan: #0e7490;
+}
+.uc2782-viz * { box-sizing: border-box; }
+#treeView:has(> .uc2782-viz) { border: 0; padding: 0; background: transparent; min-height: 0; overflow: visible; }
+#vizPanel:has(.uc2782-viz) #stepNote { display: none; }
+#vizPanel:has(.uc2782-viz) #varsPanel.vars-panel { display: block; max-height: none; overflow: visible; }
+#vizPanel:has(.uc2782-viz) #varsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
+[data-theme="light"] #vizPanel:has(.uc2782-viz) .var-name { color: #4338ca; }
+.uc2782-strip-label, .uc2782-group-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.uc2782-viz small { font-size: 12px; color: var(--uc-muted); }
+.uc2782-items { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; }
+.uc2782-item { --uc-tone: var(--uc-muted); display: grid; justify-items: center; gap: 5px; min-width: 46px; position: relative; }
+.uc2782-box { position: relative; isolation: isolate; display: grid; place-items: center; width: 46px; height: 43px; margin-top: 10px; background: var(--uc-box); border: 1px solid var(--uc-line); border-radius: 3px 3px 7px 7px; box-shadow: inset -8px 0 0 color-mix(in srgb, var(--uc-text) 7%, transparent); }
+.uc2782-box::before { content: ""; position: absolute; top: -10px; left: -1px; right: -1px; height: 13px; background: var(--uc-lid); border: 1px solid var(--uc-line); border-radius: 7px 7px 2px 2px; transform: skewX(-12deg); }
+.uc2782-box > i { position: absolute; width: 8px; height: 18px; left: 18px; top: -10px; border-inline: 1px solid var(--uc-line); background: color-mix(in srgb, var(--uc-gold) 20%, var(--uc-lid)); z-index: 1; }
+.uc2782-box > b { font-size: 23px; color: var(--uc-muted); line-height: 1; }
+.uc2782-item.known .uc2782-box { background: color-mix(in srgb, var(--uc-tone) 16%, var(--uc-surface)); }
+.uc2782-item.known .uc2782-box > b { color: var(--uc-tone); }
+.uc2782-item.current .uc2782-box { outline: 3px solid var(--uc-gold); outline-offset: 3px; }
+.uc2782-item.representative:not(.current) .uc2782-box { outline: 2px solid var(--uc-blue); outline-offset: 3px; }
+.uc2782-role { color: var(--uc-text); font-size: 12px; font-family: monospace; }
+.uc2782-item > small { white-space: nowrap; }
+.uc2782-comparison { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; gap: 10px; min-height: 150px; padding: 14px; border-radius: 12px; background: var(--uc-surface); }
+.uc2782-oracle { display: grid; justify-items: center; gap: 6px; min-width: 0; }
+.uc2782-oracle > small { overflow-wrap: anywhere; text-align: center; font-size: 11px; }
+.uc2782-oracle > span { font-size: 13px; }
+.uc2782-link { display: flex; align-items: center; width: 100%; gap: 8px; color: var(--uc-blue); }
+.uc2782-link i { height: 2px; flex: 1; background: currentColor; opacity: .5; }
+.uc2782-link b { display: grid; place-items: center; min-width: 44px; height: 44px; font-size: 32px; font-weight: 500; }
+.uc2782-comparison.is-same .uc2782-link, .uc2782-comparison.is-same .uc2782-oracle > span { color: var(--uc-green); }
+.uc2782-comparison.is-different .uc2782-link, .uc2782-comparison.is-different .uc2782-oracle > span { color: var(--uc-red); }
+.uc2782-comparison.is-new .uc2782-link, .uc2782-comparison.is-new .uc2782-oracle > span { color: var(--uc-gold); }
+.uc2782-ghost { display: grid; place-items: center; min-height: 60px; font-size: 36px; color: var(--uc-muted); opacity: .55; }
+.uc2782-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)); gap: 12px; }
+.uc2782-group { --uc-tone: var(--uc-blue); position: relative; padding: 9px 10px 15px; background: color-mix(in srgb, var(--uc-tone) 7%, var(--uc-surface)); border-radius: 8px; min-width: 0; }
+.uc2782-group.selected { box-shadow: 0 0 0 2px var(--uc-tone); }
+.uc2782-group > header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.uc2782-group > header b { color: var(--uc-tone); font-size: 20px; }
+.uc2782-group > header strong { font-size: 12px; font-weight: 500; }
+.uc2782-group > header small { margin-left: auto; font-size: 11px; }
+.uc2782-members { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 10px; }
+.uc2782-members > span { display: grid; place-items: center; min-width: 32px; min-height: 28px; padding: 3px; color: var(--uc-text); background: color-mix(in srgb, var(--uc-tone) 12%, var(--uc-surface)); border-radius: 5px; font: 12px monospace; }
+.uc2782-members .just-added { outline: 2px solid var(--uc-gold); outline-offset: 1px; }
+.uc2782-tray { position: absolute; height: 7px; bottom: 0; left: 5px; right: 5px; border: 2px solid var(--uc-tone); border-top: 0; border-radius: 0 0 8px 8px; opacity: .7; }
+.uc2782-empty { display: grid; place-items: center; min-height: 85px; color: var(--uc-muted); border-bottom: 2px dashed var(--uc-line); font-size: 30px; opacity: .5; }
+.uc2782-complete { display: grid; justify-items: center; gap: 5px; padding: 16px; background: var(--uc-surface); border-radius: 12px; }
+.uc2782-complete > span { color: var(--uc-green); letter-spacing: 6px; font-size: 20px; }
+.uc2782-complete > strong { font-size: 40px; line-height: 1; color: var(--uc-text); font-weight: 500; }
+.uc2782-crop { text-align: center; overflow-wrap: anywhere; }
+.uc2782-viz .tone-0 { --uc-tone: var(--uc-blue); }
+.uc2782-viz .tone-1 { --uc-tone: var(--uc-green); }
+.uc2782-viz .tone-2 { --uc-tone: var(--uc-purple); }
+.uc2782-viz .tone-3 { --uc-tone: var(--uc-gold); }
+.uc2782-viz .tone-4 { --uc-tone: var(--uc-red); }
+.uc2782-viz .tone-5 { --uc-tone: var(--uc-cyan); }
+@media (max-width: 600px) {
+  .uc2782-items { gap: 8px; }
+  .uc2782-comparison { grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 6px; padding: 10px; }
+  .uc2782-oracle > small { font-size: 11px; }
+  .uc2782-link { gap: 3px; }
+}
