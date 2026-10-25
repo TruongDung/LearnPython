@@ -280,6 +280,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.nextWord9005View), surface: "treeView", render: (step) => {
       renderNextWord9005View(step);
     } },
+    { predicate: (step) => Boolean(step.palindrome680View), surface: "treeView", render: (step) => {
+      renderPalindrome680View(step);
+    } },
     { predicate: (step) => Boolean(step.kSum2386View), surface: "treeView", render: (step) => {
       renderKSum2386View(step);
     } },
