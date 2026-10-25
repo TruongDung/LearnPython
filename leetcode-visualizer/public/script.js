@@ -277,6 +277,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.maxConsecutiveOnes1004View), surface: "treeView", render: (step) => {
       renderMaxConsecutiveOnes1004View(step);
     } },
+    { predicate: (step) => Boolean(step.nextWord9005View), surface: "treeView", render: (step) => {
+      renderNextWord9005View(step);
+    } },
     { predicate: (step) => Boolean(step.kSum2386View), surface: "treeView", render: (step) => {
       renderKSum2386View(step);
     } },

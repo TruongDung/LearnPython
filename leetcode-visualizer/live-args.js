@@ -544,6 +544,13 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),
       );
     }
+    case 9005: {
+      const { sentences, query } = problem.parseNextWord9005Input(input, params);
+      return { ...designConfig("Predictor", [], [
+        { name: "train", args: [sentences] },
+        { name: "predict", args: [query] },
+      ]), resultMode: "last" };
+    }
     case 9001:
       return {
         functionName: "get_highest_earning_experiences",
