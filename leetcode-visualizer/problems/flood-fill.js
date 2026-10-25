@@ -1199,13 +1199,16 @@ function buildSteps463v2(input) {
 function buildSteps1254(input) {
   const { valid, grid } = parseBinary(input, true);
   const steps = [];
+  const variableValues = { r: "—", c: "—", "grid[r][c]": "—", count: "—", answer: "—" };
+  const snapshotVariables = () => Object.entries(variableValues).map(([name, value]) => ({ name, value }));
   if (!valid || grid.length < 3 || grid[0].length < 3) {
+    variableValues.answer = 0;
     steps.push({
       title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
       arr: [],
       bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
       highlight: [], mark: [], final: true, codeLines: [3],
-      vars: [{ name: "answer", value: 0 }],
+      vars: snapshotVariables(),
       note: {
         vi: "Grid phải gồm 0/1, kích thước tối thiểu 3×3. Ví dụ: 1111110|1000010|1011010|1000110|1111110.",
         en: "Grid must contain 0/1 and be at least 3×3. Example: 1111110|1000010|1011010|1000110|1111110.",
@@ -1221,6 +1224,7 @@ function buildSteps1254(input) {
   const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
   let island = 0;
   let closedCount = 0;
+  let countInitialized = false;
 
   const callStack = [];
   const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
@@ -1249,6 +1253,21 @@ function buildSteps1254(input) {
   function snap(o) {
     const line = (o.codeLines || [])[0];
     const current = o.cur || null;
+    const position = o.position || current;
+    for (const variable of o.vars || []) {
+      if (variable.name === "r" || variable.name === "c") variableValues[variable.name] = variable.value;
+    }
+    if (position) [variableValues.r, variableValues.c] = position;
+    if (line === 14 || line === 21) variableValues.c = "—";
+    if (line === 17) variableValues.r = "—";
+    if (line === 20) {
+      countInitialized = true;
+      variableValues.r = variableValues.c = "—";
+    }
+    const { r, c } = variableValues;
+    variableValues["grid[r][c]"] = Number.isInteger(r) && Number.isInteger(c) && r >= 0 && r < rows && c >= 0 && c < cols ? work[r][c] : "—";
+    variableValues.count = countInitialized ? closedCount : "—";
+    variableValues.answer = o.final ? closedCount : "—";
     const isCounting = line >= 20 || Boolean(o.final);
     const at = current ? `(${current[0]}, ${current[1]})` : "";
     const compact = o.final
@@ -1274,7 +1293,7 @@ function buildSteps1254(input) {
       },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      vars: [],
+      vars: snapshotVariables(),
       note: compact.note,
     });
   }
@@ -1299,7 +1318,7 @@ function buildSteps1254(input) {
     const oob = r < 0 || r >= rows || c < 0 || c >= cols;
     snap({
       title: { vi: `dfs(${r},${c}) — line 5: kiểm tra biên`, en: `dfs(${r},${c}) — line 5: boundary check` },
-      cur: oob ? null : [r, c], codeLines: [5],
+      position: [r, c], cur: oob ? null : [r, c], codeLines: [5],
       vars: [{ name: "r, c", value: `${r}, ${c}` }, { name: "out of bounds?", value: oob }],
       note: {
         vi: oob ? `(${r},${c}) nằm NGOÀI grid → line 6 return.` : `(${r},${c}) trong grid → sang line 7.`,
@@ -1471,7 +1490,7 @@ function buildSteps1254(input) {
       closedCount += 1;
       snap({
         title: { vi: `line 25: count += 1 → ${closedCount}`, en: `line 25: count += 1 → ${closedCount}` },
-        codeLines: [25],
+        cur: [r, c], codeLines: [25],
         vars: [{ name: "count", value: closedCount }],
         note: { vi: `Đảo closed #${island} đã được đếm. count = ${closedCount}.`, en: `Closed island #${island} counted. count = ${closedCount}.` },
       });

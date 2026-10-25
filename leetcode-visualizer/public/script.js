@@ -1691,6 +1691,7 @@ function renderStep() {
   if (!step) return;
 
   const panel = $("vizPanel");
+  panel.classList.toggle("ci1254-tracking", Boolean(step.closedIsland1254View));
   panel.classList.toggle("ci1568-daylight", Boolean(step.disconnect1568View));
   if (step.disconnect1568View) panel.dataset.theme = "light";
   else delete panel.dataset.theme;

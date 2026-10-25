@@ -6425,15 +6425,27 @@ body:has(.rp1786-viz) #stepNote { display: none; }
 .ci1254-count strong { color: #6ee7b7; font-size: 18px; }
 
 #vizPanel:has(.ci1254-viz) #stepNote { display: none; }
+#vizPanel.ci1254-tracking #varsPanel.vars-panel { display: block; max-height: none; overflow: visible; }
+#vizPanel.ci1254-tracking #varsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
 
+[data-theme="light"] #vizPanel.ci1254-tracking #bfsGridView { color: #1e293b; background: #f0f9ff; border-color: #bae6fd; }
+[data-theme="light"] #vizPanel.ci1254-tracking .var-name { color: #4338ca; }
 [data-theme="light"] .ci1254-viz { color: #1e293b; }
 [data-theme="light"] .ci1254-phases > span { color: #64748b; background: #f8fafc; }
 [data-theme="light"] .ci1254-phases > span.is-active { color: #92400e; background: #fffbeb; }
 [data-theme="light"] .ci1254-phases > span.is-done { color: #047857; }
 [data-theme="light"] .ci1254-cell { background-color: #f1f5f9; }
 [data-theme="light"] .ci1254-cell.is-water { background: linear-gradient(145deg, #cffafe, #dbeafe); }
+[data-theme="light"] .ci1254-cell.is-water .ci1254-mark::before,
+[data-theme="light"] .ci1254-cell.is-water .ci1254-mark::after { border-color: #0284c7; }
 [data-theme="light"] .ci1254-cell.is-land { background: linear-gradient(145deg, #dcfce7, #bbf7d0); }
 [data-theme="light"] .ci1254-cell.is-flooded { background: linear-gradient(145deg, #e0f2fe, #dbeafe); }
+[data-theme="light"] .ci1254-cell.is-flooded .ci1254-mark,
+[data-theme="light"] .ci1254-legend .is-flooded i { border-color: #0284c7; }
+[data-theme="light"] .ci1254-cell.is-flooded .ci1254-mark::after { background: #0284c7; }
 [data-theme="light"] .ci1254-cell.is-island { background: linear-gradient(145deg, #d1fae5, #a7f3d0); }
 [data-theme="light"] .ci1254-cell > small { color: #047857; }
 [data-theme="light"] .ci1254-cell > small { background: #d1fae5; }

@@ -38,7 +38,9 @@ test("1254 keeps the correct answer while attaching a picture-first state to eve
     assert.equal(run.answer, answer);
     assert.ok(run.steps.length > 0);
     assert.ok(run.steps.every((step) => step.closedIsland1254View));
-    assert.ok(run.steps.every((step) => step.vars.length === 0));
+    for (const step of run.steps) assert.deepEqual(step.vars.map(variable => variable.name), ["r", "c", "grid[r][c]", "count", "answer"]);
+    assert.equal(run.steps.at(-1).vars.find(variable => variable.name === "count").value, answer);
+    assert.equal(run.steps.at(-1).vars.find(variable => variable.name === "answer").value, answer);
   }
 
   const run = problem.builder(problem.defaultInput);
@@ -66,4 +68,24 @@ test("1254 renders a compact illustrated map instead of emoji-filled text labels
   assert.match(css, /\.ci1254-cell\.is-water \.ci1254-mark::before/);
   assert.match(css, /\.ci1254-cell\.is-land \.ci1254-mark/);
   assert.match(css, /#vizPanel:has\(\.ci1254-viz\) #stepNote/);
+});
+
+test("1254 watches follow recursive coordinates, flooding, and count initialization", () => {
+  const values = step => Object.fromEntries(step.vars.map(variable => [variable.name, variable.value]));
+  const steps = problem.builder("000|010|000").steps;
+  assert.equal(values(steps[0]).count, "—");
+  for (const step of steps) {
+    const state = values(step);
+    if (step.codeLines[0] === 9) assert.equal(state["grid[r][c]"], 1);
+    const current = step.bfsGrid.cells.flatMap((row, r) => row.flatMap((cell, c) => cell.isCurrent ? [[r, c]] : []))[0];
+    if (current) assert.deepEqual([state.r, state.c], current);
+    if (Number.isInteger(state.r) && Number.isInteger(state.c) && (state.r < 0 || state.r >= 3 || state.c < 0 || state.c >= 3)) {
+      assert.equal(state["grid[r][c]"], "—");
+    }
+  }
+  assert.ok(steps.some(step => values(step).r === -1));
+  assert.equal(values(steps.find(step => step.codeLines[0] === 20)).count, 0);
+  const counted = problem.builder("111|101|111").steps.find(step => step.codeLines[0] === 25);
+  assert.deepEqual(values(counted), { r: 1, c: 1, "grid[r][c]": 1, count: 1, answer: "—" });
+  assert.deepEqual(problem.builder("invalid").steps[0].vars.map(variable => variable.name), ["r", "c", "grid[r][c]", "count", "answer"]);
 });
