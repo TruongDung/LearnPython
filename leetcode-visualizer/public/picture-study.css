@@ -13,6 +13,7 @@
 #treeView:has(> .study-viz) { min-height:0; padding:0; border:0; overflow:visible; background:transparent; }
 #vizPanel:has(.study-viz) #stepNote, #vizPanel:has(.study-viz) #answer { display:none; }
 #vizPanel:has(.study-viz) #codePanel { height:auto; max-height:440px; max-width:100%; overflow-x:auto; overflow-y:auto; position:static; }
+#vizPanel:has(.study-island-grid) #codePanel { max-height:none; overflow-y:hidden; }
 #vizPanel:has(.study-viz) #codePanel .code-line { width:max-content; min-width:100%; white-space:pre; }
 #vizPanel:has(.study-viz) #codePanel .txt { flex:0 0 auto; white-space:pre; overflow-wrap:normal; word-break:normal; }
 #vizBody:has(.study-viz) { display:flex; flex-direction:column; }
