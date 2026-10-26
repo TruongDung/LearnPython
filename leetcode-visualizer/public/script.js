@@ -989,7 +989,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderSearchMatrix240View(step);
     } },
     { predicate: (step) => Boolean(step.search74View), surface: "treeView", render: (step) => {
-      renderSearchMatrix74View(step);
+      renderSearchMatrix74Pictures(step);
     } },
     { predicate: (step) => Boolean(step.zero73View), surface: "treeView", render: (step) => {
       renderSetMatrixZeroes73View(step);
