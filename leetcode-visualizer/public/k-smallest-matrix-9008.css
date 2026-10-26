@@ -3,9 +3,9 @@
 .km8-viz * { box-sizing:border-box; }
 #treeView:has(> .km8-viz) { min-height:0; padding:0; border:0; overflow:visible; background:transparent; }
 #vizPanel:has(.km8-viz) #stepNote, #vizPanel:has(.km8-viz) #answer { display:none; }
-#vizPanel:has(.km8-viz) .code-panel { height:auto; max-height:none; overflow-y:hidden; position:static; }
-#vizPanel:has(.km8-viz) .code-line { min-width:0; width:100%; white-space:pre-wrap; }
-#vizPanel:has(.km8-viz) .code-line .txt { flex:1 1 auto; min-width:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+#vizPanel:has(.km8-viz) .code-panel { height:auto; max-height:none; overflow-x:auto; overflow-y:hidden; position:static; font-size:11px; }
+#vizPanel:has(.km8-viz) .code-line { min-width:100%; width:max-content; white-space:pre; }
+#vizPanel:has(.km8-viz) .code-line .txt { flex:0 0 auto; white-space:pre; overflow-wrap:normal; }
 #vizBody:has(.km8-viz) { display:flex; flex-direction:column; }
 #vizPanel:has(.km8-viz) #varsPanel { order:-1; display:block; max-height:none; overflow:visible; margin:0 0 14px; background:#171d30; position:sticky; top:8px; z-index:30; }
 [data-theme="light"] #vizPanel:has(.km8-viz) #varsPanel { background:#f8fafc; }
