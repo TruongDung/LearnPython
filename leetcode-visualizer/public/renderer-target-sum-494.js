@@ -1,100 +1,33 @@
 function renderTargetSum494View(step) {
-  const view = step.targetSum494View;
-  const vi = lang === "vi";
-  const text = (vietnamese, english) => vi ? vietnamese : english;
-  const layers = [new Map([[0, 1]])];
-
-  for (const num of view.nums) {
-    const next = new Map();
-    for (const [sum, ways] of layers.at(-1)) {
-      next.set(sum + num, (next.get(sum + num) || 0) + ways);
-      next.set(sum - num, (next.get(sum - num) || 0) + ways);
-    }
-    layers.push(next);
+  const v = step.targetSum494View, host = $("treeView"), vi = lang === "vi";
+  const P = v.subsetTarget, t = v.transition, final = v.final, dpReady = v.dp.length > 0;
+  const indices = P === null ? [] : P <= 24 ? Array.from({ length: P + 1 }, (_, i) => i) : (() => {
+    const sums = new Set([0, 1, 2, P - 2, P - 1, P]);
+    for (const center of [t?.source, t?.destination]) if (center !== undefined) for (let delta = -2; delta <= 2; delta++) if (center + delta >= 0 && center + delta <= P) sums.add(center + delta);
+    return [...sums].sort((a, b) => a - b);
+  })();
+  const chips = v.nums.map((num, i) => `<span class="ts494p-num ${i === v.activeNumIndex && v.processed <= i ? "active" : ""} ${i < v.processed ? "done" : ""}"><small>[${i}]</small><b>${num}</b></span>`).join("");
+  const cell = (row, sum, before) => {
+    const count = row[sum], source = t?.source === sum && before, dest = t?.destination === sum && !before;
+    return `<span class="ts494p-cell ${source ? "source" : ""} ${dest ? "dest" : ""} ${before && t?.destination === sum ? "skip" : ""} ${sum === P ? "target" : ""}" data-sum="${sum}" title="${before ? "previous" : "dp"}[${sum}] = ${count}"><small>${sum}</small><b>${count}</b><i>${count <= 5 ? "●".repeat(count) : "● × " + count}</i></span>`;
+  };
+  const row = (values, before = false) => values.length ? indices.map((sum, i) => `${i && sum > indices[i - 1] + 1 ? '<span class="ts494p-gap">…</span>' : ""}${cell(values, sum, before)}`).join("") : '<span class="ts494p-empty">—</span>';
+  const feasible = v.checks.range !== false && v.checks.even !== false;
+  const reduction = P === null ? `<div class="ts494p-guards"><span>|target| ${Math.abs(v.target)} ≤ Σ ${v.total}<b>${v.checks.range === null ? "?" : v.checks.range ? "✓" : "×"}</b></span><span>(Σ + target) % 2<b>${v.checks.even === null ? "?" : v.checks.even ? "0 ✓" : "1 ×"}</b></span></div>`
+    : `<div class="ts494p-balance"><b class="plus" title="+ group">P ${P}</b><strong>−</strong><b class="minus" title="− group">N ${v.total - P}</b><strong>=</strong><b>🎯 ${v.target}</b><small>Σ ${v.total} · P = (${v.total} + ${v.target}) / 2</small></div>`;
+  let operation;
+  if (t) {
+    operation = `<div class="ts494p-route minus"><b>−${v.num}</b><span>dp[${t.destination}]</span><strong>${t.before}</strong></div><strong>+</strong><div class="ts494p-route plus"><b>+${v.num}</b><span>dp[${t.source}]</span><strong>${t.sourceWays}</strong></div><strong>→</strong><b class="ts494p-count">${t.after ?? "?"}</b>`;
+  } else if (final) operation = `<strong>${feasible ? "✓" : "×"}</strong><b class="ts494p-count">${v.answer}</b>`;
+  else if (v.phase === "choose-signs") operation = `<b class="minus">−${v.num}</b><strong>↘</strong><b class="plus">+${v.num}</b><strong>↙</strong><span>j: ${P} ← ${v.num}</span>`;
+  else if (v.phase === "initialize") operation = `<span>∅</span><strong>→</strong><span>dp[0] = 1</span>`;
+  else operation = `<span>${v.phase === "sum-end" ? "✓" : "Σ"}</span><b>${v.phase === "intro" ? v.total : v.phase === "reduction" ? `P = ${P}` : v.phase === "sum-end" ? `${v.processed} / ${v.nums.length}` : "←"}</b>`;
+  const dp = dpReady ? `<section class="ts494p-dp">${final ? "" : `<header><b>${vi ? "Trước số đang xét" : "Before this value"}</b><small>${v.previous.length ? `i = ${v.activeNumIndex}` : "—"}</small></header><div class="ts494p-row previous">${row(v.previous, true)}</div>`}<header><b>dp</b><small>← j · ${vi ? "tổng ở trên, số cách ở dưới" : "sum above, ways below"}</small></header><div class="ts494p-row current">${row(v.dp)}</div></section>` : '<section class="ts494p-dp"><div class="ts494p-empty">dp = —</div></section>';
+  const solutions = v.sampleAssignments.map(signs => `<div class="ts494p-expression">${signs.length ? signs.map((sign, i) => `<b class="${sign > 0 ? "plus" : "minus"}" title="nums[${i}]"><small>[${i}]</small>${sign > 0 ? "+" : "−"}${v.nums[i]}</b>`).join("") : '<b class="ts494p-empty">∅</b>'}<strong>= ${v.target}</strong></div>`).join("");
+  const history = v.history.map(record => `<span class="ts494p-history-item"><small>[${record.itemIndex}] ±${record.num}</small><b>${record.ways}</b></span>`).join("");
+  host.innerHTML = `<section class="ts494p-viz" aria-label="Target Sum 494"><header class="ts494p-heading"><b>#494 · ± TARGET SUM</b><small>${v.detailed ? "" : vi ? "Theo từng số · " : "Per value · "}${vi ? "Dòng" : "Line"} ${v.line}</small></header><div class="ts494p-input">${chips || "∅"}<strong>🎯 ${v.target}</strong></div>${reduction}<div class="ts494p-operation">${operation}</div>${dp}${solutions ? `<section class="ts494p-solutions"><header><b>± → 🎯</b><small>${v.sampleAssignments.length} / ${v.answer}</small></header><div class="ts494p-sample-grid">${solutions}</div></section>` : `<div class="ts494p-history"><small>dp[P]</small>${history || '<span class="ts494p-empty">—</span>'}</div>`}</section>`;
+  for (const container of host.querySelectorAll(".ts494p-row")) {
+    const current = container.querySelector(".source, .dest"); if (current) container.scrollLeft = Math.max(0, current.offsetLeft - container.clientWidth / 2 + current.clientWidth / 2);
   }
-
-  const visibleLayers = layers.map((layer) => {
-    const sorted = [...layer].sort((a, b) =>
-      Math.abs(a[0] - view.target) - Math.abs(b[0] - view.target) || a[0] - b[0],
-    );
-    return sorted.slice(0, 14).sort((a, b) => a[0] - b[0]);
-  });
-  const maxNodes = Math.max(1, ...visibleLayers.map((layer) => layer.length));
-  const height = Math.max(100, maxNodes * 34 + 34);
-  const width = Math.max(140, 90 + view.nums.length * 108);
-  const xAt = (layerIndex) => 44 + layerIndex * 108;
-  const positions = visibleLayers.map((layer, layerIndex) => {
-    const spacing = (height - 40) / Math.max(layer.length, 1);
-    return new Map(layer.map(([sum], nodeIndex) => [sum, 20 + spacing * (nodeIndex + 0.5)]));
-  });
-
-  const edges = view.nums.map((num, index) => {
-    const highlighted = index === view.activeNumIndex;
-    return visibleLayers[index].flatMap(([sum]) => [
-      [sum, sum + num, "+", "plus"],
-      [sum, sum - num, "−", "minus"],
-    ].flatMap(([from, to, sign, tone]) => {
-      const targetY = positions[index + 1].get(to);
-      if (targetY === undefined) return [];
-      const sourceY = positions[index].get(from);
-      const x1 = xAt(index) + 23;
-      const x2 = xAt(index + 1) - 23;
-      const middle = (x1 + x2) / 2;
-      return [
-        `<path class="ts494-edge ${tone}${highlighted ? " active" : ""}" d="M${x1},${sourceY} C${middle},${sourceY} ${middle},${targetY} ${x2},${targetY}"/>`,
-        `<text class="ts494-edge-label ${tone}${highlighted ? " active" : ""}" x="${middle}" y="${(sourceY + targetY) / 2 - 2}">${sign}</text>`,
-      ];
-    })).join("");
-  }).join("");
-
-  const nodes = visibleLayers.map((layer, layerIndex) => layer.map(([sum, ways]) => {
-    const y = positions[layerIndex].get(sum);
-    const active = Number.isInteger(view.activeNumIndex) && layerIndex === view.activeNumIndex + 1;
-    const target = sum === view.target;
-    const x = xAt(layerIndex);
-    return `<g class="ts494-node${active ? " active" : ""}${target ? " target" : ""}" transform="translate(${x} ${y})">
-      <circle r="22"/><text class="sum" y="-2">${sum}</text><text class="ways" y="11">×${ways}</text>
-    </g>`;
-  }).join("")).join("");
-
-  const layerLabels = view.nums.map((num, index) =>
-    `<text class="ts494-layer-label" x="${xAt(index + 1)}" y="12">${index + 1}: ±${num}</text>`,
-  ).join("");
-  const renderDpCell = (ways, sum) =>
-    `<span class="ts494-dp-cell${sum === view.subsetTarget ? " target" : ""}${step.highlight?.includes(sum) ? " current" : ""}">
-      <small>${sum}</small><strong>${ways}</strong>
-    </span>`;
-  const dpShown = view.dp.length <= 26
-    ? view.dp.map(renderDpCell).join("")
-    : (() => {
-        const start = Math.max(0, Math.min(view.subsetTarget - 12, view.dp.length - 24));
-        return `${start > 0 ? '<span class="ts494-ellipsis">…</span>' : ""}
-          ${view.dp.slice(start, start + 24).map((ways, offset) => renderDpCell(ways, start + offset)).join("")}
-          ${start + 24 < view.dp.length ? '<span class="ts494-ellipsis">…</span>' : ""}`;
-      })();
-  const activeTotal = view.currentSum === null ? null : view.currentSum;
-
-  $("treeView").innerHTML = `<section class="ts494-viz" role="img" aria-label="${text("Sơ đồ gán dấu cộng trừ bài 494", "Target Sum 494 sign-assignment diagram")}">
-    <header class="ts494-header">
-      <div><small>#494 · ${text("GÁN DẤU", "ASSIGN SIGNS")}</small><h3>${text("Mỗi số rẽ thành hai nhánh", "Each number branches two ways")}</h3></div>
-      <strong class="ts494-answer">${view.final || view.phase === "infeasible" ? view.answer : "?"}</strong>
-    </header>
-    <div class="ts494-number-row">${view.nums.map((num, index) =>
-      `<span class="${index === view.activeNumIndex ? "active" : ""}">${num}</span>`,
-    ).join('<i>→</i>')}<b>🎯 ${view.target}</b></div>
-    ${view.phase === "infeasible"
-      ? `<div class="ts494-empty">${text("Không có đường đến target", "No path reaches target")}</div>`
-      : `      <div class="ts494-graph-scroll"><svg class="ts494-graph" style="width:${width}px" viewBox="0 0 ${width} ${height}" role="presentation">
-          ${layerLabels}${edges}${nodes}
-        </svg></div>
-        <div class="ts494-legend"><span class="plus">＋ ${text("cộng", "add")}</span><span class="minus">− ${text("trừ", "subtract")}</span><span class="target">🎯 ${text("target", "target")}</span></div>
-        <section class="ts494-dp">
-          <header><strong>${text("Đếm cách", "Count ways")}</strong><span>P = (Σ + target) / 2 = ${view.subsetTarget}</span></header>
-          <div class="ts494-dp-cells">${dpShown}</div>
-        </section>
-        <div class="ts494-equation">${text("Tổng cần chọn", "Subset target")} <b>${view.subsetTarget}</b>
-          <span>↔</span> ${text("Tổng có dấu", "Signed sum")} <b>${view.target}</b>
-          ${activeTotal === null ? "" : `<em>j = ${activeTotal}</em>`}
-        </div>`}
-  </section>`;
+  const historyPane = host.querySelector(".ts494p-history"); if (historyPane) historyPane.scrollLeft = historyPane.scrollWidth;
 }
