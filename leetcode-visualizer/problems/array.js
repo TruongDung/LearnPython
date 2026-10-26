@@ -4464,21 +4464,44 @@ function buildSteps867(input) {
 }
 
 /** LeetCode 1337: The K Weakest Rows in a Matrix. */
-function buildSteps1337(input, params = {}) {
+function parseWeakRows1337(input, params = {}) {
   const matrix = parseIntegerMatrix2D(input);
+  if (matrix.some(row => row.some(value => value !== 0 && value !== 1))) throw new Error("mat must contain only 0 and 1");
   const k = Number(params.k);
   if (!Number.isInteger(k) || k <= 0 || k > matrix.length) throw new Error("k must be between 1 and the number of rows");
-  const steps = [matrixStep2D(matrix, { title: { vi: "Đếm soldiers ở từng hàng", en: "Count soldiers in every row" }, codeLines: [3], vars: [{ name: "k", value: k }], note: { vi: "Hàng yếu hơn có ít soldier hơn; nếu bằng nhau, chỉ số hàng nhỏ hơn đứng trước.", en: "A weaker row has fewer soldiers; ties use the smaller row index." }, grid: { caption: "1 = soldier, 0 = civilian" } })];
-  const strengths = [];
-  for (let r = 0; r < matrix.length; r++) {
-    const soldiers = matrix[r].reduce((sum, value) => sum + value, 0);
-    strengths.push([soldiers, r]);
-    steps.push(matrixStep2D(matrix, { title: { vi: `Hàng ${r}: ${soldiers} soldier`, en: `Row ${r}: ${soldiers} soldiers` }, codeLines: [4, 5], vars: [{ name: "row", value: r }, { name: "soldiers", value: soldiers }, { name: "pairs", value: strengths.map(([count, row]) => `(${count},${row})`).join(" ") }], note: { vi: `Tổng các bit của hàng ${r} là ${soldiers}.`, en: `The sum of row ${r}'s bits is ${soldiers}.` }, grid: { pathCells: matrix[r].map((_, c) => [r, c]), caption: "Counting this row" } }));
+  return { matrix, k };
+}
+
+function buildSteps1337(input, params = {}) {
+  const { matrix, k } = parseWeakRows1337(input, params);
+  const steps = [], strength = [];
+  let row = null;
+  const snap = (phase, line, vi, en, final = false) => steps.push({
+    title: { vi, en }, note: { vi, en }, codeLines: [line], final, arr: [], highlight: [], mark: [],
+    vars: [
+      { name: "r", value: row ?? "—" },
+      { name: "sum(row)", value: row === null ? "—" : matrix[row].reduce((sum, value) => sum + value, 0) },
+      { name: "len(strength)", value: strength.length }, { name: "k", value: k },
+    ],
+    weakRows1337View: {
+      matrix: cloneMatrix2D(matrix), k, row, phase,
+      strength: strength.map(pair => [...pair]),
+      answer: final ? strength.slice(0, k).map(([, r]) => r) : [],
+    },
+  });
+  snap("init", 3, "Đếm lính → xếp hàng → chọn k", "Count soldiers → rank rows → pick k");
+  for (row = 0; row < matrix.length; row++) {
+    snap("row", 4, `Xét hàng #${row}`, `Inspect row #${row}`);
+    const soldiers = matrix[row].reduce((sum, value) => sum + value, 0);
+    strength.push([soldiers, row]);
+    snap("count", 5, `Hàng #${row}: ${soldiers} lính`, `Row #${row}: ${soldiers} soldiers`);
   }
-  strengths.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const answer = strengths.slice(0, k).map(([, row]) => row);
-  steps.push(matrixStep2D(matrix, { title: { vi: `Sắp xếp và lấy ${k} hàng yếu nhất`, en: `Sort and take the ${k} weakest rows` }, codeLines: [6, 7], final: true, vars: [{ name: "sorted (soldiers,row)", value: strengths.map((item) => `(${item[0]},${item[1]})`).join(" ") }, { name: "answer", value: `[${answer.join(", ")}]` }], note: { vi: `Thứ tự sau sắp xếp cho ${k} hàng đầu là [${answer.join(", ")}].`, en: `The first ${k} row indexes after sorting are [${answer.join(", ")}].` }, grid: { pathCells: answer.flatMap((row) => matrix[row].map((_, col) => [row, col])), caption: "Weakest rows highlighted" } }));
-  return { original: matrix, answer, steps };
+  // Python keeps the final loop binding after enumerate finishes.
+  row = matrix.length - 1;
+  strength.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  snap("sort", 6, "Ít lính đứng trước · hòa thì # nhỏ trước", "Fewer soldiers first · ties use smaller #");
+  snap("pick", 7, `Chọn ${k} hàng yếu nhất`, `Pick the ${k} weakest rows`, true);
+  return { original: cloneMatrix2D(matrix), answer: strength.slice(0, k).map(([, r]) => r), steps };
 }
 
 /** LeetCode 1351: Count Negative Numbers in a Sorted Matrix. */
@@ -12523,7 +12546,8 @@ Object.assign(module.exports, {
     defaultInput: "1,1,0,0,0;1,1,1,1,0;1,0,0,0,0;1,1,0,0,0;1,1,1,1,1", inputKind: "string", inputLabel: { vi: "mat (hàng cách ;)", en: "mat (rows separated by ;)" }, extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 3, min: 1 }],
     approach: [{ vi: "Đếm soldier (tổng các bit) của từng hàng.", en: "Count soldiers (the row's bit sum) in each row." }, { vi: "Sắp xếp cặp (soldiers, rowIndex), rồi lấy k chỉ số đầu.", en: "Sort (soldiers, rowIndex) pairs and take the first k indexes." }],
     complexity: { time: "O(m·n + m log m)", space: "O(m)", note: { vi: "Mảng pair lưu strength của từng hàng.", en: "A pair array stores every row's strength." } },
-    code: ["class Solution:", "    def kWeakestRows(self, mat, k):", "        strength = []", "        for r, row in enumerate(mat):", "            strength.append((sum(row), r))", "        strength.sort()", "        return [row for _, row in strength[:k]]"], builder: buildSteps1337,
+    code: ["class Solution:", "    def kWeakestRows(self, mat, k):", "        strength = []", "        for r, row in enumerate(mat):", "            strength.append((sum(row), r))", "        strength.sort()", "        return [row for _, row in strength[:k]]"], debugMode: "line-by-line", builder: buildSteps1337,
+    liveArgs: (input, params = {}) => { const { matrix, k } = parseWeakRows1337(input, params); return [matrix, k]; },
   },
   1351: {
     id: 1351, difficulty: "easy", slug: "count-negative-numbers-in-a-sorted-matrix",
