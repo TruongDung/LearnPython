@@ -1,78 +1,42 @@
 function renderOnesAndZeroes474View(step) {
-  const view = step.onesZeros474View;
-  const vi = lang === "vi";
-  const text = (vietnamese, english) => vi ? vietnamese : english;
-  const escape = (value) => String(value).replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  })[character]);
-  const active = Number.isInteger(view.activeIndex) ? view.strings[view.activeIndex] : null;
-  const maxDp = view.dp.reduce(
-    (maximum, row) => row.reduce((rowMaximum, count) => Math.max(rowMaximum, count), maximum),
-    1,
-  );
-  const strings = view.strings.map((item) => {
-    const state = view.final || item.index < (view.activeIndex ?? -1)
-      ? "done"
-      : item.index === view.activeIndex ? "active" : "";
-    const bits = [...item.text].map((bit) => {
-      const tone = bit === "0" ? "bit-0" : bit === "1" ? "bit-1" : "bit-other";
-      return `<i class="bit ${tone}">${escape(bit)}</i>`;
-    }).join("");
-    return `<div class="oz474-string ${state}">
-      <small>#${item.index + 1}</small><div class="oz474-bits">${bits || `<i class="oz474-empty">∅</i>`}</div>
-      <b><span class="zero">0×${item.zeros}</span><span class="one">1×${item.ones}</span></b>
-    </div>`;
+  const v = step.onesZeros474View, host = $("treeView"), vi = lang === "vi", esc = escapeHtml, t = v.transition;
+  const bits = text => text ? [...text].map(bit => `<i class="ozp-bit ${bit === "0" ? "zero" : "one"}">${bit}</i>`).join("") : '<i class="ozp-empty">∅</i>';
+  const chosen = new Set(v.witness || []), shown = v.strings.length <= 12 ? v.strings.map(s => s.index) : (() => {
+    const set = new Set([0, 1, v.strings.length - 2, v.strings.length - 1]);
+    if (v.activeIndex !== null) for (let d = -2; d <= 2; d++) if (v.activeIndex + d >= 0 && v.activeIndex + d < v.strings.length) set.add(v.activeIndex + d);
+    return [...set].sort((a, b) => a - b);
+  })();
+  const cards = shown.map((index, position) => {
+    const item = v.strings[index], selected = v.final && chosen.has(index);
+    return `${position && index > shown[position - 1] + 1 ? '<span class="ozp-gap">…</span>' : ""}<article class="ozp-string ${index === v.activeIndex && index >= v.processed ? "active" : ""} ${selected ? "selected" : ""} ${index < v.processed && !selected ? "done" : ""}" data-item-index="${index}" title="${item.text || "∅"}"><small>[${index}] ${selected ? "✓" : ""}</small><div class="ozp-bits">${bits(item.text)}</div><span><b class="zero">0 × ${item.zeros}</b><b class="one">1 × ${item.ones}</b></span></article>`;
   }).join("");
-  const rows = view.dp.map((row, z) => `<div class="oz474-row">
-    <strong class="oz474-row-label" title="${text("số 0 tối đa", "zeroes available")}">${z}<small>0</small></strong>
-    ${row.map((count, o) => {
-      const destination = z === view.z && o === view.o;
-      const source = z === view.sourceZ && o === view.sourceO;
-      const winner = destination && view.phase === "update" && view.take > view.skip;
-      const intensity = Math.round((count / maxDp) * 30);
-      return `<span class="oz474-cell${destination ? " destination" : ""}${source ? " source" : ""}${winner ? " winner" : ""}" style="--oz-fill:${intensity}%" title="${text("Tối đa", "Max")} ${count} ${text("chuỗi với", "strings with")} ${z}×0, ${o}×1">
-        <small>${count}</small>
-      </span>`;
-    }).join("")}
-  </div>`).join("");
-  const columnLabels = `<div class="oz474-row oz474-column-labels"><strong class="oz474-row-label">${text("0 ↓ / 1 →", "0 ↓ / 1 →")}</strong>
-    ${Array.from({ length: view.n + 1 }, (_, o) => `<strong class="oz474-col-label">${o}</strong>`).join("")}
-  </div>`;
-  const comparison = view.phase === "compare" || view.phase === "update"
-    ? `<section class="oz474-choice">
-        <div class="oz474-choice-card skip${view.skip >= view.take ? " chosen" : ""}">
-          <small>${text("Không lấy", "SKIP")}</small><b>${view.skip}</b>
-        </div>
-        <span class="oz474-or">↔</span>
-        <div class="oz474-choice-card take${view.take > view.skip ? " chosen" : ""}">
-          <small>${text("Lấy", "TAKE")} · dp[${view.sourceZ}][${view.sourceO}] + 1</small><b>${view.takeFrom} + 1 = ${view.take}</b>
-        </div>
-      </section>`
-    : active
-      ? `<div class="oz474-cost">${text("Tốn chỗ", "COSTS")} <b class="zero">0×${active.zeros}</b> <b class="one">1×${active.ones}</b>
-          <span>${active.zeros <= view.m && active.ones <= view.n ? "✓" : "×"}</span>
-        </div>`
-      : "";
-
-  $("treeView").innerHTML = `<section class="oz474-viz" role="region" aria-label="${text("Hình minh họa Ones and Zeroes", "Ones and Zeroes visual explanation")}">
-    <header class="oz474-header">
-      <div><small>#474 · ${text("CHỌN CHUỖI 0/1", "PICK BINARY STRINGS")}</small><h3>${text("Cái túi có 2 ngăn", "A backpack with two pockets")}</h3></div>
-      <strong class="oz474-answer">${view.final ? view.answer : "?"}</strong>
-    </header>
-    <div class="oz474-capacity">
-      <div><span class="zero">0️⃣</span><strong>${view.m}</strong><small>${text("số 0 tối đa", "zero limit")}</small></div>
-      <i>＋</i>
-      <div><span class="one">1️⃣</span><strong>${view.n}</strong><small>${text("số 1 tối đa", "one limit")}</small></div>
-    </div>
-    <section class="oz474-card oz474-items">
-      <header><strong>${text("THẺ CHUỖI", "STRING CARDS")}</strong><span>${view.strings.length}</span></header>
-      <div class="oz474-string-list">${strings}</div>
-    </section>
-    ${comparison}
-    <section class="oz474-card oz474-table-card">
-      <header><strong>${text("SỐ CHUỖI TỐI ĐA", "MAX STRINGS")}</strong><span>${text("ô sáng = đang xét", "glow = current cell")}</span></header>
-      <div class="oz474-table-scroll"><div class="oz474-table">${columnLabels}${rows}</div></div>
-      <div class="oz474-legend"><span class="source-key">● ${text("ô nguồn", "source budget")}</span><span class="destination-key">● ${text("ngân sách đang xét", "current budget")}</span></div>
-    </section>
-  </section>`;
+  const costsKnown = v.final ? v.witness !== null : !["intro", "initialize", "choose-string", "count-zero"].includes(v.phase);
+  const used = v.final && v.witness !== null ? v.witness.reduce((a, i) => [a[0] + v.strings[i].zeros, a[1] + v.strings[i].ones], [0, 0]) : [v.zeros, v.ones];
+  const pocket = (bit, limit, cost) => `<div class="ozp-pocket ${bit ? "one" : "zero"}"><header><b>${bit} · ${bit ? "n" : "m"} = ${limit}</b><strong>${costsKnown ? cost : "—"} / ${limit}</strong></header><div>${Array.from({ length: Math.min(limit, 14) }, (_, i) => `<i class="${costsKnown && i < cost ? "filled" : ""}">${bit}</i>`).join("")}${limit > 14 ? '<span>…</span>' : !limit ? '<span>∅</span>' : ""}${costsKnown && cost > limit ? `<b class="ozp-over">+${cost - limit} ×</b>` : ""}</div></div>`;
+  const axis = (limit, centers) => {
+    if (limit <= 12) return Array.from({ length: limit + 1 }, (_, i) => i);
+    const set = new Set([0, 1, limit - 1, limit]);
+    for (const center of centers) if (center !== null && center !== undefined) for (let d = -1; d <= 1; d++) if (center + d >= 0 && center + d <= limit) set.add(center + d);
+    const sorted = [...set].sort((a, b) => a - b), expanded = [];
+    sorted.forEach((value, i) => { if (i && value > sorted[i - 1] + 1) expanded.push(null); expanded.push(value); });
+    return expanded;
+  };
+  const zs = axis(v.m, [t?.z, t?.sourceZ]), os = axis(v.n, [t?.o, t?.sourceO]), dest = v.final ? [v.m, v.n] : t ? [t.z, t.o] : null;
+  const columns = `<b class="ozp-axis-key">0 ↓<br>1 →</b>${os.map(o => `<b class="ozp-col">${o ?? "…"}</b>`).join("")}`;
+  const cells = v.dp.length ? zs.map(z => `<b class="ozp-row">${z ?? "…"}</b>${os.map(o => {
+    if (z === null || o === null) return '<span class="ozp-cell-gap">…</span>';
+    const value = v.dp[z][o], source = t?.sourceZ === z && t?.sourceO === o, destination = dest?.[0] === z && dest[1] === o;
+    return `<span class="ozp-cell ${source ? "source" : ""} ${destination ? "destination" : ""}" data-cell="${z},${o}" style="--ozp-level:${Math.min(30, value * 7)}%" title="dp[${z}][${o}] = ${value}"><b>${value}</b></span>`;
+  }).join("")}`).join("") : "";
+  const table = v.dp.length ? `<div class="ozp-table-scroll"><div class="ozp-table" style="grid-template-columns:32px repeat(${os.length},32px)">${columns}${cells}</div></div>` : '<div class="ozp-empty">dp = —</div>';
+  let action;
+  if (t) action = `<div class="ozp-candidate"><small>${vi ? "Bỏ" : "Skip"} · (${t.z},${t.o})</small><strong>${t.skip}</strong></div><div class="ozp-candidate take"><small>${vi ? "Lấy" : "Take"} · (${t.sourceZ},${t.sourceO})</small><strong>${t.takeFrom ?? "?"} + 1 = ${t.take ?? "?"}</strong></div><div class="ozp-max">MAX ↓ <b>${t.result ?? "?"}</b></div>`;
+  else if (v.final) action = `<div class="ozp-answer">✓ <b>${v.answer}</b></div>${v.witness === null ? "" : `<div class="ozp-witness">${v.witness.map(i => `<span><small>[${i}]</small><b>${esc(v.strings[i].text || "∅")}</b></span>`).join("") || "∅"}</div>`}`;
+  else if (v.phase === "skip-string") action = `<div class="ozp-answer bad">×</div><small>${vi ? "Vượt một ngăn" : "A pocket is too small"}</small>`;
+  else action = `<div class="ozp-direction">↖</div><code>${costsKnown ? `0 × ${v.zeros} · 1 × ${v.ones}` : "dp[z][o]"}</code>`;
+  const history = v.history.slice(-8).map(record => `<b><small>[${record.index}]</small>${record.value}</b>`).join("");
+  host.innerHTML = `<section class="ozp-viz" aria-label="Ones and Zeroes 474"><header class="ozp-heading"><b>#474 · ONES AND ZEROES</b><small>${v.detailed ? "" : vi ? "Theo từng chuỗi · " : "Per string · "}${vi ? "Dòng" : "Line"} ${v.line}</small></header><div class="ozp-strings">${cards || "∅"}</div><div class="ozp-pockets">${pocket(0, v.m, used[0])}${pocket(1, v.n, used[1])}</div><div class="ozp-work"><section class="ozp-dp"><header><b>dp[z][o]</b><small>↖ ${vi ? "duyệt giảm" : "sweep down"}</small></header>${table}</section><section class="ozp-action">${action}</section></div><div class="ozp-history"><small>dp[m][n]</small>${v.history.length > 8 ? '<span>…</span>' : ""}${history || "—"}</div></section>`;
+  const scroll = host.querySelector(".ozp-table-scroll"), current = scroll?.querySelector(".destination");
+  if (current) { scroll.scrollLeft = Math.max(0, current.offsetLeft - scroll.clientWidth / 2); scroll.scrollTop = Math.max(0, current.offsetTop - scroll.clientHeight / 2); }
+  const rail = host.querySelector(".ozp-strings"), active = rail?.querySelector(".active"); if (active) rail.scrollLeft = Math.max(0, active.offsetLeft - rail.clientWidth / 2);
 }
