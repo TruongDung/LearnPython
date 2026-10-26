@@ -998,7 +998,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderRotateImage48Pictures(step);
     } },
     { predicate: (step) => Boolean(step.spiral54View), surface: "treeView", render: (step) => {
-      renderSpiral54View(step);
+      renderSpiral54Pictures(step);
     } },
     { predicate: (step) => Boolean(step.univalue250View), surface: "treeView", render: (step) => {
       renderUnivalue250View(step);
