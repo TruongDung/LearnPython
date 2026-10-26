@@ -986,7 +986,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderImageOverlap835View(step);
     } },
     { predicate: (step) => Boolean(step.search240View), surface: "treeView", render: (step) => {
-      renderSearchMatrix240View(step);
+      renderSearchMatrix240Pictures(step);
     } },
     { predicate: (step) => Boolean(step.search74View), surface: "treeView", render: (step) => {
       renderSearchMatrix74Pictures(step);
