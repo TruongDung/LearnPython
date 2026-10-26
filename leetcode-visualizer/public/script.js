@@ -286,6 +286,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.equalComponents2440View), surface: "treeView", render: (step) => {
       renderEqualComponents2440View(step);
     } },
+    { predicate: (step) => Boolean(step.parentheses921View), surface: "treeView", render: (step) => {
+      renderParentheses921View(step);
+    } },
     { predicate: (step) => Boolean(step.kSum2386View), surface: "treeView", render: (step) => {
       renderKSum2386View(step);
     } },
