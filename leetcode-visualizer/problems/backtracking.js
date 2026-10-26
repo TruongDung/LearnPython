@@ -1570,6 +1570,7 @@ function buildSteps47(input) {
   const nums = [...original].sort((a, b) => a - b);
   const steps = [];
   const current = [];
+  const pathIndices = [];
   const results = [];
   const used = new Array(nums.length).fill(false);
   const TRACE_LIMIT = 480;
@@ -1587,7 +1588,8 @@ function buildSteps47(input) {
       traceTruncated = true;
     }
   };
-  const snapshot = ({ title, codeLines, highlight = [], mark = [], vars = [], note, final = false }) => {
+  const snapshot = ({ title, codeLines, highlight = [], mark = [], vars = [], note, final = false, phase = "ready", activeIndex = -1 }) => {
+    if (!final && steps.length >= TRACE_LIMIT) { traceTruncated = true; return; }
     pushStep({
       title,
       arr: nums.map((_, index) => (used[index] ? 1 : 0)),
@@ -1602,6 +1604,12 @@ function buildSteps47(input) {
       ],
       note,
       final,
+      permutation47View: {
+        phase, activeIndex,
+        nums: [...nums], used: [...used], path: [...pathIndices],
+        saved: results.slice(0, 8).map(row => [...row]),
+        count: results.length, truncated: traceTruncated,
+      },
     });
   };
 
@@ -1623,6 +1631,7 @@ function buildSteps47(input) {
       results.push([...current]);
       snapshot({
         title: { vi: `Hoán vị: [${current.join(", ")}]`, en: `Permutation: [${current.join(", ")}]` },
+        phase: "save",
         codeLines: [9, 10, 11],
         mark: nums.map((_, index) => index),
         vars: [{ name: "count", value: results.length }],
@@ -1640,7 +1649,8 @@ function buildSteps47(input) {
       if (i > 0 && nums[i] === nums[i - 1] && !used[i - 1]) {
         snapshot({
           title: { vi: `Bỏ qua bản sao nums[${i}] = ${nums[i]}`, en: `Skip duplicate nums[${i}] = ${nums[i]}` },
-          codeLines: [15, 16],
+          phase: "skip", activeIndex: i,
+          codeLines: [16, 17],
           highlight: [i - 1, i],
           mark: nums.map((_, index) => (used[index] ? index : -1)).filter((index) => index >= 0),
           vars: [
@@ -1658,9 +1668,11 @@ function buildSteps47(input) {
 
       used[i] = true;
       current.push(nums[i]);
+      pathIndices.push(i);
       snapshot({
         title: { vi: `Chọn nums[${i}] = ${nums[i]}`, en: `Pick nums[${i}] = ${nums[i]}` },
-        codeLines: [17, 18, 19, 20],
+        phase: "pick", activeIndex: i,
+        codeLines: [19, 20, 21],
         highlight: [i],
         vars: [
           { name: "i", value: i },
@@ -1675,10 +1687,12 @@ function buildSteps47(input) {
       backtrack();
 
       const removed = current.pop();
+      pathIndices.pop();
       used[i] = false;
       snapshot({
         title: { vi: `Quay lui: bỏ ${removed}`, en: `Backtrack: pop ${removed}` },
-        codeLines: [21, 22],
+        phase: "backtrack", activeIndex: i,
+        codeLines: [22, 23],
         vars: [{ name: "popped", value: removed }],
         note: {
           vi: `Khôi phục current và used[${i}] để thử lựa chọn kế tiếp ở cùng level.`,
@@ -1691,7 +1705,8 @@ function buildSteps47(input) {
   backtrack();
   snapshot({
     title: { vi: `Kết quả: ${results.length} hoán vị duy nhất`, en: `Result: ${results.length} unique permutations` },
-    codeLines: [24, 25],
+    phase: "done",
+    codeLines: [25, 26],
     vars: [
       { name: "total", value: results.length },
       { name: "permutations", value: resultPreview() },
@@ -4862,7 +4877,7 @@ module.exports = {
       "        backtrack()",
       "        return result",
     ],
-    builder: (input, params) => addBacktrackingDecisionTree(buildSteps47(input, params), 47),
+    builder: buildSteps47,
   },
   77: {
     id: 77,

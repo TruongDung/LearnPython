@@ -769,17 +769,123 @@ function cps730InvariantPanel(state, copy, locale) {
 function cps730CounterPanel(state, copy, locale) {
   return `<section class="cps730-card cps730-counters" aria-labelledby="cps730-counters-title"><header><h3 id="cps730-counters-title">${cps730Escape(copy.counters)}</h3></header><ul>${CPS730_COUNTERS.map(([key, en, vi]) => `<li><small>${cps730Escape(locale === "vi" ? vi : en)}</small><strong>${cps730Escape(state.counters[key])}</strong></li>`).join("")}</ul></section>`;
 }
+// Picture data comes only from intervals already computed in this trace.
+function cps730PictureModel(step, state = cps730Normalize(step)) {
+  const raw = step?.countPalindromicSubsequences730View || {};
+  const [i, j] = state.displayInterval || [null, null];
+  const s = state.input.s;
+  const entriesAt = (a, b) => {
+    if (a > b) return [];
+    if (!state.computedMask[a]?.[b]) return null;
+    return cps730Evidence(raw.evidenceTable?.[a]?.[b], s.length)?.entries || [];
+  };
+  let kind = i === null ? 'setup' : i === j ? 'single' : cps730RecurrenceCase(state) || 'scan';
+  if (state.final && i !== null && i !== j) {
+    const matches = [...s.slice(i + 1, j)].filter(c => c === s[i]).length;
+    kind = s[i] !== s[j] ? 'unequal' : matches === 0 ? 'zero' : matches === 1 ? 'one' : 'multiple';
+  }
+  const words = entries => entries?.map(e => e.palindrome) || [];
+  const middle = i !== null ? entriesAt(i + 1, j - 1) : null;
+  let groups = [], arithmetic = [], duplicates = [];
+  if (kind === 'unequal') {
+    const left = entriesAt(i, j - 1), right = entriesAt(i + 1, j);
+    if (left && right && middle) {
+      duplicates = words(middle);
+      groups = [
+        { key:'left', values:words(left), count:left.length },
+        { key:'right', values:words(right), count:right.length, crossed:duplicates },
+      ];
+      arithmetic = [left.length, '+', right.length, '−', duplicates.length];
+    }
+  } else if (['zero', 'one', 'multiple'].includes(kind) && middle) {
+    const inner = words(middle), wrapped = inner.map(word => s[i] + word + s[j]);
+    duplicates = wrapped.filter(word => inner.includes(word));
+    groups = [
+      {key:'middle', values:inner, count:inner.length},
+      {key:'wrap', values:wrapped, count:wrapped.length, crossed:duplicates},
+      {key:'extra', values:[s[i], s[i] + s[j]], count:kind === 'zero' ? 2 : kind === 'one' ? 1 : 0,
+        crossed:kind === 'zero' ? [] : kind === 'one' ? [s[i]] : [s[i], s[i] + s[j]]},
+    ];
+    if (kind === 'multiple') groups = groups.filter(group => group.key !== 'extra');
+    arithmetic = [inner.length, '+', wrapped.length, ...(kind === 'multiple' ? ['−', duplicates.length] : ['+', kind === 'zero' ? 2 : 1])];
+  }
+  return { i, j, kind, groups, arithmetic, duplicates, evidence:state.evidence, value:i !== null && state.computedMask[i]?.[j] ? state.dp[i][j] : null };
+}
+
 function renderCountPalindromicSubsequences730View(step) {
-  const host = typeof document !== "undefined" && document.getElementById
-    ? document.getElementById("treeView")
-    : typeof $ === "function" ? $("treeView") : null;
+  const host = typeof document !== 'undefined' && document.getElementById ? document.getElementById('treeView') : typeof $ === 'function' ? $('treeView') : null;
   if (!host) return;
-  const locale = cps730Locale();
-  const copy = CPS730_TEXT[locale];
   const state = cps730Normalize(step);
-  const event = cps730EventLabel(state.event, locale);
-  const note = state.note
-    ? `<aside class="cps730-note"><strong>${cps730Escape(copy.note)}</strong><p>${cps730Escape(state.note)}</p></aside>`
-    : "";
-  host.innerHTML = `<article class="cps730-viz ${state.final ? "cps730-final" : ""} cps730-branch-${state.recurrence.branch}" role="region" aria-label="${cps730Escape(`${copy.fallback}, ${copy.line} ${state.source.line}, ${event}`)}"><header class="cps730-header"><div><span>${cps730Escape(copy.kicker)}</span><h2>${cps730Escape(state.title)}</h2></div><div><strong>${cps730Escape(copy.line)} ${cps730Escape(state.source.line)}</strong><span>${cps730Escape(state.timing === "before" ? copy.before : copy.after)}</span><em>${cps730Escape(event)}</em></div></header>${cps730Rail(state, copy, locale)}${cps730SourcePanel(state, copy, locale)}${cps730IndexedInput(state, copy)}<div class="cps730-main-grid">${cps730DpTable(state, copy)}${cps730EndpointPanel(state, copy)}</div>${cps730RecurrencePanel(state, copy, locale)}${cps730EvidencePanel(state, copy)}<div class="cps730-footer-grid">${cps730InvariantPanel(state, copy, locale)}${cps730CounterPanel(state, copy, locale)}</div>${note}</article>`;
+  const model = cps730PictureModel(step, state);
+  const t = (vi, en) => cps730Locale() === 'vi' ? vi : en;
+  const { i, j, kind, groups, arithmetic, evidence, value } = model;
+  const s = state.input.s;
+  const width = Math.max(220, (host.clientWidth || 550) - 24);
+  const columns = width < 360 ? 5 : 10;
+  const count = Math.min(columns, s.length);
+  const stride = Math.min(56, width / count);
+  const tile = Math.min(44, stride - 6);
+  const point = index => {
+    const row = Math.floor(index / columns);
+    const rowCount = Math.min(columns, s.length - row * columns);
+    return {x:(width - rowCount * stride) / 2 + (index % columns + .5) * stride, y:16 + row * 82};
+  };
+  // A selection is local to one trace frame; never carry an index tuple to another input.
+  const selectionKey = `${s}:${state.counters.frames}:${i}:${j}`;
+  if (host._pal730SelectionKey !== selectionKey) host._pal730Selection = null;
+  const entries = evidence?.entries || [];
+  const selected = entries.find(entry => entry.palindrome === host._pal730Selection);
+  const selectedIndices = new Set(selected?.indexTuple || []);
+  const scanActive = kind === 'scan' && state.scan.target !== null;
+  const indexed = [...s].map((c, index) => {
+    const p = point(index);
+    const endpoint = index === i || index === j;
+    const scanned = scanActive && (index === state.cursors.low || index === state.cursors.high);
+    const cls = selected ? selectedIndices.has(index) ? 'chosen' : 'faded' : endpoint ? 'end' : i !== null && index > i && index < j ? 'inside' : i !== null ? 'faded' : '';
+    return `<g class="pal730-letter ${cls}" transform="translate(${p.x - tile / 2},${p.y})"><rect width="${tile}" height="42" rx="7"/><text class="pal730-char" x="${tile / 2}" y="28" text-anchor="middle">${c}</text><text class="pal730-index" x="${tile / 2}" y="-5" text-anchor="middle">${index}${index === i ? ' · i' : index === j ? ' · j' : ''}</text>${scanned ? `<path class="pal730-cursor" d="M${tile / 2 - 5},-10 L${tile / 2},-3 L${tile / 2 + 5},-10"/>` : ''}</g>`;
+  }).join('');
+  const lastRow = Math.floor((s.length - 1) / columns);
+  const lines = selected ? selected.indexTuple.slice(1).map((index, k) => {
+    const from = point(selected.indexTuple[k]), to = point(index);
+    return Math.floor(selected.indexTuple[k] / columns) === Math.floor(index / columns)
+      ? `<path class="pal730-link" d="M${from.x},${from.y + 42} Q${(from.x + to.x) / 2},${from.y + 68} ${to.x},${to.y + 42}"/>`
+      : `<path class="pal730-link" d="M${from.x + tile / 2},${from.y + 21} H${width - 1} V${to.y + 21} H${to.x + tile / 2}"/>`;
+  }).join('') : '';
+  const word = (text, crossed = false, wrapped = false) => `<span class="pal730-word ${crossed ? 'crossed' : ''} ${wrapped ? 'wrapped' : ''}" aria-label="${cps730Escape(text)}${crossed ? t(' · đã có', ' · already counted') : ''}">${[...text].map((c, k) => `<span class="${k === 0 || k === text.length - 1 ? 'edge' : ''}">${c}</span>`).join('')}</span>`;
+  const names = {
+    left:t('Bỏ đầu phải', 'Drop right end'), right:t('Bỏ đầu trái', 'Drop left end'),
+    middle:t('Giữ phần giữa', 'Keep the middle'), wrap:t(`Bọc ${s[i] || ''}…${s[j] || ''}`, `Wrap ${s[i] || ''}…${s[j] || ''}`),
+    extra:t('Thêm mới', 'Add new'),
+  };
+  const headings = {
+    setup:t('Chọn đoạn ngắn → mở rộng', 'Short intervals → longer ones'),
+    single:t('Một ký tự = một palindrome', 'One character = one palindrome'),
+    scan:t('Tìm bản sao bên trong', 'Find matching copies inside'),
+    unequal:t('Hai đầu khác nhau → gộp, bỏ trùng', 'Different ends → merge, deduplicate'),
+    zero:t('Hai đầu giống nhau · thêm 2', 'Matching ends · add 2'),
+    one:t('Một bản sao bên trong · thêm 1', 'One copy inside · add 1'),
+    multiple:t('Nhiều bản sao · trừ phần trùng', 'Multiple copies · subtract duplicates'),
+  };
+  const lanes = groups.map(group => `<div class="pal730-lane ${group.key}"><header><span>${names[group.key]}</span><b>${group.count}</b></header><div>${group.values.slice(0, 6).map(text => word(text, group.crossed?.includes(text), group.key === 'wrap')).join('') || '<span class="pal730-empty">∅</span>'}${group.values.length > 6 ? `<small>+${group.values.length - 6}</small>` : ''}</div></div>`).join('');
+  const equation = arithmetic.length ? `<div class="pal730-equation" aria-label="${arithmetic.join(' ')} = ${value ?? '?'}">${arithmetic.map((item, k) => `<${typeof item === 'number' ? 'b' : 'span'} class="part-${k}">${item}</${typeof item === 'number' ? 'b' : 'span'}>`).join('')}<span>=</span><strong>${value ?? '?'}</strong></div>` : '';
+  const selectedCaption = selected ? `${selected.palindrome} · [${selected.indexTuple.join(', ')}]` : t('Bấm một palindrome để xem các ký tự tạo ra nó.', 'Select a palindrome to see its source characters.');
+  const gallery = entries.slice(0, 12).map(entry => `<button class="pal730-choice" type="button" data-pal730-word="${cps730Escape(entry.palindrome)}" aria-pressed="${selected?.palindrome === entry.palindrome}" aria-label="${cps730Escape(entry.palindrome)} · [${entry.indexTuple.join(', ')}]">${word(entry.palindrome)}</button>`).join('');
+  const table = `<details class="pal730-dp"><summary>${t('Bảng DP', 'DP table')}</summary><div><table><thead><tr><th>i / j</th>${[...s].map((c,k) => `<th>${k}<small>${c}</small></th>`).join('')}</tr></thead><tbody>${[...s].map((c, row) => `<tr><th>${row}<small>${c}</small></th>${[...s].map((_, col) => `<td class="${row === i && col === j ? 'active' : ''}">${col < row ? '' : state.computedMask[row][col] ? state.dp[row][col] : '·'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+  host.innerHTML = `<section class="pal730-viz"><header><strong>${headings[kind]}</strong><span>${i !== null ? `dp[${i}][${j}]` : '#730'}</span></header><svg class="pal730-source" viewBox="0 0 ${width} ${lastRow * 82 + 88}" role="img" aria-label="${cps730Escape(selected ? `${selected.palindrome}: ${selected.indexTuple.join(', ')}` : `${s}, ${i !== null ? `[${i}, ${j}]` : t('chuỗi gốc', 'input')}`)}">${lines}${indexed}</svg>${scanActive ? `<div class="pal730-scan">low = ${state.cursors.low ?? '—'} <span>→</span> ${state.scan.target} <span>←</span> high = ${state.cursors.high ?? '—'}</div>` : ''}${lanes ? `<div class="pal730-lanes">${lanes}</div>${equation}<small class="pal730-rule">${groups.some(g => g.crossed?.length) ? t('Gạch ngang = đã đếm, không thêm lần nữa.', 'Crossed out = already counted, keep just once.') : t('Giữ thứ tự ký tự · mỗi chuỗi chỉ đếm một lần.', 'Keep character order · count each string once.')}</small>` : ''}<section class="pal730-results"><header><strong>${t('Palindrome khác nhau', 'Distinct palindromes')}</strong><b>${evidence ? evidence.count : '?'}</b></header><div>${gallery || `<span class="pal730-empty">${t('Chưa tính đoạn này', 'Interval not computed yet')}</span>`}</div>${evidence && evidence.count > Math.min(entries.length, 12) ? `<small>+${evidence.count - Math.min(entries.length, 12)} ${t('chuỗi khác', 'more')}</small>` : ''}${entries.length ? `<small class="pal730-selection" aria-live="polite">${cps730Escape(selectedCaption)}</small>` : ''}</section>${table}</section>`;
+  host._pal730SelectionKey = selectionKey;
+  host._pal730Step = step;
+  host._pal730Width = host.clientWidth;
+  host.querySelectorAll?.('[data-pal730-word]').forEach(button => button.addEventListener('click', () => {
+    const name = button.dataset.pal730Word;
+    host._pal730Selection = host._pal730Selection === name ? null : name;
+    renderCountPalindromicSubsequences730View(host._pal730Step);
+    // Replacing the diagram must not drop keyboard focus after selection.
+    [...host.querySelectorAll('[data-pal730-word]')].find(item => item.dataset.pal730Word === name)?.focus({preventScroll:true});
+  }));
+  if (typeof ResizeObserver !== 'undefined' && !host._pal730Observer) {
+    host._pal730Observer = new ResizeObserver(() => {
+      if (host.querySelector('.pal730-viz') && host.clientWidth !== host._pal730Width) renderCountPalindromicSubsequences730View(host._pal730Step);
+    });
+    host._pal730Observer.observe(host);
+  }
 }

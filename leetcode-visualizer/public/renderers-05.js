@@ -2398,61 +2398,84 @@ function renderFibonacciView(step) {
 }
 
 function renderTribonacciView(step) {
-  const view = step.tribonacciView || {};
-  const vi = lang === "vi";
-  const terms = Array.isArray(view.terms) ? view.terms : [];
-  const labels = {
-    base: vi ? "Base case" : "Base case",
-    calculate: vi ? "Cộng 3 số trước" : "Add 3 previous terms",
-    done: vi ? "Hoàn tất" : "Complete",
+  const view = step.tribonacciView;
+  if (!view) return;
+  const host = $("treeView");
+  const t = (vi, en) => lang === "vi" ? vi : en;
+  const terms = view.terms;
+  const rolling = Number(view.approach) === 2;
+  const focus = view.target ?? Math.min(2, view.n);
+  const width = Math.max(220, (host.clientWidth || 550) - 24);
+  const valueAt = i => terms[i]?.value ?? null;
+  const colors = ["first", "second", "third"];
+  const sources = [focus - 3, focus - 2, focus - 1].map(valueAt);
+  const result = valueAt(focus);
+  // Unit blocks stay countable. Large values use proportional segments instead.
+  const grouped = focus >= 3 && result > 36;
+  const units = (count, color, w, offset = 0, total = count, columns = 5) => {
+    const cols = Math.min(columns, Math.max(1, total));
+    const origin = (w - (cols - 1) * 10) / 2 - 3;
+    return Array.from({ length: count ?? 0 }, (_, i) => `<rect class="tri1137-unit ${color}" x="${origin + (offset + i) % cols * 10}" y="${57 + Math.floor((offset + i) / cols) * 10}" width="6" height="6" rx="1"/>`).join("");
   };
-
-  const termHtml = terms.map((term) => {
-    const value = term.value === null ? "?" : term.value;
-    const status = term.value === null ? (vi ? "chưa tính" : "not computed") : (vi ? "đã biết" : "known");
-    return `<article class="cs70-stair ${term.state}"><small>T(${term.step})</small><strong>${value}</strong><em>${status}</em></article>`;
-  }).join("");
-
-  let equation = vi ? "Dãy được tính từ trái sang phải." : "The sequence is computed left to right.";
-  let reason = "";
-  if (view.formula) {
-    const f = view.formula;
-    equation = `T(${f.target}) = T(${f.s[2]}) + T(${f.s[1]}) + T(${f.s[0]}) = ${f.values[2]} + ${f.values[1]} + ${f.values[0]} = <b>${f.result}</b>`;
-    reason = vi
-      ? "Mỗi số Tribonacci mới bằng tổng của đúng ba số đứng ngay trước nó."
-      : "Every new Tribonacci number is the sum of exactly the three preceding numbers.";
-  } else if (view.phase === "base") {
-    equation = "T(0) = <b>0</b>,  T(1) = <b>1</b>,  T(2) = <b>1</b>";
-    reason = vi ? "Đây là ba giá trị cơ sở của dãy Tribonacci." : "These are the three base values of the Tribonacci sequence.";
-  } else if (view.phase === "done") {
-    const target = Number.isInteger(view.target) ? view.target : view.n;
-    const result = terms[target] ? terms[target].value : "?";
-    equation = `T(${target}) = <b>${result}</b>`;
-    reason = vi ? "Ô cuối là số Tribonacci cần trả về." : "The final cell is the Tribonacci number to return.";
+  const pool = (x, y, w, h, index, value, color, content, name = "") => `<g class="tri1137-pool ${color}" transform="translate(${x},${y})" data-index="${index}" data-value="${value ?? '?'}"><rect class="tri1137-box" width="${w}" height="${h}" rx="9"/><text class="tri1137-label" x="${w / 2}" y="18" text-anchor="middle">${name ? name + ' · ' : ''}T(${index})</text><text class="tri1137-value ${String(value).length > 5 ? 'long' : ''}" x="${w / 2}" y="43" text-anchor="middle">${value ?? '?'}</text>${content}</g>`;
+  const markers = `<defs>${[...colors, "target"].map(color => `<marker id="tri1137-head-${color}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path class="tri1137-fill ${color}" d="M0 0L10 5L0 10Z"/></marker>`).join("")}</defs>`;
+  let scene;
+  if (focus < 3) {
+    const seeds = terms.filter(term => term.step <= 2 && term.value !== null);
+    const w = Math.min(140, (width - 32) / seeds.length);
+    scene = `<svg class="tri1137-scene" viewBox="0 0 ${width} 100" role="img" aria-label="${t('Ba số khởi đầu', 'Starting values')}">${seeds.map((term, j) => pool((width / seeds.length) * (j + .5) - w / 2, 8, w, 84, term.step, term.value, view.phase === 'done' && term.step === focus ? 'target' : colors[j], units(term.value, colors[j], w))).join("")}</svg>`;
+  } else {
+    const vertical = width < 400 && grouped;
+    const w = vertical ? (width - 48) / 2 : Math.min(165, (width - 48) / 3);
+    const h = grouped ? 80 : 112;
+    const targetW = vertical ? w : Math.min(330, width - 24);
+    const targetX = vertical ? width - w - 4 : (width - targetW) / 2;
+    const targetY = vertical ? 92 : h + 54;
+    const targetH = grouped ? 80 : 112;
+    const positions = colors.map((_, j) => vertical ? { x: 4, y: 8 + j * 84 } : { x: width / 3 * (j + .5) - w / 2, y: 8 });
+    let offset = 0;
+    const targetContent = colors.map((color, j) => {
+      const content = grouped
+        ? `<rect class="tri1137-unit ${color}" x="${12 + (targetW - 24) * offset / result}" y="59" width="${(targetW - 24) * sources[j] / result}" height="10"/>`
+        : units(sources[j], color, targetW, offset, result, Math.min(10, Math.floor((targetW - 20) / 10)));
+      offset += sources[j];
+      return content;
+    }).join("");
+    const pools = positions.map((p, j) => pool(p.x, p.y, w, h, focus - 3 + j, sources[j], colors[j], grouped ? `<rect class="tri1137-unit ${colors[j]}" x="12" y="59" width="${(w - 24) * sources[j] / Math.max(...sources)}" height="10" rx="3"/>` : units(sources[j], colors[j], w), rolling && view.phase === 'calculate' ? ['a', 'b', 'c'][j] : '')).join("");
+    const wires = positions.map((p, j) => {
+      const fromX = vertical ? p.x + w : p.x + w / 2;
+      const fromY = vertical ? p.y + h / 2 : p.y + h;
+      const toX = vertical ? targetX - 3 : width / 2 + (j - 1) * 20;
+      const toY = vertical ? targetY + 22 + j * 18 : targetY - 3;
+      return `<path class="tri1137-wire ${colors[j]}" d="M${fromX},${fromY} C${vertical ? fromX + 18 : fromX},${vertical ? fromY : fromY + 24} ${vertical ? toX - 18 : toX},${vertical ? toY : toY - 24} ${toX},${toY}" marker-end="url(#tri1137-head-${colors[j]})"/>`;
+    }).join("");
+    const plus = vertical ? '' : [1, 2].map(j => `<text class="tri1137-plus" x="${width * j / 3}" y="52" text-anchor="middle">+</text>`).join('');
+    scene = `<svg class="tri1137-scene" viewBox="0 0 ${width} ${vertical ? 264 : targetY + targetH + 8}" role="img" aria-label="${sources.join(' + ')} = ${result}">${markers}${pools}${plus}${wires}${pool(targetX, targetY, targetW, targetH, focus, result, 'target', targetContent, rolling ? (view.phase === 'done' ? 'c' : 'next') : '')}</svg>`;
   }
-
-  const rolling = view.rolling;
-  const rollingHtml = rolling ? [
-    ["a", rolling.a, vi ? "3 số trước" : "three terms back"],
-    ["b", rolling.b, vi ? "2 số trước" : "two terms back"],
-    ["c", rolling.c, vi ? "số trước" : "previous term"],
-    ["next", rolling.next, vi ? "số mới" : "new term"],
-  ].map(([name, item, hint]) => `<article class="cs70-register ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `T(${item.step})` : hint}</em></article>`).join("") : "";
-
-  const method = Number(view.approach) === 2
-    ? (vi ? "APPROACH 2 · chỉ giữ 3 biến" : "APPROACH 2 · keep only 3 variables")
-    : (vi ? "APPROACH 1 · bảng DP" : "APPROACH 1 · DP table");
-  const rollingSection = rollingHtml
-    ? `<section class="cs70-rolling four"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 3 giá trị → số mới" : "three-value window → new term"}</span></header><div>${rollingHtml}</div></section>`
-    : "";
-
-  $("treeView").innerHTML = `<section class="cs70-viz" role="img" aria-label="${vi ? "Trực quan hóa số Tribonacci" : "Tribonacci-number visualization"}">
-    <header><strong>TRIBONACCI NUMBER</strong><span class="cs70-phase">${escapeHtml(labels[view.phase] || view.phase || "")}</span></header>
-    <section class="cs70-rule"><b>CORE RULE</b><strong>T(i) = T(i−1) + T(i−2) + T(i−3)</strong><span>${vi ? "Mỗi số mới là tổng của ba số liền trước." : "Each new term is the sum of its three previous terms."}</span></section>
-    <section class="cs70-action"><small>${escapeHtml(method)}</small><strong>${equation}</strong>${reason ? `<span>${escapeHtml(reason)}</span>` : ""}</section>
-    ${rollingSection}
-    <section class="cs70-table"><header><strong>${vi ? "BẢNG TRIBONACCI T(i)" : "TRIBONACCI TABLE T(i)"}</strong><span>${vi ? "tím = 3 nguồn · vàng = ô đang tính · xanh = đã biết" : "purple = 3 sources · yellow = current target · green = known"}</span></header><div class="cs70-stairs">${termHtml}</div></section>
-  </section>`;
+  // One simultaneous assignment: b, c, next become the new a, b, c.
+  let memory = '';
+  if (rolling && view.phase === 'calculate') {
+    const w = (width - 32) / 3;
+    memory = `<div class="tri1137-shift"><small>${t('Dịch cửa sổ →', 'Slide window →')}</small><svg class="tri1137-memory" viewBox="0 0 ${width} 115" role="img" aria-label="a = ${sources[1]}, b = ${sources[2]}, c = ${result}">${[sources[1], sources[2], result].map((value, j) => {
+      const x = 8 + j * (w + 8);
+      const color = ["second", "third", "target"][j];
+      return `<text class="tri1137-label" x="${x + w / 2}" y="14" text-anchor="middle">${['b', 'c', 'next'][j]}</text><path class="tri1137-wire ${color}" d="M${x + w / 2},22 V40" marker-end="url(#tri1137-head-${color})"/>${pool(x, 46, w, 64, focus - 2 + j, value, color, '', ['a', 'b', 'c'][j])}`;
+    }).join('')}</svg></div>`;
+  }
+  const start = Math.max(0, focus - 5);
+  const strip = terms.slice(start, start + 7).map(term => {
+    const color = term.step === focus && view.phase !== 'base' ? 'target' : focus >= 3 && term.step >= focus - 3 && term.step < focus ? colors[term.step - focus + 3] : term.value === null ? 'future' : '';
+    return `<span class="tri1137-term ${color}"><small>T(${term.step})</small><b>${term.value ?? '?'}</b></span>`;
+  }).join('');
+  host.innerHTML = `<section class="tri1137-viz" aria-label="${t('Tribonacci: gộp ba nhóm thành số tiếp theo', 'Tribonacci: combine three groups into the next term')}"><header><span>${rolling ? t('3 biến · O(1)', '3 variables · O(1)') : t('Bảng DP', 'DP table')}</span><strong>${view.phase === 'base' ? t('Bắt đầu: 0, 1, 1', 'Start: 0, 1, 1') : `T(${focus}) = ${result}`}</strong></header>${scene}${memory}<div class="tri1137-history"><small>${rolling ? t('Dãy minh họa', 'Sequence trace') : 'dp'}</small><div>${start ? '<span>…</span>' : ''}${strip}${start + 7 < terms.length ? '<span>…</span>' : ''}</div></div><footer>${focus >= 3 ? `<span class="first">T(${focus - 3})</span><span>+</span><span class="second">T(${focus - 2})</span><span>+</span><span class="third">T(${focus - 1})</span><span>→</span><span class="target">T(${focus})</span>` : ''}<small>${grouped ? t('Số lớn: dùng thanh', 'Large values: bars') : t('■ = 1 đơn vị', '■ = 1 unit')}</small></footer></section>`;
+  host._tribonacciStep = step;
+  host._tribonacciWidth = host.clientWidth;
+  if (typeof ResizeObserver !== 'undefined' && !host._tribonacciObserver) {
+    host._tribonacciObserver = new ResizeObserver(() => {
+      if (host.querySelector('.tri1137-viz') && host.clientWidth !== host._tribonacciWidth) renderTribonacciView(host._tribonacciStep);
+    });
+    host._tribonacciObserver.observe(host);
+  }
 }
 
 function renderClimbingStairsView(step) {

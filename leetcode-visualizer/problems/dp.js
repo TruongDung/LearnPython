@@ -2035,14 +2035,7 @@ function buildSteps509Optimized(n) {
 }
 
 /**
- * Attach a clear, Fibonacci-style visualization to each #1137 step.
- *
- * The plain bar chart made it hard to see *which* three previous terms feed
- * into the current one. This view mirrors the #509 / #70 "cs70" layout:
- *   - a persistent core rule  T(i) = T(i-1) + T(i-2) + T(i-3)
- *   - a per-step equation with the actual numbers being added
- *   - a table where the 3 sources, the target, and known terms are colour-coded
- *   - (approach 2) a live-memory window showing a, b, c and the new term.
+ * Attach source values, the current sum, and rolling memory for #1137 pictures.
  */
 function attachTribonacciViews(n, approach, steps) {
   const len = Math.max(n, 2) + 1;
@@ -2132,7 +2125,7 @@ function attachTribonacciViews(n, approach, steps) {
  */
 function buildSteps1137(input, params) {
   const n = input[0];
-  const approach = (params && params.approach) || 1;
+  const approach = Number(params && params.approach) || 1;
   if (approach === 2) return buildSteps1137Rolling(n);
 
   const dp = new Array(Math.max(n + 1, 3)).fill(0);
@@ -23389,7 +23382,7 @@ module.exports = {
       vi: "Dãy Tribonacci: T(0)=0, T(1)=1, T(2)=1, và T(n) = T(n-1) + T(n-2) + T(n-3) với n ≥ 3. Cho n, trả về T(n).",
       en: "The Tribonacci sequence: T(0)=0, T(1)=1, T(2)=1, and T(n) = T(n-1) + T(n-2) + T(n-3) for n ≥ 3. Given n, return T(n).",
     },
-    defaultInput: [10],
+    defaultInput: [6],
     inputKind: "nonneg",
     inputLabel: { vi: "n", en: "n" },
     singleInput: true,

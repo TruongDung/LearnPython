@@ -1011,6 +1011,41 @@
 }
 
 
+/* LeetCode 1137 · Three groups merge into the next term. */
+.tri1137-viz { --tri-bg:#101827; --tri-panel:#172337; --tri-text:#e2e8f0; --tri-muted:#a8b6c9; --tri-line:#43536b; --tri-first:#38bdf8; --tri-second:#c084fc; --tri-third:#fbbf24; --tri-target:#4ade80; display:grid; gap:12px; min-width:0; padding:12px; color:var(--tri-text); background:var(--tri-bg); border:1px solid var(--tri-line); border-radius:12px; }
+[data-theme="light"] .tri1137-viz { --tri-bg:#f5f8fc; --tri-panel:#fff; --tri-text:#172033; --tri-muted:#526379; --tri-line:#b7c5d7; --tri-first:#0369a1; --tri-second:#7e22ce; --tri-third:#a16207; --tri-target:#047857; }
+#treeView:has(>.tri1137-viz) { padding:0; border:0; background:transparent; min-height:0; overflow:visible; }
+.tri1137-viz > header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+.tri1137-viz > header > span, .tri1137-history > small, .tri1137-shift > small { color:var(--tri-muted); font-size:12px; }
+.tri1137-viz > header > strong { color:var(--tri-target); font-size:18px; font-variant-numeric:tabular-nums; }
+.tri1137-scene, .tri1137-memory { display:block; width:100%; height:auto; }
+.tri1137-viz .first { --tri-color:var(--tri-first); }
+.tri1137-viz .second { --tri-color:var(--tri-second); }
+.tri1137-viz .third { --tri-color:var(--tri-third); }
+.tri1137-viz .target { --tri-color:var(--tri-target); }
+.tri1137-box { fill:var(--tri-panel); stroke:var(--tri-color,var(--tri-line)); stroke-width:1.5; }
+.tri1137-pool.target > .tri1137-box { fill:color-mix(in srgb,var(--tri-target) 8%,var(--tri-panel)); stroke-width:2; }
+.tri1137-label { fill:var(--tri-muted); font:12px ui-monospace,monospace; }
+.tri1137-value { fill:var(--tri-text); font:700 24px ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+.tri1137-value.long { font-size:14px; }
+.tri1137-pool.target .tri1137-value { fill:var(--tri-target); }
+.tri1137-unit, .tri1137-fill { fill:var(--tri-color); }
+.tri1137-wire { fill:none; stroke:var(--tri-color); stroke-width:2; }
+.tri1137-plus { fill:var(--tri-muted); font-size:24px; }
+.tri1137-history { display:grid; gap:6px; min-width:0; }
+.tri1137-history > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.tri1137-term { display:grid; gap:4px; justify-items:center; min-width:48px; max-width:100%; padding:6px; border-bottom:3px solid var(--tri-color,var(--tri-line)); }
+.tri1137-term small { color:var(--tri-muted); font:11px ui-monospace,monospace; }
+.tri1137-term b { font:600 13px ui-monospace,monospace; overflow-wrap:anywhere; }
+.tri1137-term.future { opacity:.55; }
+.tri1137-viz > footer { display:flex; flex-wrap:wrap; align-items:center; gap:6px; color:var(--tri-muted); font-size:12px; }
+.tri1137-viz > footer > span { color:var(--tri-color,var(--tri-muted)); }
+.tri1137-viz > footer > small { margin-left:auto; font-size:12px; }
+#vizPanel:has(.tri1137-viz) .note { display:none; }
+#vizPanel:has(.tri1137-viz) :is(#codePanel,#codePanel2) { max-height:none; overflow:visible; white-space:pre-wrap; }
+#vizPanel:has(.tri1137-viz) .code-line, #vizPanel:has(.tri1137-viz) .code-line .txt { min-width:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:768px) { .viz-split:has(.tri1137-viz) .viz-right { order:-1; } #vizPanel:has(.tri1137-viz) { padding-inline:10px; } }
+
 /* LeetCode 70 · Group routes by their final jump. */
 .cs70-viz { --cs-bg: #0f172a; --cs-panel: #1e293b; --cs-text: #e2e8f0; --cs-muted: #a5b4c8; --cs-line: #475569; --cs-one: #5eead4; --cs-two: #c4b5fd; --cs-goal: #fcd34d; display: grid; gap: 14px; min-width: 0; padding: 16px; color: var(--cs-text); background: var(--cs-bg); border: 1px solid var(--cs-line); border-radius: 13px; container-type: inline-size; }
 [data-theme="light"] .cs70-viz { --cs-bg: #fff; --cs-panel: #f1f5f9; --cs-text: #172033; --cs-muted: #475569; --cs-line: #cbd5e1; --cs-one: #0f766e; --cs-two: #6d28d9; --cs-goal: #92400e; }

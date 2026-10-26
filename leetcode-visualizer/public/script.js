@@ -487,6 +487,12 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.nextPermutationView), surface: "treeView", render: (step) => {
       renderNextPermutation31View(step);
     } },
+    { predicate: (step) => Boolean(step.nonConsecutive600View), surface: "treeView", render: (step) => {
+      renderNonConsecutive600View(step);
+    } },
+    { predicate: (step) => Boolean(step.permutation47View), surface: "treeView", render: (step) => {
+      renderPermutations47View(step);
+    } },
     { predicate: (step) => Boolean(step.permutation46View), surface: "treeView", render: (step) => {
       renderPermutation46View(step);
     } },

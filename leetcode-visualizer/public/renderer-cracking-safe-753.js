@@ -544,12 +544,77 @@ function cs753RenderDiagnostics(state, copy, locale) {
   return `<section class="cs753-diagnostics"><article class="cs753-card"><header><h3>${cs753Escape(copy.invariants)}</h3></header><ul class="cs753-checks" role="list">${invariantRows}</ul></article><article class="cs753-card"><header><h3>${cs753Escape(copy.counters)}</h3></header><dl class="cs753-counters">${counterRows}</dl></article></section>`;
 }
 
-function renderCrackingSafe753View(step) {
-  const root = typeof $ === "function" ? $("treeView") : null;
-  if (!root) return;
-  const locale = cs753Locale();
-  const copy = CS753_COPY[locale];
+function cs753PictureModel(step, selectedWord = null) {
   const state = cs753Normalize(step);
-  const event = CS753_EVENT_LABELS[state.event]?.[locale] || state.event;
-  root.innerHTML = `<div class="cs753-viz${state.final ? " cs753-is-final" : ""}" role="region" aria-label="${cs753Escape(copy.region)}"><header class="cs753-hero"><div><p>${cs753Escape(copy.kicker)}</p><h2>${cs753Escape(state.title)}</h2><span>${cs753Escape(event)}</span></div><dl><div><dt>n / k</dt><dd>${state.n} / ${state.k}</dd></div><div><dt>${cs753Escape(copy.nodes)}</dt><dd>${state.totalNodes}</dd></div><div><dt>${cs753Escape(copy.edges)}</dt><dd>${state.traversal.usedCount}/${state.totalEdges}</dd></div><div><dt>${cs753Escape(copy.length)}</dt><dd>${state.output.sequence ? state.output.sequence.length : "—"}/${state.expectedLength}</dd></div></dl></header>${cs753RenderPhases(state, copy)}${cs753RenderSource(state, copy, locale)}<div class="cs753-primary-grid">${cs753RenderGraph(state, copy)}${cs753RenderLedger(state, copy)}</div><div class="cs753-secondary-grid">${cs753RenderStack(state, copy)}${cs753RenderOutput(state, copy)}</div>${cs753RenderDiagnostics(state, copy, locale)}<section class="cs753-note"><strong>${cs753Escape(copy.note)}</strong><p>${cs753Escape(state.note)}</p></section></div>`;
+  const verified = state.output.sequence === null ? [] : state.output.verifiedWindows.filter(item => item.unique && item.expected);
+  const window = verified.find(item => item.word === selectedWord) || verified[0] || null;
+  const edgeId = window?.word ?? state.graph.activeEdgeId;
+  const edge = state.graph.edges.find(item => item.id === edgeId) || null;
+  const digits = state.output.sequence === null ? state.output.postorderDigits : [...state.output.sequence];
+  const selectedIndices = window ? Array.from({length:state.n}, (_,offset) => window.index + offset) : [];
+  return {state, edge, window, verified, digits, selectedIndices};
+}
+
+function renderCrackingSafe753View(step) {
+  const root = typeof $ === 'function' ? $('treeView') : null;
+  if (!root) return;
+  const input = step?.crackingSafe753View?.input;
+  const frameKey = `${input?.n}:${input?.k}:${step?.crackingSafe753View?.counters?.frames}`;
+  if (root._safe753FrameKey !== frameKey) root._safe753Word = null;
+  const model = cs753PictureModel(step, root._safe753Word);
+  const {state, edge, window: selectedWindow, verified, digits, selectedIndices} = model;
+  const t = (vi, en) => cs753Locale() === 'vi' ? vi : en;
+  const label = node => node || 'ε';
+  const width = Math.max(220, (root.clientWidth || 550) - 24);
+  const skipped = ['seen-check-true','skip-seen-edge'].includes(state.event);
+  const emit = state.event === 'emit-postorder-digit';
+  const reverse = emit;
+  const titles = {
+    'consume-edge':t('Đánh dấu cạnh mới', 'Mark a new edge'),
+    'recurse-edge':t('Đi tiếp → chưa ghi số', 'Go deeper → no digit written yet'),
+    'emit-postorder-digit':t('Quay lui → ghi một số', 'Return → write one digit'),
+    'value-loop-false':t('Hết cạnh → quay lui', 'No edges left → return'),
+    'seen-check-true':t('Cạnh đã đi → bỏ qua', 'Used edge → skip'),
+    'skip-seen-edge':t('Cạnh đã đi → bỏ qua', 'Used edge → skip'),
+  };
+  const title = state.final ? t('Đủ mọi mã ✓', 'Every password covered ✓') : titles[state.event] || t('Chọn cạnh chưa đi', 'Choose an unused edge');
+  const boxWidth = Math.min(110, width / 2 - 34);
+  const nodeBox = (x, node, caption, cls) => `<g class="safe753-node ${cls}" transform="translate(${x - boxWidth / 2},68)"><rect width="${boxWidth}" height="56" rx="9"/><text class="safe753-small" x="${boxWidth / 2}" y="-10" text-anchor="middle">${caption}</text><text class="safe753-node-value" x="${boxWidth / 2}" y="35" text-anchor="middle">${cs753Escape(label(node))}</text></g>`;
+  let scene;
+  if (edge) {
+    const start = width / 4 + boxWidth / 2 + 4;
+    const end = width * 3 / 4 - boxWidth / 2 - 8;
+    scene = `<svg class="safe753-scene ${skipped ? 'skipped' : ''} ${reverse ? 'returning' : ''}" viewBox="0 0 ${width} 147" role="img" aria-label="${cs753Escape(`${edge.word}: ${label(edge.from)} → ${label(edge.to)}${emit ? `, ${t('ghi', 'write')} ${edge.digit}` : ''}`)}"><defs><marker id="safe753-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z"/></marker></defs><text class="safe753-password" x="${width / 2}" y="27" text-anchor="middle">${cs753Escape(edge.word.slice(0,-1))}<tspan class="safe753-new">${edge.digit}</tspan></text>${nodeBox(width / 4, edge.from, t('trước', 'before'), reverse ? 'destination' : 'source')}${nodeBox(width * 3 / 4, edge.to, t('sau', 'after'), reverse ? 'source' : 'destination')}<text class="safe753-small" x="${width / 2}" y="81" text-anchor="middle">${reverse ? '↶' : '+' + edge.digit}</text><path class="safe753-flow" d="M${reverse ? end : start},99 H${reverse ? start : end}" marker-end="url(#safe753-arrow)"/>${skipped ? `<text class="safe753-reject" x="${width / 2}" y="121" text-anchor="middle">×</text>` : ''}</svg>`;
+  } else {
+    scene = `<svg class="safe753-scene" viewBox="0 0 ${width} 138" role="img" aria-label="dfs(${cs753Escape(label(state.traversal.currentNode ?? state.startNode))})">${nodeBox(width / 2, state.traversal.currentNode ?? state.startNode, t('node hiện tại', 'current node'), 'source')}</svg>`;
+  }
+  const frames = state.traversal.callStack;
+  const trail = frames.slice(-4).map((frame, i, shown) => `<span class="safe753-frame ${i === shown.length - 1 ? 'top' : ''}">${cs753Escape(label(frame.node))}</span>`).join('<span aria-hidden="true">→</span>');
+  const stack = !state.final && frames.length ? `<div class="safe753-trail"><small>DFS</small>${frames.length > 4 ? '<span>…</span>' : ''}${trail}${state.phase === 'unwind' ? '<span class="safe753-back" aria-hidden="true">↶</span>' : ''}</div>` : '';
+  const suffixStart = state.output.sequence === null ? digits.length : digits.length - state.output.startSuffix.length;
+  const selectedSet = new Set(selectedIndices);
+  const tape = digits.map((digit, index) => `<span class="safe753-digit ${index >= suffixStart ? 'suffix' : ''} ${selectedSet.has(index) ? 'selected' : ''} ${emit && index === digits.length - 1 ? 'newest' : ''}" data-index="${index}"><small>${index}</small><b>${digit}</b></span>`).join('');
+  const passwords = state.graph.edges.map(item => {
+    const checked = verified.some(win => win.word === item.word);
+    const active = edge?.id === item.id;
+    return `<button class="safe753-code ${checked ? 'verified' : item.emitted ? 'emitted' : item.seen ? 'used' : ''} ${active ? 'active' : ''}" type="button" data-safe753-word="${cs753Escape(item.word)}" ${!checked ? 'disabled' : ''} aria-pressed="${selectedWindow?.word === item.word}" aria-label="${cs753Escape(item.word)} · ${checked ? t('có trong kết quả', 'present in the result') : item.emitted ? t('đã ghi số', 'digit emitted') : item.seen ? t('đã đi', 'visited') : t('chưa đi', 'unvisited')}"><b>${cs753Escape(item.word)}</b><span aria-hidden="true">${checked || item.emitted ? '✓' : item.seen ? '●' : '○'}</span></button>`;
+  }).join('');
+  const caption = selectedWindow ? `${selectedWindow.word} · [${selectedWindow.index}…${selectedWindow.index + state.n - 1}]` : emit ? t(`Ghi ${edge?.digit ?? ''} sau khi quay về.`, `Write ${edge?.digit ?? ''} after returning.`) : t('Chỉ ghi số khi quay lui.', 'Write digits only on return.');
+  const outputLabel = state.output.sequence === null ? t('Số đã ghi khi quay lui', 'Digits written on return') : t('Chuỗi mở khóa', 'Unlocking sequence');
+  root.innerHTML = `<section class="safe753-viz"><header><strong>${title}</strong><span>n=${state.n} · k=${state.k}</span></header>${scene}<small class="safe753-hint">${state.n === 1 ? t('Node rỗng ε · mỗi chữ số là một cạnh.', 'Empty node ε · each digit is an edge.') : t(`Giữ ${state.n - 1} chữ số cuối để đi tiếp.`, `Keep the last ${state.n - 1} digits to continue.`)}</small>${stack}<section class="safe753-output"><header><span>${outputLabel}</span><b>${digits.length}/${state.output.sequence === null ? state.totalEdges : state.expectedLength}</b></header><div class="safe753-tape">${tape || `<span class="safe753-empty">${t('Chưa ghi số', 'No digits written yet')}</span>`}</div><small class="safe753-caption" aria-live="polite">${cs753Escape(caption)}</small>${state.final ? `<div class="safe753-join"><span>${t('Nối cuối', 'Append suffix')}</span><code>${cs753Escape(state.output.startSuffix.join('') || 'ε')}</code><span>· ${state.output.postorderDigits.length} + ${state.output.startSuffix.length} = ${state.expectedLength} ${t('ký tự', 'characters')}</span></div>` : ''}</section><section class="safe753-passwords"><header><strong>${state.final ? t('Bấm mã để xem cửa sổ', 'Select a password to show its window') : t('Mỗi mã = một cạnh', 'Each password = one edge')}</strong><span>${state.traversal.usedCount}/${state.totalEdges}</span></header><div>${passwords}</div>${!state.final ? `<small>${t('○ chưa đi · ● đã đi · ✓ đã ghi số', '○ unvisited · ● visited · ✓ digit written')}</small>` : ''}</section></section>`;
+  root._safe753FrameKey = frameKey;
+  root._safe753Step = step;
+  root._safe753Width = root.clientWidth;
+  root.querySelectorAll?.('[data-safe753-word]').forEach(button => button.addEventListener('click', () => {
+    const name = button.dataset.safe753Word;
+    root._safe753Word = name;
+    renderCrackingSafe753View(root._safe753Step);
+    [...root.querySelectorAll('[data-safe753-word]')].find(item => item.dataset.safe753Word === name)?.focus({preventScroll:true});
+  }));
+  if (typeof ResizeObserver !== 'undefined' && !root._safe753Observer) {
+    root._safe753Observer = new ResizeObserver(() => {
+      if (root.querySelector('.safe753-viz') && root.clientWidth !== root._safe753Width) renderCrackingSafe753View(root._safe753Step);
+    });
+    root._safe753Observer.observe(root);
+  }
 }
