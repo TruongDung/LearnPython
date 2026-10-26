@@ -38,8 +38,8 @@ function renderNonConsecutive600View(step) {
     }
     if(view.addition)detail=`<div class="nc600-sum" aria-live="polite"><b>${view.addition.before}</b><span>+</span><b>${view.addition.amount}</b><span>=</span><strong>${view.addition.after}</strong></div>`;
     if(event==='check-prev'||view.change){
-      const before=view.change?.before??view.prev,after=view.change?.after??Number(bits[index]);
-      detail=`<div class="nc600-register ${cutAt===index?'bad':''}"><span><small>prev</small><b>${before}</b></span><em>${view.change?'←':'·'}</em><span><small>bit</small><b>${after}</b></span>${cutAt===index?'<strong>11 ×</strong>':''}</div>`;
+      const previous=view.prev,current=Number(bits[index]);
+      detail=`<div class="nc600-register ${cutAt===index?'bad':''}"><span><small>prev</small><b>${previous}</b></span><em>${view.change?'←':'·'}</em><span><small>bit</small><b>${current}</b></span>${cutAt===index?'<strong>11 ×</strong>':''}</div>`;
     }
   }
   const input=`<section class="nc600-input"><small>n = ${n}${position!==null?` · i = ${position}`:''}</small><div>${[...bits].map((bit,i)=>`<span class="nc600-indexed-bit"><small>${i}</small>${binary(bit,i===position&&event!=='bit-loop-exit'?0:-1,false,(phase==='cut'||done&&cutAt!==null)&&bit==='1'&&(bits[i-1]==='1'||bits[i+1]==='1'))}</span>`).join('')}</div></section>`;

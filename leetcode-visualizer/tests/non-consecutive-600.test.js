@@ -55,6 +55,53 @@ test('600 displayed Python returns the same results as the visualization',()=>{
  assert.equal(result.status,0,result.stderr);
 });
 
+test('600 every executed line and all bound local variables match CPython after execution',()=>{
+ const inputs=[0,1,2,3,5,6,13,31,64,127,715827882,1000000000];
+ const python=`import json,sys
+data=json.load(sys.stdin)
+ns={}
+exec(data['code'],ns)
+results=[]
+names=['n','bits','f','length','total','prev','i','bit','remaining']
+for n in data['inputs']:
+    frames=[]
+    pending=[None]
+    def trace(frame,event,arg):
+        if frame.f_code.co_name != 'findIntegers': return None
+        def snapshot():
+            return {k:(v[:] if isinstance(v,list) else v) for k,v in frame.f_locals.items() if k in names}
+        if event == 'line':
+            if pending[0] is not None: frames.append({'line':pending[0],'locals':snapshot()})
+            pending[0]=frame.f_lineno
+        elif event == 'return':
+            frames.append({'line':pending[0],'locals':snapshot()})
+        return trace
+    sys.settrace(trace)
+    answer=ns['Solution']().findIntegers(n)
+    sys.settrace(None)
+    results.append({'answer':answer,'frames':frames})
+print(json.dumps(results))`;
+ const result=spawnSync(process.env.PYTHON||'python',['-c',python],{input:JSON.stringify({code:problem.code.join('\n'),inputs}),encoding:'utf8'});
+ assert.equal(result.status,0,result.stderr);
+ const expected=JSON.parse(result.stdout);
+ inputs.forEach((n,index)=>{
+  const run=problem.builder([n]);
+  assert.equal(run.answer,expected[index].answer);
+  assert.equal(run.steps.length,expected[index].frames.length,`frame count at n=${n}`);
+  run.steps.forEach((step,k)=>{
+   const view=step.nonConsecutive600View;
+   assert.deepEqual(step.codeLines,[expected[index].frames[k].line],`line ${k} at n=${n}`);
+   assert.deepEqual(view.locals,expected[index].frames[k].locals,`locals after line ${view.line} at n=${n}`);
+  });
+ });
+ assert.equal(problem.debugMode,'line-by-line');
+ const final=problem.builder([5]).steps.at(-1).nonConsecutive600View;
+ assert.equal(final.total,4);assert.equal(final.answer,5);
+ const cut=problem.builder([6]);
+ assert.deepEqual(cut.steps.slice(-2).map(step=>step.codeLines[0]),[12,13]);
+ assert.ok(!cut.steps.some(step=>step.codeLines[0]===15));
+});
+
 test('600 validates bounds and renders bounded pictures without changing the trace',()=>{
  for(const input of [[],[1,2],[-1],[1.1],[1e9+1],['5'],null])assert.throws(()=>problem.builder(input),/#600/);
  const host={clientWidth:250,innerHTML:''},context={lang:'vi',$:()=>host};
