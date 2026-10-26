@@ -132,56 +132,115 @@ function parseCoordinateList(raw) {
   return coords;
 }
 
-function buildSteps9007(input, params = {}) {
+const OBSTACLE_GRID_9007_CODE = [
+  "from collections import deque",
+  "",
+  "def shortest_path(grid, sources, target):",
+  "    rows, cols = len(grid), len(grid[0])",
+  "    sources = list(dict.fromkeys(map(tuple, sources)))",
+  "    target = tuple(target)",
+  "    queue = deque(sources)",
+  "    parent = {cell: None for cell in sources}",
+  "    distance = {cell: 0 for cell in sources}",
+  "    while queue:",
+  "        cell = queue.popleft()",
+  "        if cell == target:",
+  "            path = []",
+  "            while cell is not None:",
+  "                path.append(cell)",
+  "                cell = parent[cell]",
+  "            path.reverse()",
+  "            return len(path) - 1",
+  "        r, c = cell",
+  "        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):",
+  "            nr, nc = r + dr, c + dc",
+  "            neighbor = (nr, nc)",
+  "            if not (0 <= nr < rows and 0 <= nc < cols) or grid[nr][nc] == 1 or neighbor in parent:",
+  "                continue",
+  "            parent[neighbor] = cell",
+  "            distance[neighbor] = distance[cell] + 1",
+  "            queue.append(neighbor)",
+  "    return -1",
+];
+
+function parseObstacleGrid9007(input, params = {}) {
   const grid = parseGrid(input);
-  const rows = grid.length, cols = grid[0].length;
-  const sources = parseCoordinateList(params.sources);
-  const [target] = parseCoordinateList(params.target);
-  const inside = ([row, col]) => row >= 0 && row < rows && col >= 0 && col < cols;
-  if (!sources.every(inside) || !inside(target) || sources.some(([row, col]) => grid[row][col]) || grid[target[0]][target[1]]) throw new Error("Source/target phải nằm trong grid và ở ô trống (0).");
-  const key = ([row, col]) => `${row},${col}`;
-  const sourceKeys = new Set(sources.map(key));
-  const targetKey = key(target);
-  const queue = sources.map((point) => [...point]);
-  const visited = new Set(sources.map(key));
-  const parent = new Map();
-  const steps = [];
-  const cells = (current = null, path = []) => {
-    const queued = new Set(queue.map(key));
-    const pathSet = new Set(path.map(key));
-    return grid.map((row, r) => row.map((value, c) => {
-      const pointKey = `${r},${c}`;
-      let cls = value ? "wall" : pathSet.has(pointKey) ? "path" : current && current[0] === r && current[1] === c ? "current" : queued.has(pointKey) ? "queued" : visited.has(pointKey) ? "visited" : "empty";
-      const label = value ? "×" : sourceKeys.has(pointKey) ? "S" : pointKey === targetKey ? "T" : "";
-      if (sourceKeys.has(pointKey) && !current) cls = "start";
-      return { cls, label, meta: visited.has(pointKey) ? `d=${distance.get(pointKey)}` : "" };
-    }));
-  };
-  const distance = new Map(sources.map((point) => [key(point), 0]));
-  const snap = (title, line, note, current = null, path = [], final = false) => steps.push({
-    title, arr: [], highlight: [], mark: [], final, codeLines: [line], bfsGrid: { rows, cols, cells: cells(current, path) },
-    vars: [{ name: "sources", value: `[${sources.map(key).join("; ")}]` }, { name: "queue", value: `[${queue.map(key).join("; ")}]` }, { name: "target", value: targetKey }], note,
+  const rawSources = parseCoordinateList(params.sources);
+  const targets = parseCoordinateList(params.target);
+  const inside = point => point.length === 2 && point[0] >= 0 && point[0] < grid.length && point[1] >= 0 && point[1] < grid[0].length;
+  if (targets.length !== 1 || ![...rawSources, ...targets].every(point => inside(point) && grid[point[0]][point[1]] === 0)) {
+    throw new Error("Source/target phải là tọa độ row,col ở ô trống; chỉ nhập một target.");
+  }
+  const sources = [...new Map(rawSources.map(point => [point.join(","), point])).values()];
+  return { grid, sources, target: targets[0] };
+}
+
+function buildSteps9007(input, params = {}) {
+  const { grid, sources, target } = parseObstacleGrid9007(input, params);
+  const key = point => point?.join(",");
+  const copy = point => point ? [...point] : point;
+  const queue = sources.map(copy), parent = new Map(sources.map(point => [key(point), null]));
+  const distance = new Map(sources.map(point => [key(point), 0]));
+  const steps = [], path = [];
+  let current, neighbor, expanding = null, reason = null, reversed = false;
+  const tuple = point => point === undefined ? "—" : point === null ? "None" : `(${point.join(", ")})`;
+  const snap = (operation, source, titleVi, titleEn, phase = "search", final = false) => steps.push({
+    title: { vi: titleVi, en: titleEn }, note: { vi: titleVi, en: titleEn },
+    arr: [], highlight: [], mark: [], final,
+    codeLines: [OBSTACLE_GRID_9007_CODE.indexOf(source) + 1],
+    vars: [
+      { name: "cell", value: tuple(current) }, { name: "neighbor", value: tuple(neighbor) },
+      { name: "distance[cell]", value: distance.get(key(current)) ?? "—" },
+      { name: "parent[neighbor]", value: parent.has(key(neighbor)) ? tuple(parent.get(key(neighbor))) : "—" },
+      { name: "distance[neighbor]", value: distance.get(key(neighbor)) ?? "—" },
+      { name: "len(queue)", value: queue.length },
+    ],
+    obstacle9007View: {
+      grid: grid.map(row => [...row]), sources: sources.map(copy), target: copy(target),
+      queue: queue.map(copy), current: copy(current) ?? null, neighbor: copy(neighbor) ?? null,
+      expanding: copy(expanding), parent: Object.fromEntries([...parent].map(([cell, prev]) => [cell, copy(prev)])),
+      distance: Object.fromEntries(distance), path: path.map(copy), reversed,
+      phase, operation, reason, answer: final ? (path.length ? path.length - 1 : -1) : null,
+    },
   });
-  snap({ vi: `Khởi tạo ${sources.length} source`, en: `Initialize ${sources.length} source(s)` }, 6, { vi: "Multi-source BFS đẩy tất cả source vào queue ở distance 0. Một source duy nhất chính là BFS thường.", en: "Multi-source BFS pushes every source into the queue at distance 0. One source is ordinary BFS." });
-  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  let found = null;
+  snap("init", "    distance = {cell: 0 for cell in sources}", "S → T · Bắt đầu cùng lúc", "S → T · Start together", "setup");
   while (queue.length) {
-    const current = queue.shift();
-    const currentKey = key(current);
-    snap({ vi: `Pop (${currentKey})`, en: `Pop (${currentKey})` }, 9, { vi: "FIFO đảm bảo ô được pop theo khoảng cách không giảm.", en: "FIFO ensures cells are popped in nondecreasing distance." }, current);
-    if (currentKey === targetKey) { found = current; break; }
-    for (const [dr, dc] of directions) {
-      const next = [current[0] + dr, current[1] + dc];
-      const nextKey = key(next);
-      if (!inside(next) || grid[next[0]][next[1]] || visited.has(nextKey)) continue;
-      visited.add(nextKey); parent.set(nextKey, current); distance.set(nextKey, distance.get(currentKey) + 1); queue.push(next);
-      snap({ vi: `Visit (${nextKey})`, en: `Visit (${nextKey})` }, 14, { vi: `Đặt parent và distance=${distance.get(nextKey)}, rồi append vào queue.`, en: `Set parent and distance=${distance.get(nextKey)}, then append to the queue.` }, next);
+    current = queue.shift(); expanding = copy(current); reason = null;
+    snap("dequeue", "        cell = queue.popleft()", `Lấy ${tuple(current)} khỏi đầu queue`, `Pop ${tuple(current)} from queue front`);
+    const reached = key(current) === key(target);
+    snap("target-check", "        if cell == target:", reached ? "Đã tới T ✓" : "Chưa tới T → đi tiếp", reached ? "Reached T ✓" : "Not T → expand");
+    if (reached) {
+      snap("path-init", "            path = []", "Lần theo parent: T → S", "Follow parents: T → S", "trace");
+      while (current !== null) {
+        path.push(copy(current));
+        snap("path-append", "                path.append(cell)", `Thêm ${tuple(current)} vào đường đi`, `Collect ${tuple(current)} in path`, "trace");
+        current = parent.get(key(current));
+        snap("path-parent", "                cell = parent[cell]", "← Quay về ô cha", "← Follow parent", "trace");
+      }
+      path.reverse(); reversed = true;
+      snap("path-reverse", "            path.reverse()", "Đảo lại: S → T", "Reverse: S → T", "trace");
+      snap("done", "            return len(path) - 1", `${path.length - 1} bước · đường ngắn nhất`, `${path.length - 1} moves · shortest path`, "done", true);
+      return { original: grid.map(row => [...row]), answer: path.length - 1, steps };
+    }
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      neighbor = [current[0] + dr, current[1] + dc];
+      const [r, c] = neighbor;
+      reason = r < 0 || r >= grid.length || c < 0 || c >= grid[0].length ? "boundary" : grid[r][c] === 1 ? "wall" : parent.has(key(neighbor)) ? "seen" : null;
+      const vi = reason === "boundary" ? "Ngoài lưới" : reason === "wall" ? "Vật cản" : reason === "seen" ? "Đã thăm" : "Ô mới";
+      const en = reason === "boundary" ? "Outside grid" : reason === "wall" ? "Wall" : reason === "seen" ? "Already seen" : "New cell";
+      snap("check", "            if not (0 <= nr < rows and 0 <= nc < cols) or grid[nr][nc] == 1 or neighbor in parent:", `${tuple(neighbor)} · ${vi}`, `${tuple(neighbor)} · ${en}`);
+      if (reason) continue;
+      parent.set(key(neighbor), copy(current));
+      snap("set-parent", "            parent[neighbor] = cell", `${tuple(current)} → ${tuple(neighbor)}`, `${tuple(current)} → ${tuple(neighbor)}`);
+      distance.set(key(neighbor), distance.get(key(current)) + 1);
+      snap("set-distance", "            distance[neighbor] = distance[cell] + 1", `${distance.get(key(current))} + 1 = ${distance.get(key(neighbor))} bước`, `${distance.get(key(current))} + 1 = ${distance.get(key(neighbor))} moves`);
+      queue.push(copy(neighbor));
+      snap("enqueue", "            queue.append(neighbor)", `Thêm ${tuple(neighbor)} vào cuối queue`, `Append ${tuple(neighbor)} to queue back`);
     }
   }
-  const path = found ? (() => { const result = []; for (let point = found; point; point = parent.get(key(point))) result.push(point); return result.reverse(); })() : [];
-  const answer = path.length ? path.length - 1 : -1;
-  snap(path.length ? { vi: `Đường ngắn nhất = ${answer} bước`, en: `Shortest path = ${answer} move(s)` } : { vi: "Không có đường đi", en: "No path exists" }, 17, path.length ? { vi: "Ô T được pop lần đầu nên path hiện tại là ngắn nhất từ source gần nhất.", en: "T is popped for the first time, so this path is shortest from the nearest source." } : { vi: "Queue đã rỗng trước khi tới target.", en: "The queue emptied before reaching target." }, found, path, true);
-  return { original: grid, answer, steps };
+  reason = null;
+  snap("unreachable", "    return -1", "Queue rỗng · Không tới được T", "Queue empty · T is unreachable", "done", true);
+  return { original: grid.map(row => [...row]), answer: -1, steps };
 }
 
 function parseSortedMatrix(input) {
@@ -1758,7 +1817,8 @@ module.exports = {
     statement: { vi: "Lưới 0/1: 0 là ô trống, 1 là vật cản. Tìm số bước ít nhất từ source tới target theo 4 hướng. Follow-up: nhập nhiều source, BFS trả đường từ source gần target nhất.", en: "In a 0/1 grid, 0 is open and 1 is an obstacle. Find the fewest 4-direction moves from sources to target. Follow-up: provide multiple sources; BFS returns a path from the nearest source." },
     defaultInput: "0,0,0,0,0|1,1,0,1,0|0,0,0,1,0|0,1,1,0,0|0,0,0,0,0", inputKind: "string", inputLabel: { vi: "Grid 0/1 (hàng cách |)", en: "0/1 grid (rows separated by |)" }, extraParams: [{ key: "sources", type: "string", label: { vi: "sources row,col;row,col", en: "sources row,col;row,col" }, default: "0,0" }, { key: "target", type: "string", label: { vi: "target row,col", en: "target row,col" }, default: "4,4" }],
     approach: [{ vi: "BFS thường khởi tạo một source; multi-source BFS đưa tất cả source vào queue với distance 0.", en: "Ordinary BFS starts with one source; multi-source BFS places every source in the queue at distance 0." }, { vi: "Khi target được pop lần đầu, đó là path ngắn nhất từ source gần nhất.", en: "When target is popped for the first time, it is the shortest path from the nearest source." }, { vi: "parent lưu predecessor để dựng path cuối.", en: "parent stores predecessors to reconstruct the final path." }], complexity: { time: "O(rows · cols)", space: "O(rows · cols)", note: { vi: "Mỗi ô trống được visit nhiều nhất một lần, không phụ thuộc số source.", en: "Each open cell is visited at most once, independent of the number of sources." } },
-    code: ["from collections import deque", "", "def shortest_path(grid, sources, target):", "    rows, cols = len(grid), len(grid[0])", "    parent = {}", "    queue = deque(sources)  # all start at d=0", "    seen = set(sources)", "    while queue:", "        r, c = queue.popleft()", "        if (r, c) == target: break", "        for nr, nc in neighbors4(r, c):", "            if inside(nr, nc) and grid[nr][nc] == 0 and (nr, nc) not in seen:", "                seen.add((nr, nc)); parent[nr, nc] = (r, c)", "                queue.append((nr, nc))", "    return reconstruct(parent, target)"], builder: buildSteps9007,
+    code: OBSTACLE_GRID_9007_CODE, debugMode: "line-by-line", builder: buildSteps9007,
+    liveArgs: (input, params) => { const { grid, sources, target } = parseObstacleGrid9007(input, params); return [grid, sources, target]; },
   },
   9008: {
     id: 9008, difficulty: "medium", category: HEAP, tags: [MATRIX], title: { vi: "K Smallest Numbers in Sorted Matrix", en: "K Smallest Numbers in Sorted Matrix" }, titleVi: { vi: "k số nhỏ nhất trong ma trận sorted", en: "k smallest numbers in a sorted matrix" },
