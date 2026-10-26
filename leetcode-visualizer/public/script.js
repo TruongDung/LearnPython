@@ -794,7 +794,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderMeetingTimelineView(step);
     } },
     { predicate: (step) => Boolean(step.skylineView), surface: "treeView", render: (step) => {
-      renderSkylineView(step);
+      renderSkyline218Pictures(step);
     } },
     { predicate: (step) => Boolean(step.bfsLevelView), surface: "treeView", render: (step) => {
       renderBfsLevelView(step);
