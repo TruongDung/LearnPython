@@ -1,0 +1,101 @@
+.tt1275-viz {
+  --tt1275-ink:#edf3ff; --tt1275-muted:#acbad0; --tt1275-paper:#162238; --tt1275-line:#3f526f;
+  --tt1275-a:#8cbcff; --tt1275-b:#ff9fb6; --tt1275-active:#ffd17a; --tt1275-green:#6ee1b3;
+  display:grid; gap:12px; min-width:0; text-align:left; color:var(--tt1275-ink); container:tictactoe1275 / inline-size;
+}
+[data-theme="light"] .tt1275-viz {
+  --tt1275-ink:#25344e; --tt1275-muted:#596d88; --tt1275-paper:#fff; --tt1275-line:#d5deed;
+  --tt1275-a:#2869c5; --tt1275-b:#c03a62; --tt1275-active:#a56900; --tt1275-green:#087c58;
+}
+.tt1275-viz * { box-sizing:border-box; }
+#treeView:has(> .tt1275-viz) { padding:0; min-height:0; border:0; overflow:visible; background:transparent; }
+#vizPanel:has(.tt1275-viz) #stepNote, #vizPanel:has(.tt1275-viz) #answer { display:none; }
+#vizPanel:has(.tt1275-viz) .viz-split, #vizPanel:has(.tt1275-viz) .code-panel { min-width:0; }
+/* Long statements stay on one line; scrolling belongs to the snippet. */
+#vizPanel:has(.tt1275-viz) .code-panel { max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }
+#vizPanel:has(.tt1275-viz) .code-line { width:max-content; min-width:100%; white-space:pre; }
+#vizPanel:has(.tt1275-viz) .code-line .txt { flex:0 0 auto; white-space:pre; overflow-wrap:normal; word-break:normal; }
+#vizPanel:has(.tt1275-viz) #varsGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+body:has(.tt1275-viz) #catalogJumpNav.is-visible { position:static; display:flex; flex-wrap:wrap; justify-content:center; max-width:calc(100% - 24px); max-height:none; overflow:visible; margin:12px auto calc(90px + env(safe-area-inset-bottom)); }
+body:has(.tt1275-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
+.tt1275-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.tt1275-heading > div { display:flex; gap:7px; }
+.tt1275-heading > span { color:var(--tt1275-muted); font-size:11px; }
+.tt1275-player { display:flex; align-items:center; gap:4px; border:1px solid var(--tt1275-line); border-radius:9px; padding:3px 8px; font-size:13px; }
+.tt1275-player.A { color:var(--tt1275-a); }
+.tt1275-player.B { color:var(--tt1275-b); }
+.tt1275-player.active { border:2px solid var(--tt1275-active); }
+.tt1275-player.won { border-color:var(--tt1275-green); }
+.tt1275-icon { display:inline-block; width:28px; height:28px; flex-shrink:0; vertical-align:middle; }
+.tt1275-mark path, .tt1275-mark circle { fill:none; stroke-width:var(--tt1275-pen,5); stroke-linecap:round; }
+.tt1275-mark.A path { stroke:var(--tt1275-a); }
+.tt1275-mark.B circle { stroke:var(--tt1275-b); }
+.tt1275-mark.preview { opacity:.35; stroke-dasharray:5 5; }
+.tt1275-work { display:grid; grid-template-columns:minmax(0,1fr) 160px; gap:12px; align-items:center; }
+.tt1275-board-panel { min-width:0; padding:8px; border:1px solid var(--tt1275-line); border-radius:16px; background:var(--tt1275-paper); }
+.tt1275-board { display:block; width:100%; max-width:370px; margin:auto; }
+.tt1275-viz svg text { text-anchor:middle; dominant-baseline:central; font-family:inherit; }
+.tt1275-axis { fill:var(--tt1275-muted); font-size:11px; }
+.tt1275-cell > rect { fill:var(--tt1275-paper); stroke:var(--tt1275-line); stroke-width:1.5; }
+.tt1275-cell.A > rect { fill:color-mix(in srgb,var(--tt1275-a) 8%,var(--tt1275-paper)); }
+.tt1275-cell.B > rect { fill:color-mix(in srgb,var(--tt1275-b) 8%,var(--tt1275-paper)); }
+.tt1275-cell.current > rect { stroke:var(--tt1275-active); stroke-width:3; }
+.tt1275-cell.examined > rect { stroke:var(--tt1275-active); stroke-width:2; }
+.tt1275-cell.winning > rect { fill:color-mix(in srgb,var(--tt1275-green) 12%,var(--tt1275-paper)); stroke:var(--tt1275-green); stroke-width:3; }
+.tt1275-empty-dot { fill:var(--tt1275-line); }
+.tt1275-order-bg { fill:var(--tt1275-paper); }
+.tt1275-order { fill:var(--tt1275-muted); font-size:10px; font-weight:650; }
+.tt1275-check-line, .tt1275-winning-line { fill:none; stroke:var(--tt1275-active); stroke-width:11; stroke-linecap:round; opacity:.25; stroke-dasharray:7 7; }
+.tt1275-check-line.matched, .tt1275-winning-line { stroke:var(--tt1275-green); stroke-dasharray:none; }
+.tt1275-winning-line { stroke-width:16; opacity:.4; }
+.tt1275-inspector { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; min-width:0; min-height:170px; padding:12px 8px; border:1px solid var(--tt1275-line); border-radius:14px; background:var(--tt1275-paper); text-align:center; }
+.tt1275-inspector header { display:flex; align-items:center; gap:3px; font-size:12px; }
+.tt1275-inspector > span, .tt1275-inspector > code, .tt1275-inspector > b { color:var(--tt1275-muted); font-size:11px; }
+.tt1275-inspector > strong { font-size:15px; }
+.tt1275-inspector.success > strong { color:var(--tt1275-green); }
+.tt1275-big-mark { display:block; width:100px; height:88px; }
+.tt1275-inspector .tt1275-drop { color:var(--tt1275-active); font-size:28px; line-height:1; }
+.tt1275-goal svg { display:block; width:130px; height:40px; }
+.tt1275-outcome { font-size:31px; line-height:1; }
+.tt1275-outcome.draw { color:var(--tt1275-muted); font-size:64px; }
+.tt1275-clock { width:80px; height:80px; fill:none; stroke:var(--tt1275-active); stroke-width:3; stroke-linecap:round; }
+.tt1275-line-pieces { display:flex; gap:4px; }
+.tt1275-line-pieces svg { width:44px; height:48px; }
+.tt1275-line-pieces rect { fill:var(--tt1275-paper); stroke:var(--tt1275-line); }
+.tt1275-line-pieces .matches rect { fill:color-mix(in srgb,var(--tt1275-green) 10%,var(--tt1275-paper)); stroke:var(--tt1275-green); }
+.tt1275-line-pieces .misses { opacity:.5; }
+.tt1275-match { color:var(--tt1275-active); font-variant-numeric:tabular-nums; }
+.tt1275-match.success { color:var(--tt1275-green); }
+.tt1275-patterns { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; }
+.tt1275-pattern { position:relative; margin:0; padding:5px; border:1px solid var(--tt1275-line); border-radius:9px; background:var(--tt1275-paper); }
+.tt1275-pattern svg { display:block; width:100%; max-width:43px; margin:auto; }
+.tt1275-mini-grid { fill:none; stroke:var(--tt1275-line); stroke-width:.8; }
+.tt1275-mini-line { fill:none; stroke:var(--tt1275-muted); stroke-width:3; opacity:.35; }
+.tt1275-pattern circle { fill:var(--tt1275-muted); }
+.tt1275-pattern figcaption { position:absolute; top:1px; right:3px; color:var(--tt1275-muted); font-size:11px; font-weight:750; }
+.tt1275-pattern.active { border:2px solid var(--tt1275-active); }
+.tt1275-pattern.active .tt1275-mini-line { stroke:var(--tt1275-active); opacity:1; }
+.tt1275-pattern.active circle { fill:var(--tt1275-active); }
+.tt1275-pattern.passed { border-color:var(--tt1275-green); }
+.tt1275-pattern.passed .tt1275-mini-line { stroke:var(--tt1275-green); opacity:1; }
+.tt1275-pattern.passed circle, .tt1275-pattern.passed figcaption { fill:var(--tt1275-green); color:var(--tt1275-green); }
+.tt1275-pattern.tested:not(.active) { opacity:.5; }
+.tt1275-moves { display:flex; flex-wrap:wrap; gap:6px; min-width:0; justify-content:center; }
+.tt1275-move { display:grid; justify-items:center; padding:5px 7px; min-width:48px; border:1px solid var(--tt1275-line); border-radius:9px; background:var(--tt1275-paper); }
+.tt1275-move > small { color:var(--tt1275-muted); font-size:9px; }
+.tt1275-move > b { color:var(--tt1275-muted); font:10px ui-monospace,monospace; }
+.tt1275-move .tt1275-icon { width:23px; height:23px; }
+.tt1275-move.future { opacity:.35; }
+.tt1275-move.active { border:2px solid var(--tt1275-active); }
+@container tictactoe1275 (max-width:480px) {
+  .tt1275-work { grid-template-columns:minmax(0,1fr); }
+  .tt1275-board { max-width:316px; }
+  .tt1275-inspector { flex-direction:row; flex-wrap:wrap; gap:12px; min-height:90px; padding:8px; }
+  .tt1275-big-mark { width:74px; height:65px; }
+  .tt1275-clock { width:60px; height:60px; }
+  .tt1275-inspector .tt1275-drop { transform:rotate(-90deg); }
+  .tt1275-goal { display:flex; flex-direction:column; }
+  .tt1275-goal svg { width:100px; height:30px; }
+  .tt1275-patterns { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .tt1275-pattern svg { max-width:34px; }
+}
