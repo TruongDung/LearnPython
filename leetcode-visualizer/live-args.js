@@ -385,8 +385,12 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
       return designConfig("NumMatrix", [parseMatrix(input)], [{ name: "sumRegion", args: [params.row1, params.col1, params.row2, params.col2] }]);
     case 307:
       return designConfig("NumArray", [input], parseSpaceOperations(params.operations));
-    case 355:
-      return designConfig("Twitter", [], parseFunctionOperations(input));
+    case 355: {
+      const operations = typeof problem.parseTwitter355Operations === "function"
+        ? problem.parseTwitter355Operations(input).map(({ name, args }) => ({ name, args: [...args] }))
+        : parseFunctionOperations(input);
+      return designConfig("Twitter", [], operations);
+    }
     case 381:
       return designConfig("RandomizedCollection", [], parseSpaceOperations(input));
     case 432:

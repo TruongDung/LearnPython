@@ -701,7 +701,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderFindMinRotatedView(step);
     } },
     { predicate: (step) => Boolean(step.twitterView), surface: "treeView", render: (step) => {
-      renderTwitterView(step);
+      renderDesignTwitter355Pictures(step);
     } },
     { predicate: (step) => Boolean(step.matrix542View), surface: "treeView", render: (step) => {
       renderMatrix542View(step);
