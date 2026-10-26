@@ -9,12 +9,13 @@ const code = ["from collections import deque", "class Solution:", "    def count
   "                            seen.add((nx, ny))", "                            queue.append((nx, ny))", "                if total % k == 0:", "                    answer += 1", "        return answer"];
 function parse(input, params = {}) { return { grid: gridInput(input), k: integer(params.k ?? 5, 1, 1000000, "k") }; }
 function builder(input, params) {
-  const { grid, k } = parse(input, params), m = grid.length, n = grid[0].length, seen = new Set(), queue = [], owners = {}, islands = [], t = pictureTrace(3619, code, ["k", "cell", "total", "total % k", "len(queue)", "answer"]);
-  let total, answer = 0, current = null, island = -1, sumReady = false;
+  const { grid, k } = parse(input, params), m = grid.length, n = grid[0].length, seen = new Set(), queue = [], owners = {}, islands = [], t = pictureTrace(3619, code, ["k", "cell", "total", "total % k", "len(queue)", "answer", "(nx, ny)", "len(seen)"]);
+  let total, answer = 0, current = null, neighbor = null, island = -1, sumReady = false, seenReady = false, answerReady = false;
   const emit = (line, phase, action = null, final = false) => t.emit(line, phase,
-    { k, cell: current ? `(${current.join(",")})` : null, total, "total % k": sumReady ? total % k : null, "len(queue)": island >= 0 ? queue.length : null, answer },
-    { grid, k, seen: [...seen], queue, owners, islands, island, current, total, answer, action }, final);
-  emit(4, "grid"); emit(5, "seen = ∅"); emit(6, "answer = 0");
+    { k, cell: current ? `(${current.join(",")})` : null, total, "total % k": sumReady ? total % k : null, "len(queue)": island >= 0 ? queue.length : null, answer: answerReady ? answer : null,
+      "(nx, ny)": neighbor ? `(${neighbor.join(",")})` : null, "len(seen)": seenReady ? seen.size : null },
+    { grid, k, seen: [...seen], queue, owners, islands, island, current, neighbor, total, answer, action }, final);
+  emit(4, "grid"); seenReady = true; emit(5, "seen = ∅"); answerReady = true; emit(6, "answer = 0");
   for (let r = 0; r < m; r++) {
     emit(7, "r");
     for (let c = 0; c < n; c++) {
@@ -28,7 +29,7 @@ function builder(input, params) {
         emit(14, "queue ≠ ∅"); current = queue.shift(); emit(15, "queue → cell");
         const [x, y] = current; total += grid[x][y]; islands[island].total = total; emit(16, "Σ + cell", { kind: "add", value: grid[x][y] });
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          emit(17, "↓ ↑ → ←"); const nx = x + dx, ny = y + dy; emit(18, "neighbor", { kind: "neighbor", cell: [nx, ny] });
+          emit(17, "↓ ↑ → ←"); const nx = x + dx, ny = y + dy; neighbor = [nx, ny]; emit(18, "neighbor", { kind: "neighbor", cell: [nx, ny] });
           const pass = nx >= 0 && nx < m && ny >= 0 && ny < n && grid[nx][ny] > 0 && !seen.has(`${nx},${ny}`);
           emit(19, "land ∧ unseen ?", { kind: "neighbor", cell: [nx, ny], pass });
           if (pass) { seen.add(`${nx},${ny}`); owners[`${nx},${ny}`] = island; islands[island].cells.push([nx, ny]); emit(20, "seen ✓", { kind: "neighbor", cell: [nx, ny], pass }); queue.push([nx, ny]); emit(21, "queue ← neighbor", { kind: "enqueue", cell: [nx, ny] }); }

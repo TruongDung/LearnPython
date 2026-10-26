@@ -27,12 +27,13 @@ function parseFoodRatings2353(input = defaultInput) {
   return { foods: [...p.foods], cuisines: [...p.cuisines], ratings, operations };
 }
 function builder(input) {
-  const parsed = parseFoodRatings2353(input), { foods, cuisines, ratings, operations } = parsed, food = {}, heaps = {}, history = [], results = [], t = pictureTrace(2353, code, ["food", "cuisine", "rating", "newRating", "heap[0]", "len(heap)"]);
+  const parsed = parseFoodRatings2353(input), { foods, cuisines, ratings, operations } = parsed, food = {}, heaps = {}, history = [], results = [], t = pictureTrace(2353, code, ["food", "cuisine", "rating", "newRating", "heap[0]", "len(heap)", "live rating", "stale"]);
   let activeIndex = -1, local = {}, answer = null;
   const heapFor = cuisine => heaps[cuisine] || (heaps[cuisine] = []);
   const emit = (line, phase, action = null, final = false) => {
     const heap = local.cuisine === undefined ? null : heaps[local.cuisine];
-    t.emit(line, phase, { ...local, "heap[0]": heap?.length ? `(${heap[0].join(", ")})` : null, "len(heap)": heap?.length },
+    t.emit(line, phase, { ...local, "heap[0]": heap?.length ? `(${heap[0].join(", ")})` : null, "len(heap)": heap?.length,
+      "live rating": heap?.length ? food[heap[0][1]][0] : null, "stale": heap?.length ? -heap[0][0] !== food[heap[0][1]][0] : null },
       { foods, cuisines, food, heaps, operations, activeIndex, local, history, answer, action }, final);
   };
   emit(5, "food = ∅"); emit(6, "heaps = ∅");

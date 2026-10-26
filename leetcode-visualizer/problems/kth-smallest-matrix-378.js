@@ -13,10 +13,10 @@ function parse(input, params = {}) {
   return { matrix, k: integer(params.k ?? 8, 1, matrix.length ** 2, "k") };
 }
 function builder(input, params) {
-  const { matrix, k } = parse(input, params), n = matrix.length, heap = [], taken = [], t = pictureTrace(378, code, ["k", "rank", "val", "r", "c", "len(heap)"]);
+  const { matrix, k } = parse(input, params), n = matrix.length, heap = [], taken = [], t = pictureTrace(378, code, ["k", "rank", "val", "r", "c", "len(heap)", "heap[0][0]", "matrix[r][c+1]"]);
   let rank, val, r, c, ready = false;
   const emit = (line, phase, action = null, final = false) => t.emit(line, phase,
-    { k, rank, val, r, c, "len(heap)": ready ? heap.length : null }, { matrix, k, heap, heapReady: ready, taken, action, cursor: r === undefined ? null : [r, c], rank }, final);
+    { k, rank, val, r, c, "len(heap)": ready ? heap.length : null, "heap[0][0]": heap[0]?.[0], "matrix[r][c+1]": matrix[r]?.[c + 1] }, { matrix, k, heap, heapReady: ready, taken, action, cursor: r === undefined ? null : [r, c], rank }, final);
   emit(4, "n");
   for (let row = 0; row < n; row++) heap.push([matrix[row][0], row, 0]);
   ready = true; emit(5, "matrix → heap"); heapify(heap); emit(6, "heapify");

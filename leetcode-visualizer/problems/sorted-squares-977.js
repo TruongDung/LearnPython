@@ -9,11 +9,12 @@ function parse(input) {
   return [...input];
 }
 function builder(input) {
-  const nums = parse(input), n = nums.length, t = pictureTrace(977, code, ["left", "right", "pos", "|nums[left]|", "|nums[right]|", "result[pos]"]);
+  const nums = parse(input), n = nums.length, t = pictureTrace(977, code, ["left", "right", "pos", "|nums[left]|", "|nums[right]|", "result[pos]", "nums[left]", "nums[right]"]);
   let result = [], written = [], used = [], left, right, pos, choice = null;
   const emit = (line, phase, action = null, final = false) => t.emit(line, phase,
     { left, right, pos, "|nums[left]|": left !== undefined && left <= right ? Math.abs(nums[left]) : null,
-      "|nums[right]|": right !== undefined && left <= right ? Math.abs(nums[right]) : null, "result[pos]": result[pos] },
+      "|nums[right]|": right !== undefined && left <= right ? Math.abs(nums[right]) : null, "result[pos]": result[pos],
+      "nums[left]": left <= right ? nums[left] : null, "nums[right]": left <= right ? nums[right] : null },
     { nums, result, written, used, left, right, pos, choice, action }, final);
   emit(3, "n"); result = Array(n).fill(0); written = Array(n).fill(false); emit(4, "result = 0");
   left = 0; right = n - 1; pos = n - 1; emit(5, "left → ← right");
