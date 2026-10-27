@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.reduceZero1342View), surface: "treeView", render: (step) => { renderReduceZero1342Pictures(step); } },
+    { predicate: (step) => Boolean(step.uniquePaths980View), surface: "treeView", render: (step) => { renderUniquePaths980Pictures(step); } },
+    { predicate: (step) => Boolean(step.letterCase784View), surface: "treeView", render: (step) => { renderLetterCase784Pictures(step); } },
     { predicate: (step) => Boolean(step.combinations77View), surface: "treeView", render: (step) => { renderCombinations77Pictures(step); } },
     { predicate: (step) => Boolean(step.nQueens52View), surface: "treeView", render: (step) => { renderNQueens52Pictures(step); } },
     { predicate: (step) => Boolean(step.nQueens51View), surface: "treeView", render: (step) => { renderNQueens51Pictures(step); } },
@@ -1467,7 +1470,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderMountain1095View(step);
     } },
     { predicate: (step) => Boolean(step.tiling1240View), surface: "treeView", render: (step) => {
-      renderTiling1240View(step);
+      renderTiling1240Pictures(step);
     } },
     { predicate: (step) => Boolean(step.students1349View), surface: "treeView", render: (step) => {
       renderStudents1349View(step);
