@@ -1,173 +1,165 @@
+"use strict";
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
 const { test } = require('node:test');
 const vm = require('node:vm');
-
-const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
+const { spawnSync } = require('node:child_process');
 const problem = require('../problems').SUPPORTED[22];
+const build = (n, approach = 1) => (approach === 1 ? problem.builder : problem.builder2)([n]);
 
-const build = n => problem.builder([n]);
-const buildBitmask = n => problem.builder2([n], { approach: 2 });
-
-function isValid(value, n) {
-  if (value.length !== 2 * n) return false;
-  let balance = 0;
-  for (const char of value) {
-    balance += char === '(' ? 1 : -1;
-    if (balance < 0) return false;
+function oracle(n) {
+  const answer = [];
+  for (let mask = 0; mask < 2 ** (2*n); mask++) {
+    const s = mask.toString(2).padStart(2*n,'0').replace(/0/g,'(').replace(/1/g,')');
+    let balance = 0, valid = true;
+    for (const char of s) { balance += char === '(' ? 1 : -1; if (balance < 0) valid = false; }
+    if (valid && balance === 0) answer.push(s);
   }
-  return balance === 0;
+  return answer;
 }
 
-test('22 is registered with line-by-line backtracking and bitmask approaches', () => {
-  assert.equal(problem.id, 22);
-  assert.equal(problem.slug, 'generate-parentheses');
-  assert.equal(problem.category.key, 'backtracking');
-  assert.equal(problem.debugMode, 'line-by-line');
-  assert.match(problem.complexity.time, /4ⁿ/);
-  assert.equal(problem.code[1], '    def generateParenthesis(self, n: int) -> list[str]:');
-  assert.equal(problem.code2[1], '    def generateParenthesis(self, n: int) -> list[str]:');
-  assert.equal(typeof problem.builder2, 'function');
-  assert.deepEqual(problem.extraParams[0].options.map(option => option.value), ['1', '2']);
-});
-
-test('22 matches the published examples in deterministic DFS order', () => {
-  assert.deepEqual(build(1).answer, ['()']);
-  assert.deepEqual(build(2).answer, ['(())', '()()']);
-  assert.deepEqual(build(3).answer, ['((()))', '(()())', '(())()', '()(())', '()()()']);
-});
-
-test('22 produces every Catalan result exactly once', () => {
-  const catalan = [0, 1, 2, 5, 14, 42];
+test('22 returns all Catalan strings for both complete approaches, with no duplicate or missing answers', () => {
+  const counts = [0,1,2,5,14,42];
   for (let n = 1; n <= 5; n++) {
-    const answer = build(n).answer;
-    assert.equal(answer.length, catalan[n]);
-    assert.equal(new Set(answer).size, answer.length);
-    assert.ok(answer.every(value => isValid(value, n)));
+    const expected = oracle(n);
+    assert.equal(expected.length, counts[n]);
+    for (const approach of [1,2]) {
+      const run = build(n,approach);
+      assert.deepEqual([...run.answer].sort(), expected.sort());
+      assert.equal(new Set(run.answer).size, counts[n]);
+      assert.deepEqual(run.steps.at(-1).generateParentheses22View.results, run.answer);
+      assert.equal(run.steps.filter(step => step.final).length, 1);
+    }
   }
+  assert.deepEqual(build(3).answer, ['((()))','(()())','(())()','()(())','()()()']);
 });
 
-test('22 bitmask approach produces the same Catalan set', () => {
-  for (let n = 1; n <= 4; n++) {
-    const expected = [...build(n).answer].sort();
-    const answer = buildBitmask(n).answer;
-    assert.deepEqual([...answer].sort(), expected);
-    assert.equal(new Set(answer).size, answer.length);
-    assert.ok(answer.every(value => isValid(value, n)));
-  }
+for (const approach of [1,2]) test(`22 approach ${approach} matches every completed CPython line and its actual local variables`, () => {
+  const code = approach === 1 ? problem.code : problem.code2;
+  const python = `import sys,json,copy
+scope={};filename='<gp22>';exec(compile(json.load(sys.stdin),filename,'exec'),scope)
+runs=[]
+for n in range(1,6):
+ events=[];pending={}
+ def trace(frame,event,arg):
+  if frame.f_code.co_filename!=filename or frame.f_code.co_name not in ('generateParenthesis','backtrack'):return trace
+  if event in ('line','return'):
+   if frame in pending:
+    x=frame.f_locals;callers=[];cursor=frame
+    while cursor:
+     if cursor.f_code.co_filename==filename and cursor.f_code.co_name=='backtrack':callers.append({k:copy.deepcopy(cursor.f_locals[k]) for k in ('path','opened','closed')})
+     cursor=cursor.f_back
+    events.append({'line':pending.pop(frame),'scope':frame.f_code.co_name,'locals':copy.deepcopy({k:x[k] for k in ('n','result','path','opened','closed','width','mask','i','balance','valid') if k in x}),'stack':list(reversed(callers))})
+   if event=='line':pending[frame]=frame.f_lineno
+  return trace
+ sys.settrace(trace);answer=scope['Solution']().generateParenthesis(n);sys.settrace(None)
+ runs.append({'answer':answer,'events':events})
+print(json.dumps(runs))`;
+  const proc = spawnSync('python3',['-c',python],{ input:JSON.stringify(code.join('\n')), encoding:'utf8', maxBuffer:48*1024*1024 });
+  assert.equal(proc.status,0,proc.stderr);
+  JSON.parse(proc.stdout).forEach((reference,c) => {
+    const n = c+1, run = build(n,approach);
+    assert.deepEqual(run.answer,reference.answer); assert.equal(run.steps.length, reference.events.length, `n=${n}`);
+    run.steps.forEach((step,i) => {
+      const v=step.generateParentheses22View, e=reference.events[i];
+      assert.deepEqual(step.codeLines,[e.line],`n=${n}, event=${i}`);
+      assert.deepEqual(v.locals,e.locals,`n=${n}, event=${i}, line=${e.line}`);
+      assert.equal(v.scope,e.scope); assert.equal(v.source.timing,'after'); assert.equal(v.source.line,e.line);
+      assert.deepEqual(v.results,e.locals.result);
+      if (approach === 1) {
+        assert.deepEqual(v.stack.map(f => ({path:[...f.path],opened:f.opened,closed:f.closed})),e.stack);
+        assert.deepEqual(step.vars.map(w => w.value),[n,e.locals.path??'—',e.locals.opened??'—',e.locals.closed??'—',e.locals.path?.length??'—',e.locals.result.length]);
+      } else assert.deepEqual(step.vars.map(w => w.value),[e.locals.mask??'—',e.locals.i??'—',e.locals.path??'—',e.locals.balance??'—',e.locals.valid??'—',e.locals.result.length]);
+    });
+  });
 });
 
-test('22 trace keeps every state valid and debugs one source line at a time', () => {
-  const run = build(3);
-  assert.ok(run.steps.some(step => step.generateParentheses22View.phase === 'blocked'));
-  assert.ok(run.steps.some(step => step.generateParentheses22View.event === 'save-result'));
-  assert.ok(run.steps.some(step => step.generateParentheses22View.event === 'pop-open'));
-  assert.ok(run.steps.some(step => step.generateParentheses22View.event === 'pop-close'));
-
+test('22 append and pop mutate only path; caller counts and copied saved strings remain correct', () => {
+  const run=build(3), original=JSON.stringify(run); let previous;
   for (const step of run.steps) {
-    assert.equal(step.codeLines.length, 1);
-    assert.ok(step.codeLines[0] >= 2 && step.codeLines[0] <= problem.code.length);
-    const view = step.generateParentheses22View;
-    assert.ok(view);
-    assert.ok(view.closed <= view.opened);
-    assert.ok(view.opened <= view.n);
-    assert.equal(view.path.length, view.opened + view.closed);
-    for (const node of view.nodes) {
-      assert.ok(node.closed <= node.opened);
-      assert.ok(node.opened <= view.n);
-      assert.equal(node.path.length, node.opened + node.closed);
+    const v=step.generateParentheses22View;
+    for (const node of v.nodes) {
+      assert.ok(node.closed <= node.opened && node.opened <= v.n);
+      assert.equal(node.path.length,node.opened+node.closed);
     }
-  }
-
-  const final = run.steps.at(-1);
-  assert.equal(final.final, true);
-  assert.deepEqual(final.generateParentheses22View.results, run.answer);
-  assert.equal(final.generateParentheses22View.stack.length, 0);
-});
-
-test('22 bitmask trace decodes bits, rejects bad prefixes, and debugs one line per frame', () => {
-  const run = buildBitmask(3);
-  assert.ok(run.steps.some(step => step.generateParentheses22View.event === 'read-bit'));
-  assert.ok(run.steps.some(step => step.generateParentheses22View.event === 'mark-invalid'));
-  assert.ok(run.steps.some(step => step.generateParentheses22View.event === 'save-result'));
-
-  for (const step of run.steps) {
-    assert.equal(step.codeLines.length, 1);
-    assert.ok(step.codeLines[0] >= 2 && step.codeLines[0] <= problem.code2.length);
-    const view = step.generateParentheses22View;
-    assert.equal(view.approach, 2);
-    assert.equal(view.width, 6);
-    assert.equal(view.totalMasks, 64);
-    assert.ok(view.path.length <= view.width);
-    assert.ok(view.inspected.length <= 10);
-  }
-
-  const final = run.steps.at(-1);
-  assert.equal(final.final, true);
-  assert.deepEqual(final.generateParentheses22View.results, run.answer);
-  assert.equal(final.generateParentheses22View.inspected.length, 10);
-});
-
-test('22 validates the visualization range', () => {
-  for (const value of [0, 6, -1, 1.5, NaN, 'abc']) {
-    assert.throws(() => problem.builder([value]));
-    assert.throws(() => problem.builder2([value], { approach: 2 }));
-  }
-});
-
-test('22 renderer covers every step in English and Vietnamese', () => {
-  const rendererPath = path.resolve(__dirname, '../public/renderer-generate-parentheses-22.js');
-  const source = fs.readFileSync(rendererPath, 'utf8');
-  const element = {};
-  const context = {
-    lang: 'en',
-    $: () => element,
-    escapeHtml: value => String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;'),
-    pick: value => typeof value === 'object' && value !== null
-      ? (value[context.lang] || value.en || value.vi || '')
-      : String(value ?? ''),
-  };
-  vm.createContext(context);
-  vm.runInContext(source, context);
-
-  for (const language of ['en', 'vi']) {
-    context.lang = language;
-    for (const step of build(3).steps) {
-      context.renderGenerateParentheses22View(step);
-      assert.match(element.innerHTML, /gp22-viz/);
-      assert.match(element.innerHTML, /gp22-slots/);
-      assert.match(element.innerHTML, /gp22-tree/);
-      assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
+    if (v.phase.startsWith('append-')) {
+      assert.equal(v.path,previous.path+v.added);
+      assert.equal(v.opened,previous.opened); assert.equal(v.closed,previous.closed);
+      assert.equal(v.path.length,v.opened+v.closed+1);
     }
-    for (const step of buildBitmask(3).steps) {
-      context.renderGenerateParentheses22View(step);
-      assert.match(element.innerHTML, /gp22-viz/);
-      assert.match(element.innerHTML, /gp22-bitmask-viz/);
-      assert.match(element.innerHTML, /gp22-bit-rules/);
-      assert.match(element.innerHTML, /gp22-mask-window/);
-      assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
-    }
+    if (v.phase.startsWith('pop-')) assert.equal(v.path,previous.path.slice(0,-1));
+    if (v.phase==='save-result') assert.equal(v.results.at(-1),v.path);
+    if (previous && v.phase!=='save-result') assert.deepEqual(v.results,previous.results);
+    previous=v;
+  }
+  assert.equal(run.steps.at(-1).generateParentheses22View.stack.length,0);
+  assert.deepEqual(run.steps.find(s=>s.generateParentheses22View.phase==='save-result').generateParentheses22View.results,['((()))']);
+  assert.equal(JSON.stringify(run),original);
+});
+
+test('22 bitmask preserves variable lifetimes between masks, rejects bad prefixes, and includes exhausted loop headers', () => {
+  const run=build(2,2);
+  assert.ok(run.steps.some(s=>s.generateParentheses22View.phase==='mark-invalid'));
+  assert.ok(run.steps.some(s=>s.generateParentheses22View.phase==='bits-exhausted'));
+  assert.equal(run.steps.at(-2).generateParentheses22View.phase,'masks-exhausted');
+  const second=run.steps.find(s=>s.generateParentheses22View.phase==='next-mask' && s.generateParentheses22View.mask===1);
+  assert.deepEqual(second.generateParentheses22View.locals.path,[')']);
+  const a=run.steps.find(s=>s.generateParentheses22View.phase==='append-close');
+  assert.equal(a.generateParentheses22View.balance,0);
+  assert.equal(a.generateParentheses22View.path,')');
+  assert.equal(run.steps.at(-1).generateParentheses22View.inspected.length,10);
+});
+
+test('22 validates the same bounded input for both traces and live Python arguments', () => {
+  assert.deepEqual(problem.liveArgs([3]),[3]);
+  for (const value of [0,6,-1,1.5,NaN,Infinity,'abc','',null,undefined,true,{},[],[1,2]]) {
+    assert.throws(()=>problem.builder(value),/22/);
+    assert.throws(()=>problem.builder2(value),/22/);
+    assert.throws(()=>problem.liveArgs(value),/22/);
   }
 });
 
-test('22 frontend assets, renderer registry, and responsive styles are wired', () => {
-  const html = readFrontendIndex();
-  const javascript = readFrontendJavaScript();
-  const css = readFrontendStyles();
-  assert.match(html, /generate-parentheses-22\.css/);
-  assert.match(html, /renderer-generate-parentheses-22\.js/);
-  assert.match(javascript, /step\.generateParentheses22View/);
-  assert.match(javascript, /renderGenerateParentheses22View\(step\)/);
-  assert.match(css, /\.gp22-viz \{/);
-  assert.match(css, /overflow-x:\s*clip/);
-  assert.match(css, /@container gp22 \(max-width:\s*650px\)/);
-  assert.match(css, /\.gp22-bit-rules/);
-  assert.match(css, /\.gp22-mask-window/);
+function renderer(lang) {
+  const element={innerHTML:'',querySelector:()=>null};
+  const context={lang,$:()=>element,escapeHtml:x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};
+  vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-generate-parentheses-22.js'),'utf8'),context);
+  return step=>{context.renderGenerateParentheses22View(step);return element.innerHTML;};
+}
+
+test('22 renders colored pair arcs, balance paths, connected tree, shared frames, bit decoding and every saved result in both languages',()=>{
+  for (const language of ['en','vi']) {
+    const render=renderer(language);
+    for (const approach of [1,2]) {
+      const run=build(3,approach), original=JSON.stringify(run);
+      for (const step of run.steps) {
+        const html=render(step),v=step.generateParentheses22View;
+        assert.match(html,/gp22-viz/); assert.doesNotMatch(html,/undefined|NaN|Infinity|object Object|<p\b|<ol\b|<table\b/);
+        assert.deepEqual([...html.matchAll(/data-result="([()]+)"/g)].map(m=>m[1]),v.results);
+        if (!step.final) { assert.match(html,/gp22-pairs/);assert.match(html,/gp22-balance-picture/); }
+        if (approach===1) {
+          assert.match(html,/gp22-tree/);
+          assert.equal((html.match(/data-node-id=/g)||[]).length,v.nodes.length);
+          assert.deepEqual([...html.matchAll(/data-frame-id="(\d+)"/g)].map(m=>Number(m[1])),v.stack.map(f=>f.id));
+          if(v.nodes.length>1) assert.match(html,/gp22-edge /);
+        } else assert.match(html,/gp22-mask-window/);
+      }
+      const first=render(run.steps[0]);render(run.steps.at(-1));assert.equal(render(run.steps[0]),first);
+      assert.equal(JSON.stringify(run),original);
+    }
+    const n5=render(build(5).steps.at(-1));assert.equal((n5.match(/data-result=/g)||[]).length,42);
+    assert.match(n5,/data-pair="0-9"/);
+  }
 });
 
+test('22 loads scoped assets lazily, supports light/dark, sticky watches and horizontal code scrolling',()=>{
+  const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8'),css=fs.readFileSync(require.resolve('../public/generate-parentheses-22.css'),'utf8');
+  assert.equal(problem.debugMode,'line-by-line'); assert.equal(typeof problem.builder2,'function');
+  assert.match(html,/generate-parentheses-22\.css[^\n]*data-problem-ids="22"/);
+  assert.match(html,/renderer-generate-parentheses-22\.js[^\n]*data-problem-ids="22"/);
+  assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g,''),/(?:renderer-)?generate-parentheses-22\.(?:css|js)/);
+  assert.match(css,/\[data-theme="light"\] \.gp22-viz/);
+  assert.match(css,/#varsPanel[^}]*position:sticky/);
+  assert.match(css,/\.code-panel\s*\{[^}]*overflow-x:auto/);
+  assert.match(css,/\.code-line\s*\{[^}]*white-space:pre/);
+  assert.match(css,/@container gp22 \(max-width:650px\)/);
+});

@@ -3,365 +3,131 @@
 const text = (vi, en) => ({ vi, en });
 
 function parseN(input) {
-  const value = Number(Array.isArray(input) ? input[0] : input);
+  const raw = Array.isArray(input) && input.length === 1 ? input[0] : input;
+  const value = typeof raw === "number" ? raw : typeof raw === "string" && /^[1-5]$/.test(raw) ? Number(raw) : NaN;
   if (!Number.isInteger(value) || value < 1 || value > 5) {
-    throw new Error("n must be an integer from 1 to 5 for this visualization.");
+    throw new RangeError("#22: n phải là số nguyên từ 1 đến 5 / n must be an integer from 1 to 5.");
   }
   return value;
 }
 
 function buildSteps22(input) {
-  const n = parseN(input);
-  const steps = [];
-  const results = [];
-  const nodes = [];
-  const stack = [];
-  let nextNodeId = 0;
-
-  const nodeById = (id) => nodes.find((node) => node.id === id);
-  const makeView = (phase, frame = {}) => {
-    const currentNodeId = frame.currentNodeId ?? stack.at(-1) ?? null;
-    const currentNode = currentNodeId === null ? null : nodeById(currentNodeId);
-    const path = frame.path ?? currentNode?.path ?? "";
-    const opened = frame.opened ?? currentNode?.opened ?? 0;
-    const closed = frame.closed ?? currentNode?.closed ?? 0;
-    const stackIds = new Set(stack);
-
-    return {
-      n,
-      phase,
-      event: frame.event || phase,
-      path,
-      previewPath: frame.previewPath ?? null,
-      opened,
-      closed,
-      previewOpened: frame.previewOpened ?? null,
-      previewClosed: frame.previewClosed ?? null,
-      currentNodeId,
-      pendingChoice: frame.pendingChoice ?? null,
-      backtrackedChoice: frame.backtrackedChoice ?? null,
-      check: frame.check || null,
-      results: [...results],
-      nodes: nodes.map((node) => ({
-        ...node,
-        state: node.id === currentNodeId
-          ? "current"
-          : node.status === "solution"
-            ? "solution"
-            : stackIds.has(node.id)
-              ? "ancestor"
-              : node.status,
-      })),
-      stack: stack.map((id, depth) => {
-        const node = nodeById(id);
-        return { id, depth, path: node.path, opened: node.opened, closed: node.closed };
-      }),
+  const n = parseN(input), result = [], path = [], nodes = [], stack = [], steps = [];
+  function record(line, phase, title, detail = {}, final = false) {
+    const f = stack.at(-1), active = new Set(stack.map(frame => frame.id));
+    const locals = { n, result: [...result], ...(f ? { path: [...path], opened: f.opened, closed: f.closed } : {}) };
+    const view = {
+      approach: 1, n, phase, event: phase, scope: f ? "backtrack" : "generateParenthesis", locals,
+      source: { line, timing: "after" }, path: f ? path.join("") : "", opened: f?.opened ?? null, closed: f?.closed ?? null,
+      currentNodeId: f?.id ?? null, results: [...result],
+      stack: stack.map(frame => ({ ...frame, path: path.join("") })),
+      nodes: nodes.map(node => ({ ...node, state: node.id === f?.id ? "current" : active.has(node.id) ? "ancestor" : node.status })),
+      check: f?.check ? { ...f.check } : null, ...detail,
     };
-  };
-
-  const record = (line, phase, title, note, frame = {}) => {
-    const view = makeView(phase, frame);
-    const shownPath = view.previewPath ?? view.path;
-    const shownOpened = view.previewOpened ?? view.opened;
-    const shownClosed = view.previewClosed ?? view.closed;
-    steps.push({
-      title,
-      note,
-      codeLines: [line],
-      final: Boolean(frame.final),
-      vars: [
-        { name: "path", value: shownPath || "∅" },
-        { name: "opened", value: shownOpened },
-        { name: "closed", value: shownClosed },
-        { name: "result count", value: results.length },
-      ],
-      generateParentheses22View: view,
-    });
-  };
-
-  record(2, "setup", text("Gọi generateParenthesis", "Call generateParenthesis"),
-    text(`Bắt đầu với n = ${n}; mỗi đáp án cần ${2 * n} ký tự.`, `Start with n = ${n}; every answer needs ${2 * n} characters.`));
-  record(3, "setup", text("result = []", "result = []"),
-    text("Khởi tạo danh sách kết quả rỗng.", "Initialize the empty result list."));
-  record(5, "setup", text("Định nghĩa hàm backtrack", "Define backtrack"),
-    text("State gồm path, số ngoặc mở và số ngoặc đóng đã dùng.", "A state contains the path and the counts of used open and close parentheses."));
-  record(20, "choose", text("Bắt đầu từ state rỗng", "Start from the empty state"),
-    text("Gọi backtrack([], 0, 0).", "Call backtrack([], 0, 0)."), { event: "initial-call" });
-
-  const visit = (path, opened, closed, parentId, choice) => {
-    const node = {
-      id: nextNodeId++,
-      parentId,
-      path,
-      opened,
-      closed,
-      depth: path.length,
-      choice,
-      status: "active",
-    };
+    steps.push({ title, note: text("", ""), codeLines: [line], final, vars: [
+      { name: "n", value: n }, { name: "path", value: f ? [...path] : "—" },
+      { name: "opened", value: f?.opened ?? "—" }, { name: "closed", value: f?.closed ?? "—" },
+      { name: "len(path)", value: f ? path.length : "—" }, { name: "len(result)", value: result.length },
+    ], generateParentheses22View: view });
+  }
+  record(3, "result-init", text("result = []", "result = []"));
+  record(5, "define", text("Tạo hàm backtrack", "Define backtrack"));
+  function visit(opened, closed, parentId = null, choice = null) {
+    const node = { id: nodes.length, parentId, path: path.join(""), opened, closed, depth: path.length, choice, status: "explored" };
     nodes.push(node);
-    stack.push(node.id);
-
+    const f = { id: node.id, opened, closed, entryPath: node.path, check: null }; stack.push(f);
     const complete = path.length === 2 * n;
-    record(6, complete ? "complete" : "choose",
-      complete ? text(`Đủ ${2 * n} ký tự`, `Reached ${2 * n} characters`) : text(`Xét state ${path || "∅"}`, `Inspect state ${path || "∅"}`),
-      complete
-        ? text("Path đã dùng đủ n cặp ngoặc nên đây là một đáp án.", "The path uses all n pairs, so it is a complete answer.")
-        : text("Path chưa đủ độ dài; tiếp tục thử ngoặc mở rồi ngoặc đóng.", "The path is not complete; try an open parenthesis and then a close parenthesis."),
-      { currentNodeId: node.id, check: { type: "complete", allowed: complete } });
-
+    f.check = { type: "complete", allowed: complete };
+    record(6, "complete-check", text(complete ? "Đủ 2n dấu ngoặc" : "Chưa đủ 2n dấu ngoặc", complete ? "2n parentheses reached" : "Not yet 2n parentheses"));
     if (complete) {
-      results.push(path);
-      node.status = "solution";
-      record(7, "complete", text(`Lưu ${path}`, `Save ${path}`),
-        text(`Thêm “${path}” vào result.`, `Append “${path}” to result.`), { currentNodeId: node.id, event: "save-result" });
-      record(8, "backtrack", text("Return khỏi leaf", "Return from the leaf"),
-        text("Quay lại state cha để thử lựa chọn khác.", "Return to the parent state to try another choice."), { currentNodeId: node.id, event: "leaf-return" });
-      stack.pop();
-      return;
+      result.push(path.join("")); node.status = "solution";
+      record(7, "save-result", text(`Lưu ${result.at(-1)}`, `Save ${result.at(-1)}`));
+      record(8, "leaf-return", text("↩ Về nhánh cha", "↩ Return to parent")); stack.pop(); return;
     }
-
     const canOpen = opened < n;
-    record(10, canOpen ? "choose" : "blocked",
-      text(`opened < n → ${canOpen}`, `opened < n → ${canOpen}`),
-      canOpen
-        ? text("Vẫn còn ngoặc mở; nhánh '(' hợp lệ.", "An open parenthesis remains available, so the '(' branch is valid.")
-        : text("Đã dùng đủ n ngoặc mở; chặn nhánh '('.", "All n open parentheses are used, so block the '(' branch."),
-      { currentNodeId: node.id, check: { type: "open", allowed: canOpen } });
-
+    f.check = { type: "open", allowed: canOpen };
+    record(10, canOpen ? "allow-open" : "block-open", text(`opened < n → ${canOpen}`, `opened < n → ${canOpen}`));
     if (canOpen) {
-      const nextPath = `${path}(`;
-      record(11, "choose", text(`Chọn '(' → ${nextPath}`, `Choose '(' → ${nextPath}`),
-        text("Thêm ngoặc mở vào path.", "Append an open parenthesis to the path."), {
-          currentNodeId: node.id,
-          previewPath: nextPath,
-          previewOpened: opened + 1,
-          previewClosed: closed,
-          pendingChoice: "(",
-          event: "append-open",
-        });
-      record(12, "choose", text(`Đệ quy với ${nextPath}`, `Recurse with ${nextPath}`),
-        text("Đi sâu vào nhánh vừa chọn.", "Descend into the chosen branch."), {
-          currentNodeId: node.id,
-          previewPath: nextPath,
-          previewOpened: opened + 1,
-          previewClosed: closed,
-          pendingChoice: "(",
-          event: "recurse-open",
-        });
-      visit(nextPath, opened + 1, closed, node.id, "(");
-      record(13, "backtrack", text(`pop '(' → ${path || "∅"}`, `Pop '(' → ${path || "∅"}`),
-        text("Khôi phục path của state hiện tại.", "Restore the current state's path."), {
-          currentNodeId: node.id,
-          backtrackedChoice: "(",
-          event: "pop-open",
-        });
+      path.push("("); record(11, "append-open", text("Thêm (", "Append ("), { added: "(" });
+      visit(opened + 1, closed, node.id, "(");
+      record(12, "resume-open", text("↩ Đệ quy nhánh ( hoàn tất", "↩ Open branch returned"));
+      path.pop(); record(13, "pop-open", text("Bỏ ( để thử nhánh khác", "Remove ( for the next branch"), { removed: "(" });
     }
-
     const canClose = closed < opened;
-    record(15, canClose ? "choose" : "blocked",
-      text(`closed < opened → ${canClose}`, `closed < opened → ${canClose}`),
-      canClose
-        ? text("Có ngoặc mở chưa ghép; nhánh ')' hợp lệ.", "An unmatched open parenthesis exists, so the ')' branch is valid.")
-        : text("Không thể đóng trước khi có ngoặc mở chưa ghép; chặn nhánh ')'.", "A close cannot appear without an unmatched open parenthesis, so block the ')' branch."),
-      { currentNodeId: node.id, check: { type: "close", allowed: canClose } });
-
+    f.check = { type: "close", allowed: canClose };
+    record(15, canClose ? "allow-close" : "block-close", text(`closed < opened → ${canClose}`, `closed < opened → ${canClose}`));
     if (canClose) {
-      const nextPath = `${path})`;
-      record(16, "choose", text(`Chọn ')' → ${nextPath}`, `Choose ')' → ${nextPath}`),
-        text("Thêm ngoặc đóng mà không làm prefix mất cân bằng.", "Append a close parenthesis without making the prefix invalid."), {
-          currentNodeId: node.id,
-          previewPath: nextPath,
-          previewOpened: opened,
-          previewClosed: closed + 1,
-          pendingChoice: ")",
-          event: "append-close",
-        });
-      record(17, "choose", text(`Đệ quy với ${nextPath}`, `Recurse with ${nextPath}`),
-        text("Đi sâu vào nhánh ngoặc đóng.", "Descend into the close-parenthesis branch."), {
-          currentNodeId: node.id,
-          previewPath: nextPath,
-          previewOpened: opened,
-          previewClosed: closed + 1,
-          pendingChoice: ")",
-          event: "recurse-close",
-        });
-      visit(nextPath, opened, closed + 1, node.id, ")");
-      record(18, "backtrack", text(`pop ')' → ${path || "∅"}`, `Pop ')' → ${path || "∅"}`),
-        text("Khôi phục path rồi tiếp tục quay lui.", "Restore the path and continue backtracking."), {
-          currentNodeId: node.id,
-          backtrackedChoice: ")",
-          event: "pop-close",
-        });
+      path.push(")"); record(16, "append-close", text("Thêm )", "Append )"), { added: ")" });
+      visit(opened, closed + 1, node.id, ")");
+      record(17, "resume-close", text("↩ Đệ quy nhánh ) hoàn tất", "↩ Close branch returned"));
+      path.pop(); record(18, "pop-close", text("Bỏ ) để quay lui", "Remove ) to backtrack"), { removed: ")" });
     }
-
-    node.status = "explored";
     stack.pop();
-  };
-
-  visit("", 0, 0, null, null);
-  record(21, "done", text(`Return ${results.length} đáp án`, `Return ${results.length} answer(s)`),
-    text("Toàn bộ cây quyết định hợp lệ đã được duyệt.", "The complete valid decision tree has been explored."), {
-      final: true,
-      event: "return-result",
-    });
-
-  return { original: n, answer: results, steps };
+  }
+  visit(0, 0);
+  record(20, "root-return", text("↩ Đã duyệt mọi nhánh", "↩ All branches returned"));
+  record(21, "done", text(`${result.length} chuỗi ngoặc đúng`, `${result.length} valid strings`), {}, true);
+  return { original: n, answer: [...result], steps };
 }
 
 function buildSteps22Bitmask(input) {
-  const n = parseN(input);
-  const width = 2 * n;
-  const totalMasks = 1 << width;
-  const steps = [];
-  const results = [];
-  const inspected = [];
-
-  const makeView = (phase, frame = {}) => ({
-    approach: 2,
-    n,
-    width,
-    totalMasks,
-    phase,
-    event: frame.event || phase,
-    mask: frame.mask ?? null,
-    bits: frame.mask === undefined || frame.mask === null
-      ? "".padStart(width, "0")
-      : frame.mask.toString(2).padStart(width, "0"),
-    index: frame.index ?? null,
-    path: frame.path ?? "",
-    balance: frame.balance ?? 0,
-    valid: frame.valid ?? true,
-    currentBit: frame.currentBit ?? null,
-    currentChar: frame.currentChar ?? null,
-    invalidAt: frame.invalidAt ?? null,
-    results: [...results],
-    inspected: inspected.slice(-10).map((candidate) => ({ ...candidate })),
-  });
-
-  const record = (line, phase, title, note, frame = {}) => {
-    const view = makeView(phase, frame);
-    steps.push({
-      title,
-      note,
-      codeLines: [line],
-      final: Boolean(frame.final),
+  const n = parseN(input), width = 2 * n, totalMasks = 1 << width;
+  const result = [], inspected = [], steps = [], locals = { n, result };
+  let check = null, invalidAt = null;
+  function record(line, phase, title, final = false) {
+    const path = locals.path?.join("") || "";
+    steps.push({ title, note: text("", ""), codeLines: [line], final,
       vars: [
-        { name: "mask", value: view.mask === null ? "—" : `${view.mask}/${totalMasks - 1}` },
-        { name: "path", value: view.path || "∅" },
-        { name: "balance", value: view.balance },
-        { name: "valid", value: view.valid },
-        { name: "result count", value: results.length },
-      ],
-      generateParentheses22View: view,
-    });
-  };
-
-  record(2, "setup", text("Gọi generateParenthesis", "Call generateParenthesis"),
-    text(`Duyệt mọi chuỗi ${width} bit; bit 1 là '(' và bit 0 là ')'.`, `Enumerate every ${width}-bit string; bit 1 means '(' and bit 0 means ')'.`));
-  record(3, "setup", text("result = []", "result = []"),
-    text("Khởi tạo danh sách kết quả rỗng.", "Initialize the empty result list."));
-  record(4, "setup", text(`width = ${width}`, `width = ${width}`),
-    text("Mỗi ứng viên phải chứa đúng 2n ký tự.", "Every candidate must contain exactly 2n characters."));
-
-  for (let mask = 0; mask < totalMasks; mask++) {
-    let path = "";
-    let balance = 0;
-    let valid = true;
-    let currentBit = null;
-    let currentChar = null;
-    let invalidAt = null;
-
-    const frame = (extra = {}) => ({ mask, path, balance, valid, currentBit, currentChar, invalidAt, ...extra });
-    record(6, "scan", text(`Mask ${mask}/${totalMasks - 1}`, `Mask ${mask}/${totalMasks - 1}`),
-      text(`Bắt đầu ứng viên ${mask.toString(2).padStart(width, "0")}.`, `Start candidate ${mask.toString(2).padStart(width, "0")}.`), frame({ event: "next-mask" }));
-    record(7, "scan", text("path = []", "path = []"),
-      text("Xây chuỗi ứng viên từ trái sang phải.", "Build the candidate from left to right."), frame());
-    record(8, "scan", text("balance = 0", "balance = 0"),
-      text("balance = số '(' trừ số ')' trong prefix hiện tại.", "balance is opens minus closes in the current prefix."), frame());
-    record(9, "scan", text("valid = True", "valid = True"),
-      text("Ứng viên còn hợp lệ cho đến khi balance âm.", "The candidate stays valid until its balance becomes negative."), frame());
-
-    for (let i = 0; i < width; i++) {
-      currentBit = (mask >> i) & 1;
-      currentChar = currentBit ? "(" : ")";
-      record(11, "decode", text(`Đọc vị trí ${i}`, `Read position ${i}`),
-        text(`Kiểm tra bit ${i} của mask.`, `Inspect bit ${i} of the mask.`), frame({ index: i, event: "read-bit" }));
-      record(12, "decode", text(`Bit ${i} = ${currentBit}`, `Bit ${i} = ${currentBit}`),
-        currentBit
-          ? text("Bit 1 chọn ngoặc mở.", "Bit 1 chooses an open parenthesis.")
-          : text("Bit 0 chọn ngoặc đóng.", "Bit 0 chooses a close parenthesis."),
-        frame({ index: i, event: "test-bit" }));
-
-      if (currentBit) {
-        path += "(";
-        record(13, "decode", text(`Thêm '(' → ${path}`, `Append '(' → ${path}`),
-          text("Ghi ngoặc mở vào ứng viên.", "Write an open parenthesis into the candidate."), frame({ index: i, event: "append-open" }));
-        balance += 1;
-        record(14, "validate", text(`balance = ${balance}`, `balance = ${balance}`),
-          text("Ngoặc mở làm balance tăng 1.", "An open parenthesis increases balance by 1."), frame({ index: i, event: "increase-balance" }));
-      } else {
-        path += ")";
-        record(16, "decode", text(`Thêm ')' → ${path}`, `Append ')' → ${path}`),
-          text("Ghi ngoặc đóng vào ứng viên.", "Write a close parenthesis into the candidate."), frame({ index: i, event: "append-close" }));
-        balance -= 1;
-        record(17, "validate", text(`balance = ${balance}`, `balance = ${balance}`),
-          text("Ngoặc đóng làm balance giảm 1.", "A close parenthesis decreases balance by 1."), frame({ index: i, event: "decrease-balance" }));
-      }
-
-      record(19, balance < 0 ? "reject" : "validate",
-        text(`balance < 0 → ${balance < 0}`, `balance < 0 → ${balance < 0}`),
-        balance < 0
-          ? text("Prefix đóng nhiều hơn mở nên mask này bị loại ngay.", "The prefix has more closes than opens, so reject this mask immediately.")
-          : text("Prefix vẫn hợp lệ; tiếp tục đọc bit kế tiếp.", "The prefix is still valid; continue to the next bit."),
-        frame({ index: i, event: "check-prefix" }));
-
-      if (balance < 0) {
-        valid = false;
-        invalidAt = i;
-        record(20, "reject", text("valid = False", "valid = False"),
-          text("Đánh dấu ứng viên không hợp lệ.", "Mark the candidate invalid."), frame({ index: i, event: "mark-invalid" }));
-        record(21, "reject", text("Dừng đọc mask", "Stop reading this mask"),
-          text("Không cần xét phần suffix còn lại.", "The remaining suffix cannot repair an invalid prefix."), frame({ index: i, event: "break-mask" }));
-        break;
-      }
-    }
-
-    const accepted = valid && balance === 0;
-    record(23, accepted ? "accept" : "reject",
-      text(`valid and balance == 0 → ${accepted}`, `valid and balance == 0 → ${accepted}`),
-      accepted
-        ? text("Mọi prefix hợp lệ và balance cuối bằng 0: nhận ứng viên.", "Every prefix is valid and the final balance is zero: accept the candidate.")
-        : text("Ứng viên bị loại vì prefix âm hoặc balance cuối khác 0.", "Reject because a prefix was negative or the final balance is not zero."),
-      frame({ event: "check-candidate" }));
-
-    if (accepted) {
-      results.push(path);
-      record(24, "accept", text(`Lưu ${path}`, `Save ${path}`),
-        text(`Thêm “${path}” vào result.`, `Append “${path}” to result.`), frame({ event: "save-result" }));
-    }
-
-    inspected.push({
-      mask,
-      bits: mask.toString(2).padStart(width, "0"),
-      path,
-      balance,
-      valid,
-      accepted,
-      invalidAt,
+        { name: "mask", value: locals.mask ?? "—" }, { name: "i", value: locals.i ?? "—" },
+        { name: "path", value: locals.path ? [...locals.path] : "—" }, { name: "balance", value: locals.balance ?? "—" },
+        { name: "valid", value: locals.valid ?? "—" }, { name: "len(result)", value: result.length },
+      ], generateParentheses22View: {
+        approach: 2, n, width, totalMasks, phase, event: phase, scope: "generateParenthesis", source: { line, timing: "after" },
+        locals: JSON.parse(JSON.stringify(locals)), results: [...result], inspected: inspected.slice(-10).map(row => ({ ...row })),
+        path, mask: locals.mask ?? null, index: locals.i ?? null, balance: locals.balance ?? null, valid: locals.valid ?? null,
+        check: check ? { ...check } : null, invalidAt,
+      },
     });
   }
-
-  record(26, "done", text(`Return ${results.length} đáp án`, `Return ${results.length} answer(s)`),
-    text(`Đã kiểm tra đủ ${totalMasks} mask.`, `All ${totalMasks} masks have been inspected.`), {
-      final: true,
-      event: "return-result",
-      path: "",
-      balance: 0,
-      valid: true,
-    });
-
-  return { original: n, answer: results, steps };
+  record(3, "result-init", text("result = []", "result = []"));
+  locals.width = width; record(4, "width", text(`width = ${width}`, `width = ${width}`));
+  for (let mask = 0; mask < totalMasks; mask++) {
+    locals.mask = mask; check = null; invalidAt = null;
+    record(6, "next-mask", text(`Mask ${mask}`, `Mask ${mask}`));
+    locals.path = []; record(7, "path-init", text("path = []", "path = []"));
+    locals.balance = 0; record(8, "balance-init", text("balance = 0", "balance = 0"));
+    locals.valid = true; record(9, "valid-init", text("valid = True", "valid = True"));
+    let broken = false;
+    for (let i = 0; i < width; i++) {
+      locals.i = i; check = null; record(11, "read-bit", text(`Đọc bit ${i}`, `Read bit ${i}`));
+      const bit = (mask >> i) & 1; check = { type: "bit", allowed: Boolean(bit) };
+      record(12, "test-bit", text(`bit ${i} = ${bit}`, `bit ${i} = ${bit}`));
+      if (bit) {
+        locals.path.push("("); record(13, "append-open", text("1 → (", "1 → ("));
+        locals.balance++; record(14, "increase-balance", text("balance + 1", "balance + 1"));
+      } else {
+        locals.path.push(")"); record(16, "append-close", text("0 → )", "0 → )"));
+        locals.balance--; record(17, "decrease-balance", text("balance − 1", "balance − 1"));
+      }
+      check = { type: "prefix", allowed: locals.balance >= 0 };
+      record(19, "check-prefix", text(`balance < 0 → ${locals.balance < 0}`, `balance < 0 → ${locals.balance < 0}`));
+      if (locals.balance < 0) {
+        locals.valid = false; invalidAt = i; record(20, "mark-invalid", text("valid = False", "valid = False"));
+        record(21, "break-mask", text("✕ Dừng mask này", "✕ Stop this mask")); broken = true; break;
+      }
+    }
+    if (!broken) record(11, "bits-exhausted", text("Đã đọc đủ bit", "All bits read"));
+    const accepted = locals.valid && locals.balance === 0;
+    check = { type: "candidate", allowed: accepted };
+    record(23, "check-candidate", text(accepted ? "✓ Nhận ứng viên" : "✕ Loại ứng viên", accepted ? "✓ Accept candidate" : "✕ Reject candidate"));
+    if (accepted) {
+      result.push(locals.path.join("")); record(24, "save-result", text(`Lưu ${result.at(-1)}`, `Save ${result.at(-1)}`));
+    }
+    inspected.push({ mask, path: locals.path.join(""), balance: locals.balance, accepted });
+  }
+  record(6, "masks-exhausted", text("Đã thử đủ mask", "All masks tried"));
+  record(26, "done", text(`${result.length} chuỗi ngoặc đúng`, `${result.length} valid strings`), true);
+  return { original: n, answer: [...result], steps };
 }
 
 module.exports = {
@@ -399,11 +165,7 @@ module.exports = {
       },
     ],
     debugMode: "line-by-line",
-    approach: [
-      text("Cách 1 — Backtracking: chỉ mở các nhánh giữ 0 ≤ closed ≤ opened ≤ n.", "Approach 1 — Backtracking: only explore branches that preserve 0 ≤ closed ≤ opened ≤ n."),
-      text("Cách 2 — Bitmask: duyệt 2^(2n) mask; bit 1 là '(' và bit 0 là ')'.", "Approach 2 — Bitmask: enumerate 2^(2n) masks; bit 1 is '(' and bit 0 is ')'."),
-      text("Bitmask loại ngay prefix có balance < 0 và chỉ nhận ứng viên kết thúc với balance = 0.", "Bitmask rejects a prefix as soon as balance < 0 and accepts only candidates ending with balance = 0."),
-    ],
+    approach: [text("Thêm ( hoặc ) → đi sâu → lưu chuỗi đủ 2n → pop để thử nhánh khác. Bitmask: đọc từng bit, loại khi balance âm.", "Append ( or ) → recurse → save at length 2n → pop for the next branch. Bitmask: decode each bit and reject a negative balance.")],
     complexity: {
       time: "O(Cₙ·n) / O(n·4ⁿ)",
       space: "O(n)",
