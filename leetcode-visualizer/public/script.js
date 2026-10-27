@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.nQueens52View), surface: "treeView", render: (step) => { renderNQueens52Pictures(step); } },
     { predicate: (step) => Boolean(step.nQueens51View), surface: "treeView", render: (step) => { renderNQueens51Pictures(step); } },
     { predicate: (step) => Boolean(step.permutations46View), surface: "treeView", render: (step) => { renderPermutations46Pictures(step); } },
     { predicate: (step) => Boolean(step.combination40View), surface: "treeView", render: (step) => { renderCombination40Pictures(step); } },

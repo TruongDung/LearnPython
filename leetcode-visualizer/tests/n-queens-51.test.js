@@ -98,6 +98,6 @@ test('51 next-solution control only navigates to actual saved states and reaches
 
 test('51 loads scoped SVG pictures lazily with day/night, sticky variables and horizontal source scrolling',()=>{
   const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8'),css=fs.readFileSync(require.resolve('../public/n-queens-51.css'),'utf8'),script=fs.readFileSync(require.resolve('../public/script.js'),'utf8');
-  assert.equal(p.debugMode,'line-by-line');assert.match(html,/n-queens-51\.css[^\n]*data-problem-ids="51"/);assert.match(html,/renderer-n-queens-51\.js[^\n]*data-problem-ids="51"/);assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g,''),/(?:renderer-)?n-queens-51\.(?:css|js)/);
+  assert.equal(p.debugMode,'line-by-line');assert.match(html,/n-queens-51\.css[^\n]*data-problem-ids="51(?: 52)?"/);assert.match(html,/renderer-n-queens-51\.js[^\n]*data-problem-ids="51(?: 52)?"/);assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g,''),/(?:renderer-)?n-queens-51\.(?:css|js)/);
   assert.match(script,/Boolean\(step.nQueens51View\)[^\n]*renderNQueens51Pictures\(step\)/);assert.match(css,/\[data-theme="light"\] \.nq51-viz/);assert.match(css,/#varsPanel[^}]*position:sticky/);assert.match(css,/\.code-panel\s*\{[^}]*overflow-x:auto/);assert.match(css,/\.code-line\s*\{[^}]*white-space:pre/);
 });

@@ -1,0 +1,20 @@
+.nq52-topline { display:grid; grid-template-columns:160px minmax(0,1fr); gap:10px; align-items:stretch; }
+.nq52-counter { min-width:0; padding:8px 10px; border:1px solid var(--nq51-line); border-radius:11px; background:var(--nq51-paper); }
+.nq52-counter > header { display:flex; justify-content:space-between; align-items:center; gap:5px; color:var(--nq51-muted); font:12px ui-monospace,monospace; }
+.nq52-counter button { padding:4px 6px; border:1px solid var(--nq51-line); border-radius:6px; color:var(--nq51-gold); background:var(--nq51-paper); font:11px ui-monospace,monospace; cursor:pointer; }
+.nq52-counter button:hover, .nq52-counter button:focus-visible { border-color:var(--nq51-gold); outline:1px solid var(--nq51-gold); }
+.nq52-counter button:disabled { opacity:.35; cursor:default; }
+.nq52-counter > div { display:flex; align-items:center; justify-content:center; gap:9px; min-height:47px; font-family:ui-monospace,monospace; }
+.nq52-counter strong { color:var(--nq51-blue); font-size:38px; font-weight:700; line-height:1.1; }
+.nq52-counter.increment { border:2px solid var(--nq51-green); background:color-mix(in srgb,var(--nq51-green) 7%,var(--nq51-paper)); }
+.nq52-counter.increment strong { color:var(--nq51-green); }
+.nq52-previous { color:var(--nq51-muted); opacity:.6; font-size:20px; }
+.nq52-arrow { color:var(--nq51-green); font-size:19px; }
+.nq52-placement { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:7px; padding:7px 2px; font:10px ui-monospace,monospace; color:var(--nq51-muted); }
+.nq52-placement > div { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+.nq52-placement > div > span:not(.nq51-empty) { display:grid; justify-items:center; gap:3px; }
+.nq52-placement small { font-size:8px; }
+.nq52-placement b { display:grid; place-items:center; min-width:22px; height:25px; padding:3px; border:1px solid var(--nq51-line); border-radius:6px; color:var(--nq51-blue); font:14px ui-monospace,monospace; }
+.nq52-counted figcaption { display:flex; justify-content:space-between; gap:6px; }
+.nq52-counted figcaption b { font-weight:normal; }
+@container nqueens51 (max-width:390px) { .nq52-topline { grid-template-columns:110px minmax(0,1fr); } .nq52-counter { padding:8px; } .nq52-counter strong { font-size:34px; } .nq52-viz .nq51-operation { gap:6px; } .nq52-viz .nq51-operation code { font-size:10px; } }

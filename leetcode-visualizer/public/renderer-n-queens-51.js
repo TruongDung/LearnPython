@@ -2,11 +2,12 @@
 function nq51Escape(value){return escapeHtml(String(value??""));}
 function nq51Queen(extra=""){return `<svg class="nq51-qicon ${extra}" viewBox="0 0 40 40" aria-hidden="true"><use href="#nq51Queen"/></svg>`;}
 function nq51Unit(type){return `<svg class="nq51-unit-icon ${type}" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="${type==='column'?'M12 3V21':type==='down'?'M4 4L20 20':'M20 4L4 20'}"/></svg>`;}
-function nq51Board(v,rows,mini=false){
+function nq51Defs(){return '<svg class="nq51-defs" aria-hidden="true"><defs><symbol id="nq51Queen" viewBox="0 0 40 40" fill="currentColor"><circle cx="6" cy="10" r="3"/><circle cx="20" cy="6" r="3"/><circle cx="34" cy="10" r="3"/><path d="M7 15L12 29H28L33 15L25 22L20 11L15 22Z M11 32H29V36H11Z"/></symbol></defs></svg>';}
+function nq51Board(v,rows,mini=false,options={}){
   const n=v.n,cell=38,pad=22,w=n*cell+pad*2,a=mini?null:v.active,checked=!mini&&v.check!==null;
   const center=(r,c)=>[pad+(c+.5)*cell,pad+(r+.5)*cell];
   const queens=rows.flatMap((row,r)=>[...row].flatMap((value,c)=>value==='Q'?[[r,c]]:[]));
-  const solved=mini||['save','return-solution'].includes(v.phase);
+  const solved=mini||options.solved||['save','return-solution'].includes(v.phase);
   let rays='';
   if(a){
     const k=Math.min(a.row,a.col),j=Math.min(n-1-a.row,n-1-a.col),k2=Math.min(a.row,n-1-a.col),j2=Math.min(n-1-a.row,a.col);
@@ -41,7 +42,7 @@ function renderNQueens51Pictures(step){
   const output=`<section class="nq51-card nq51-results-card"><header><span>result · ${v.resultCount}</span><button type="button" id="nq51NextSolution" title="${label('Đến lời giải kế tiếp','Jump to next solution')}" ${step.final?'disabled':''}>→ ♛</button></header><div class="nq51-results">${v.results.map((rows,i)=>`<figure data-solution="${rows.join('/')}"><figcaption>#${v.shownFrom+i+1}</figcaption>${nq51Board(v,rows,true)}</figure>`).join('')||'<span class="nq51-empty">∅</span>'}</div>${v.shownFrom?`<small>+${v.shownFrom} ${label('bàn cờ trước','earlier boards')}</small>`:''}</section>`;
   const frames=v.stack.map((frame,i)=>`${i?'<span class="nq51-stack-arrow">→</span>':''}<span class="nq51-frame ${i===v.stack.length-1?'active':''}" data-frame="${frame.id}"><b>r ${frame.row}</b><small>c ${frame.col??'—'}</small></span>`).join('')||'<span class="nq51-empty">∅</span>';
   const moves=v.moves.map(move=>`<span class="nq51-move ${move.type}" data-move="${move.type}"><small>(${move.row},${move.col})</small><b>${move.type==='undo'?'↩':'＋'}</b>${nq51Queen(move.type==='undo'?'removed':'')}</span>`).join('')||'<span class="nq51-empty">∅</span>';
-  const defs='<svg class="nq51-defs" aria-hidden="true"><defs><symbol id="nq51Queen" viewBox="0 0 40 40" fill="currentColor"><circle cx="6" cy="10" r="3"/><circle cx="20" cy="6" r="3"/><circle cx="34" cy="10" r="3"/><path d="M7 15L12 29H28L33 15L25 22L20 11L15 22Z M11 32H29V36H11Z"/></symbol></defs></svg>';
+  const defs=nq51Defs();
   $('treeView').innerHTML=`<div class="nq51-viz">${defs}<header class="nq51-heading"><span>#51 · N-Queens</span><b>L${v.source.line} ✓</b><span>${label('Sau dòng','After line')} ${v.source.line}</span></header><div class="nq51-operation">${operation}</div>${step.final?output:`<div class="nq51-workspace"><section class="nq51-card"><header><span>board</span><strong>${v.board?v.queens.length:'—'} / ${v.n} ♛</strong></header>${v.board?nq51Board(v,v.board):'<div class="nq51-uninitialized">board = —</div>'}<footer class="nq51-legend"><span class="column">│ col</span><span class="down">╲ r−c</span><span class="up">╱ r+c</span><span>${label('⋯ ô thử','⋯ trial')}</span></footer></section><div class="nq51-units">${units}</div></div>${output}`}<section class="nq51-card"><header><span>Call stack · row</span><small>${label('Chung một board','One shared board')}</small></header><div class="nq51-stack">${frames}</div></section><section class="nq51-card"><header><span>${label('Đặt / bỏ gần nhất','Recent place / undo')}</span></header><div class="nq51-moves">${moves}</div></section></div>`;
   const root=$('treeView'),stack=root.querySelector?.('.nq51-stack');if(stack)stack.scrollLeft=stack.scrollWidth;
   root.querySelector?.('#nq51NextSolution')?.addEventListener('click',()=>{stopPlay();const next=steps.findIndex((candidate,index)=>index>stepIndex&&candidate.nQueens51View?.phase==='save');stepIndex=next>=0?next:steps.length-1;renderStep();});
