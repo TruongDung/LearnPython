@@ -114,7 +114,7 @@ test('39 renders number pips, a true current-sum bar, available index range, act
 
 test('39 loads scoped assets lazily and supports light/dark, sticky watches, long current values and horizontal code scrolling',()=>{
   const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8'),css=fs.readFileSync(require.resolve('../public/combination-39.css'),'utf8'),script=fs.readFileSync(require.resolve('../public/script.js'),'utf8');
-  assert.equal(problem.debugMode,'line-by-line');assert.match(html,/combination-39\.css[^\n]*data-problem-ids="39"/);assert.match(html,/renderer-combination-39\.js[^\n]*data-problem-ids="39"/);
+  assert.equal(problem.debugMode,'line-by-line');assert.match(html,/combination-39\.css[^\n]*data-problem-ids="39(?: 40)?"/);assert.match(html,/renderer-combination-39\.js[^\n]*data-problem-ids="39(?: 40)?"/);
   assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g,''),/(?:renderer-)?combination-39\.(?:css|js)/);
   assert.match(script,/Boolean\(step.combination39View\)[^\n]*renderCombination39Pictures\(step\)/);assert.match(css,/\[data-theme="light"\] \.cs39-viz/);
   assert.match(css,/#varsPanel[^}]*position:sticky/);assert.match(css,/\.var-value\s*\{[^}]*overflow-x:auto; white-space:nowrap/);
