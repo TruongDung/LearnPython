@@ -12,6 +12,7 @@
 #vizPanel:has(.nq51-viz) #stepNote, #vizPanel:has(.nq51-viz) #answer { display:none; }
 #vizPanel:has(.nq51-viz) .viz-split, #vizPanel:has(.nq51-viz) .code-panel { min-width:0; }
 #vizPanel:has(.nq51-viz) .code-panel { max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }
+#problemPanel[data-problem-id="51"] ~ #vizPanel .code-panel { max-height:none; height:auto; overflow-y:hidden; }
 #vizPanel:has(.nq51-viz) .code-line { width:max-content; min-width:100%; white-space:pre; }
 #vizPanel:has(.nq51-viz) .code-line .txt { flex:0 0 auto; white-space:pre; overflow-wrap:normal; word-break:normal; }
 #vizBody:has(.nq51-viz) { display:flex; flex-direction:column; }

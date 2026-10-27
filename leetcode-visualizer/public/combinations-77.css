@@ -1,0 +1,59 @@
+.c77-viz { --c77-bg:#101827; --c77-panel:#19263b; --c77-text:#e2e8f0; --c77-muted:#a8b6c9; --c77-line:#43536b; --c77-blue:#38bdf8; --c77-green:#4ade80; --c77-red:#fb7185; --c77-c0:#7dd3fc; --c77-c1:#c4b5fd; --c77-c2:#fcd34d; --c77-c3:#6ee7b7; --c77-c4:#f9a8d4; --c77-c5:#fdba74; --c77-c6:#a5b4fc; --c77-c7:#67e8f9; display:grid; gap:12px; min-width:0; padding:12px; border:1px solid var(--c77-line); border-radius:12px; background:var(--c77-bg); color:var(--c77-text); }
+[data-theme="light"] .c77-viz { --c77-bg:#f5f8fc; --c77-panel:#fff; --c77-text:#172033; --c77-muted:#526379; --c77-line:#b7c5d7; --c77-blue:#0369a1; --c77-green:#047857; --c77-red:#be123c; --c77-c0:#0369a1; --c77-c1:#7e22ce; --c77-c2:#a16207; --c77-c3:#047857; --c77-c4:#be185d; --c77-c5:#c2410c; --c77-c6:#4338ca; --c77-c7:#0e7490; }
+#treeView:has(>.c77-viz) { min-height:0; padding:0; border:0; background:transparent; overflow:visible; }
+.c77-viz header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:6px; }
+.c77-viz header strong { font-size:16px; }
+.c77-viz small { font-size:11px; color:var(--c77-muted); }
+.c77-viz header>span { color:var(--c77-muted); font:12px ui-monospace,monospace; }
+.c77-number { display:inline-grid; place-items:center; width:33px; height:33px; flex:0 0 33px; box-sizing:border-box; color:var(--c77-tone); border:1px solid var(--c77-tone); border-radius:7px; background:color-mix(in srgb,var(--c77-tone) 10%,var(--c77-panel)); font:600 20px ui-monospace,monospace; }
+.c77-pool { display:grid; gap:4px; }
+.c77-pool>div { display:flex; flex-wrap:wrap; gap:6px; }
+.c77-source { display:grid; justify-items:center; gap:3px; padding:2px; }
+.c77-source.focus .c77-number { outline:2px solid var(--c77-blue); outline-offset:2px; }
+.c77-source.selected .c77-number { background:color-mix(in srgb,var(--c77-green) 25%,var(--c77-panel)); }
+.c77-source.selected>small:last-child { color:var(--c77-green); }
+.c77-source.blocked { opacity:.35; }
+.c77-source.pruned .c77-number { border-color:var(--c77-red); text-decoration:line-through; }
+.c77-source.pruned>small:last-child { color:var(--c77-red); }
+.c77-basket { display:grid; gap:6px; padding:10px; border:1px solid var(--c77-line); border-radius:9px; background:var(--c77-panel); }
+.c77-basket>div { display:flex; flex-wrap:wrap; gap:6px; }
+.c77-slot { display:grid; justify-items:center; gap:3px; min-width:35px; }
+.c77-slot>small { font:10px ui-monospace,monospace; }
+.c77-slot:not(.filled)>b { display:grid; place-items:center; width:31px; height:31px; border:1px dashed var(--c77-line); border-radius:7px; }
+.c77-empty { color:var(--c77-muted); font:20px ui-monospace,monospace; }
+.c77-operation { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; padding:8px; background:var(--c77-panel); border-radius:8px; }
+.c77-operation>strong { color:var(--c77-blue); font:600 22px ui-monospace,monospace; }
+.c77-operation code { font-size:13px; overflow-wrap:anywhere; }
+.c77-copy { display:flex; flex-wrap:wrap; justify-content:center; gap:4px; max-width:100%; }
+.c77-number.removed { opacity:.65; text-decoration:line-through; border-style:dashed; }
+.c77-condition { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:5px; font-size:12px; }
+.c77-condition code { overflow-wrap:anywhere; }
+.c77-viz .c77-yes { color:var(--c77-green); }
+.c77-viz .c77-no { color:var(--c77-red); }
+.c77-pruning { display:grid; gap:7px; padding:8px; border:1px solid var(--c77-line); border-radius:8px; }
+.c77-pruning header>b { color:var(--c77-green); font:16px ui-monospace,monospace; }
+.c77-pruning>div { display:flex; flex-wrap:wrap; gap:5px; }
+.c77-pruning.no { border-color:var(--c77-red); }
+.c77-pruning.no header>b,.c77-pruning.no>small { color:var(--c77-red); }
+.c77-missing { display:grid; place-items:center; width:31px; height:31px; border:1px dashed var(--c77-red); border-radius:7px; color:var(--c77-red); font-size:20px; }
+.c77-branch { border-top:1px solid var(--c77-line); padding-top:7px; }
+.c77-branch svg { display:block; width:100%; height:auto; max-width:500px; margin:auto; }
+.c77-branch-link { fill:none; stroke:var(--c77-green); stroke-width:2; opacity:.6; }
+.c77-branch-node circle { fill:var(--c77-panel); stroke:var(--c77-tone); stroke-width:1.5; }
+.c77-branch-node.active circle { stroke:var(--c77-blue); stroke-width:3; }
+.c77-node-value { fill:var(--c77-text); font:600 19px ui-monospace,monospace; }
+.c77-node-start { fill:var(--c77-muted); font:11px ui-monospace,monospace; paint-order:stroke; stroke:var(--c77-bg); stroke-width:4px; stroke-linejoin:round; }
+.c77-results { display:grid; gap:7px; }
+.c77-progress { height:4px; border-radius:4px; background:var(--c77-line); overflow:hidden; }
+.c77-progress i { display:block; height:100%; background:var(--c77-green); }
+.c77-gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr)); gap:6px; max-height:230px; overflow:auto; position:relative; padding:3px; scrollbar-width:thin; }
+.c77-result { min-width:0; display:flex; align-items:center; gap:5px; padding:6px; border:1px solid var(--c77-line); border-radius:7px; background:var(--c77-panel); }
+.c77-result>div { display:flex; flex-wrap:wrap; gap:3px; }
+.c77-result .c77-number { width:25px; height:25px; flex-basis:25px; font-size:16px; border-radius:5px; }
+.c77-result.new { border-color:var(--c77-green); outline:1px solid var(--c77-green); }
+#vizPanel:has(.c77-viz) .note,#vizPanel:has(.c77-viz) #answer { display:none; }
+#vizPanel:has(.c77-viz) :is(#codePanel,#codePanel2) { max-height:none; overflow-x:auto; overflow-y:visible; width:100%; max-width:100%; box-sizing:border-box; white-space:pre; }
+#vizPanel:has(.c77-viz) .code-line { min-width:100%; width:max-content; white-space:pre; }
+#vizPanel:has(.c77-viz) .code-line .txt { flex:0 0 auto; white-space:pre; }
+@media(max-width:768px) { .viz-split:has(.c77-viz) .viz-right { order:-1; } #vizPanel:has(.c77-viz) { padding-inline:10px; } }
+@media(max-width:480px) { .c77-viz { padding:9px; gap:10px; } .c77-pool>div { gap:3px; } .c77-operation { gap:7px; } }

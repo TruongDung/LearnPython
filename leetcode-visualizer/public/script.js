@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.combinations77View), surface: "treeView", render: (step) => { renderCombinations77Pictures(step); } },
     { predicate: (step) => Boolean(step.nQueens52View), surface: "treeView", render: (step) => { renderNQueens52Pictures(step); } },
     { predicate: (step) => Boolean(step.nQueens51View), surface: "treeView", render: (step) => { renderNQueens51Pictures(step); } },
     { predicate: (step) => Boolean(step.permutations46View), surface: "treeView", render: (step) => { renderPermutations46Pictures(step); } },
@@ -788,7 +789,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderProfitTracker9001View(step);
     } },
     { predicate: (step) => Boolean(step.square9013View), surface: "treeView", render: (step) => {
-      renderSquare9013View(step);
+      renderSquareArrangement9013View(step);
     } },
     { predicate: (step) => Boolean(step.loyal9014View), surface: "treeView", render: (step) => {
       renderLoyal9014View(step);
@@ -875,7 +876,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderWordSearchIIView(step);
     } },
     { predicate: (step) => Boolean(step.wordSearchView), surface: "treeView", render: (step) => {
-      renderWordSearchView(step);
+      renderWordSearch79Pictures(step);
     } },
     { predicate: (step) => Boolean(step.keypadPushView), surface: "treeView", render: (step) => {
       renderKeypadPushView(step);

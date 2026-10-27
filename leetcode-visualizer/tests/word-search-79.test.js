@@ -25,26 +25,28 @@ test('79 answers match brute force on the LeetCode examples', () => {
   assert.equal(problem.builder(DEFAULT_BOARD, { word: 'ABCB' }).answer, false);
 });
 
-test('79 trace is compact: one step per DFS call plus intro and final', () => {
+test('79 trace executes one source line per step and preserves the winning path', () => {
   const { steps, answer } = problem.builder(DEFAULT_BOARD, { word: 'ABCCED' });
   assert.equal(answer, true);
-  assert.ok(steps.length <= 40, `expected a compact trace, got ${steps.length} steps`);
+  assert.ok(steps.length <= 200, `expected a focused line trace, got ${steps.length} steps`);
   assert.equal(steps.at(-1).final, true);
   assert.equal(steps.at(-1).wordSearchView.result, true);
-  // every step carries the grid view and valid code lines (displayed code has 24 lines)
+  // Every snapshot follows exactly one displayed Python line.
   for (const s of steps) {
     assert.ok(s.wordSearchView, 'missing wordSearchView');
     assert.ok(s.title && s.note, 'missing title/note');
-    for (const n of s.codeLines || []) assert.ok(n >= 1 && n <= 24, `bad code line ${n}`);
+    assert.equal(s.codeLines.length, 1);
+    for (const n of s.codeLines) assert.ok(n >= 1 && n <= problem.code.length, `bad code line ${n}`);
   }
   // the winning path is shown in order on the final step
   const finalView = steps.at(-1).wordSearchView;
+  assert.deepEqual(finalView.board, finalView.original);
   assert.deepEqual(finalView.path.map((p) => [p.r, p.c]),
     [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1]]);
 });
 
 test('79 shows reject reasons and backtrack restores on dead ends', () => {
-  const { steps } = problem.builder(DEFAULT_BOARD, { word: 'ABCB' });
+  const { steps } = problem.builder('A,B;B,A', { word: 'ABBA' });
   const reasons = new Set(steps.map((s) => s.wordSearchView.reason).filter(Boolean));
   assert.ok(reasons.has('mismatch'), 'expected a mismatch reject');
   assert.ok(reasons.has('outside'), 'expected an outside reject');
