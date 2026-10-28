@@ -107,14 +107,28 @@ function study3619Picture(v) {
   return `<div class="study-pair"><section class="study-panel"><header><b>${studyWord("Bản đồ đảo", "Island map")}</b><small>0 ≋</small></header><div class="study-grid-scroll"><svg class="study-island-grid" style="max-width:${Math.min(w, 440)}px" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${studyWord("Đảo gồm các ô dương nối theo bốn hướng", "Islands contain positive cells connected in four directions")}"><defs><marker id="study-island-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 8 4 0 8Z"/></marker><marker id="study-island-reject" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 8 4 0 8Z"/></marker></defs>${axes}${cells}${arrow}</svg></div></section><section class="study-panel"><header><b>Σ ${v.total ?? "?"}</b><small>k = ${v.k}</small></header>${study3619Buckets(v.total, v.k, activeRecord?.complete, activeRecord?.accepted)}<div class="study-action">${action}</div><header><b>FIFO</b><small>${v.queue.length}</small></header><div class="study-stream">${queue || "∅"}</div></section></div><div class="study-island-records">${records || '<span class="study-empty">🏝 ?</span>'}</div><div class="study-score">✓ <strong>${v.answer}</strong> <small>${studyWord("đảo", "islands")}</small></div>`;
 }
 
+function study2353FoodMap(v) {
+  const esc = escapeHtml, name = v.local.food, writing = v.line === 8 || v.line === 12;
+  const tuple = (rating, cuisine) => `<span class="study-food-tuple">(<span class="study-food-rating">${rating}</span>, <span class="study-food-origin">&quot;${esc(cuisine)}&quot;</span>)</span>`;
+  const assignment = name && (writing || v.line === 7 && !Object.hasOwn(v.food, name)) ? `<div class="study-food-assignment ${writing ? "written" : ""}"><small>${writing ? studyWord(v.line === 8 ? "Thêm vào bảng" : "Cập nhật trong bảng", v.line === 8 ? "Add to the dictionary" : "Update the dictionary") : studyWord("Chuẩn bị ghi", "About to write")}</small><div><code>self.food[</code>${studyToken(`"${name}"`, "food · key")}<code>] = (</code>${studyToken(v.line === 12 ? v.local.newRating : v.local.rating, `${v.line === 12 ? "newRating" : "rating"} · [0]`, "", 3)}<code>,</code>${studyToken(`"${v.local.cuisine}"`, "cuisine · [1]", "", 2)}<code>)</code></div><p>${studyWord("Dùng tên món làm key, lưu cặp (điểm, loại ẩm thực).", "Use the food name as the key and store (rating, cuisine).")}</p></div>` : "";
+  const rows = Object.entries(v.food).map(([food, [rating, cuisine]]) => {
+    const focused = food === name;
+    const previous = focused && v.line === 12 ? `<span class="study-food-previous">${tuple(v.action.from, cuisine)}</span><span aria-hidden="true"> → </span>` : "";
+    return `<tr class="${focused ? "current" : ""} ${focused && writing ? "written" : ""}" data-food-map-key="${esc(food)}"><th scope="row">&quot;${esc(food)}&quot;</th><td>${previous}${tuple(rating, cuisine)}${focused && writing ? `<small class="study-food-saved">✓ ${studyWord("đã lưu", "saved")}</small>` : ""}</td></tr>`;
+  }).join("");
+  return `<section class="study-panel study-food-map"><header><b>self.food</b><small>${Object.keys(v.food).length} ${studyWord("món đã lưu", "stored foods")}</small></header><p class="study-food-map-help">${studyWord("self = đối tượng FoodRatings này; self.food = dictionary của đối tượng.", "self = this FoodRatings object; self.food = its dictionary.")}</p>${assignment}<div class="study-food-map-scroll">${rows ? `<table><thead><tr><th scope="col">food · key</th><th scope="col">(rating, cuisine) · value</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="study-empty">{} · ${studyWord("Chưa lưu món nào", "No foods stored yet")}</div>`}</div><div class="study-legend"><span class="study-food-rating">[0] = rating</span> · <span class="study-food-origin">[1] = cuisine</span></div></section>`;
+}
+
 function study2353Picture(v) {
   const esc = escapeHtml, cuisines = [...new Set(v.cuisines)], a = v.action, active = v.local.cuisine, max = Math.max(1, ...Object.values(v.food).map(e => e[0]));
-  const displayCuisine = cuisines.includes(selectedFoodRatingsCuisine2353) ? selectedFoodRatingsCuisine2353 : active;
+  const displayCuisine = cuisines.includes(selectedFoodRatingsCuisine2353) ? selectedFoodRatingsCuisine2353 : active || cuisines[0];
   const cards = cuisines.map((cuisine, i) => `<section class="study-cuisine ${active === cuisine ? "focus" : ""} ${displayCuisine === cuisine ? "selected" : ""}" style="--study-tone:var(--study-c${i % 6})"><header><button type="button" data-study-cuisine="${esc(cuisine)}" aria-pressed="${displayCuisine === cuisine}">🍽 ${esc(cuisine)}</button></header>${v.foods.filter(name => v.food[name]?.[1] === cuisine).map(name => `<div class="study-food ${v.local.food === name || a?.kind === "return" && a.food === name ? "focus" : ""}" data-food="${esc(name)}"><b>${esc(name)}</b><span>★ ${v.food[name][0]}</span><i style="width:${100 * v.food[name][0] / max}%"></i></div>`).join("") || '<span class="study-empty">∅</span>'}</section>`).join("");
-  const heaps = cuisines.map((cuisine, i) => {
+  const tabs = cuisines.map((cuisine, i) => `<button type="button" class="study-cuisine-tab ${active === cuisine ? "active-cuisine" : ""}" id="study-cuisine-tab-${i}" role="tab" aria-selected="${displayCuisine === cuisine}" aria-controls="study-cuisine-panel" tabindex="${displayCuisine === cuisine ? 0 : -1}" data-study-cuisine-tab="${esc(cuisine)}" style="--study-tone:var(--study-c${i % 6})">${esc(cuisine)}<small>${(v.heaps[cuisine] || []).length}</small></button>`).join("");
+  const heaps = cuisines.filter(cuisine => cuisine === displayCuisine).map(cuisine => {
+    const i = cuisines.indexOf(cuisine);
     const heap = v.heaps[cuisine] || [], stale = heap.map((e, index) => -e[0] !== v.food[e[1]][0] ? index : -1).filter(index => index >= 0);
     const selected = displayCuisine !== cuisine ? [] : a?.kind === "push" && active === cuisine ? [heap.findLastIndex(e => e[0] === a.entry[0] && e[1] === a.entry[1])] : [0];
-    return `<section class="study-cuisine-heap ${active === cuisine ? "focus" : ""} ${displayCuisine === cuisine ? "selected" : ""}" data-cuisine-heap="${esc(cuisine)}" style="--study-tone:var(--study-c${i % 6})"><header><b>heap · ${esc(cuisine)}</b><small>${heap.length} · ★ ↓ · a → z</small></header>${studyHeapPicture(heap, e => [e[1], `★ ${-e[0]}`], { selected, stale })}</section>`;
+    return `<section class="study-cuisine-heap ${active === cuisine ? "focus" : ""} selected" data-cuisine-heap="${esc(cuisine)}" id="study-cuisine-panel" role="tabpanel" aria-labelledby="study-cuisine-tab-${i}" tabindex="0" style="--study-tone:var(--study-c${i % 6})"><header><b>heap · ${esc(cuisine)}</b><small>${heap.length} · ★ ↓ · a → z</small></header>${studyHeapPicture(heap, e => [e[1], `★ ${-e[0]}`], { selected, stale })}</section>`;
   }).join("");
   const rail = v.operations.map((op, i) => `<span class="study-op ${i === v.activeIndex ? "focus" : i > v.activeIndex ? "future" : ""}" title="${esc(`${op.name}(${op.args.join(", ")})`)}"><small>${i + 1}</small>${op.name === "highestRated" ? "★" : "↻"}${i === v.activeIndex ? ` ${esc(op.args.join(" → "))}` : ""}</span>`).join("");
   const heap = v.heaps[active] || [];
@@ -127,7 +141,7 @@ function study2353Picture(v) {
   const tied = a?.kind === "return" ? members.filter(name => v.food[name][0] === v.food[a.food][0]).sort() : [];
   const tie = tied.length > 1 ? `<div class="study-food-tie">★ ${v.food[a.food][0]} = ★ ${v.food[a.food][0]} <span>${esc(tied[0])} &lt; ${esc(tied[1])}</span><strong>→ ${esc(tied[0])}</strong></div>` : "";
   const history = v.history.map(record => studyToken(record.food, `${record.cuisine} · ★${record.rating}`, "winner")).join("");
-  return `<div class="study-ops">${rail || "🍽 ?"}</div><div class="study-cuisines">${cards}</div><div class="study-action">${action}</div>${tie}<section class="study-panel"><header><b>${studyWord("Heap theo cuisine", "Heaps by cuisine")}</b><small>✕ ${studyWord("bản cũ", "stale entry")} · (−rating, food)</small></header><div class="study-cuisine-heaps">${heaps}</div></section><div class="study-stream">${history || "🏆 ?"}</div>`;
+  return `<div class="study-ops">${rail || "🍽 ?"}</div>${study2353FoodMap(v)}<div class="study-cuisines">${cards}</div><div class="study-action">${action}</div>${tie}<section class="study-panel"><header><b>${studyWord("Heap theo cuisine", "Heaps by cuisine")}</b><small>✕ ${studyWord("bản cũ", "stale entry")} · (−rating, food)</small></header><div class="study-cuisine-tabs" role="tablist" aria-label="${studyWord("Heap theo cuisine", "Heaps by cuisine")}">${tabs}</div><div class="study-cuisine-heaps">${heaps}</div></section><div class="study-stream">${history || "🏆 ?"}</div>`;
 }
 
 function study2407Picture(v) {
@@ -163,10 +177,25 @@ function renderPictureStudy(step) {
   const ops = host.querySelector(".study-ops"), active = ops?.querySelector(".focus");
   if (active) { ops.scrollLeft = Math.max(0, active.offsetLeft - ops.clientWidth / 2 + active.clientWidth / 2); }
   if (v.id === 2353) {
-    host.querySelectorAll("[data-study-cuisine]").forEach(button => button.addEventListener("click", () => {
-      selectedFoodRatingsCuisine2353 = button.dataset.studyCuisine;
+    const row = host.querySelector(".study-food-map tr.current"), dictionary = host.querySelector(".study-food-map-scroll");
+    if (row && dictionary) dictionary.scrollTop = Math.max(0, row.offsetTop - dictionary.clientHeight / 2 + row.offsetHeight / 2);
+    const selectCuisine = (cuisine, focusTab = false) => {
+      selectedFoodRatingsCuisine2353 = cuisine;
       renderPictureStudy(step);
-      host.querySelector(`[data-cuisine-heap="${esc(button.dataset.studyCuisine)}"]`)?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+      if (focusTab) host.querySelector(`[data-study-cuisine-tab="${esc(cuisine)}"]`)?.focus();
+    };
+    host.querySelectorAll("[data-study-cuisine]").forEach(button => button.addEventListener("click", () => {
+      selectCuisine(button.dataset.studyCuisine, true);
     }));
+    const tabs = [...host.querySelectorAll("[data-study-cuisine-tab]")];
+    tabs.forEach((button, index) => {
+      button.addEventListener("click", () => selectCuisine(button.dataset.studyCuisineTab, true));
+      button.addEventListener("keydown", event => {
+        const next = { ArrowRight: (index + 1) % tabs.length, ArrowLeft: (index - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        selectCuisine(tabs[next].dataset.studyCuisineTab, true);
+      });
+    });
   }
 }

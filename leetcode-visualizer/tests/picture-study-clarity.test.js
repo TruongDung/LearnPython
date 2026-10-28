@@ -9,6 +9,7 @@ const ids = [378, 3619, 2407, 977, 2353];
 const run = (id, input = SUPPORTED[id].defaultInput, params = Object.fromEntries(SUPPORTED[id].extraParams.map(p => [p.key, p.default]))) => SUPPORTED[id].builder(input, params);
 function renderer() {
   const cuisineListeners = new Map();
+  const tabListeners = new Map();
   const host = {
     innerHTML: "",
     querySelector: () => null,
@@ -17,13 +18,18 @@ function renderer() {
         dataset: { studyCuisine: cuisine },
         addEventListener: (event, listener) => cuisineListeners.set(cuisine, listener)
       }))
-      : [],
+      : selector === "[data-study-cuisine-tab]"
+        ? [...host.innerHTML.matchAll(/data-study-cuisine-tab="([^"]+)"/g)].map(([, cuisine]) => ({
+          dataset: { studyCuisineTab: cuisine },
+          addEventListener: (event, listener) => tabListeners.set(`${cuisine}:${event}`, listener)
+        }))
+        : [],
     clickCuisine: cuisine => cuisineListeners.get(cuisine)?.()
   };
   const context = { lang: "vi", $: () => host, escapeHtml: value => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]) };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-picture-study.js"), "utf8"), context);
-  return { context, clickCuisine: host.clickCuisine, render: step => { context.renderPictureStudy(step); return host.innerHTML; } };
+  return { context, clickCuisine: host.clickCuisine, clickTab: cuisine => tabListeners.get(`${cuisine}:click`)?.(), keyTab: (cuisine, key) => tabListeners.get(`${cuisine}:keydown`)?.({ key, preventDefault() {} }), render: step => { context.renderPictureStudy(step); return host.innerHTML; } };
 }
 
 test("five picture lessons keep eight stable watches and expose the actual candidate values", () => {
@@ -149,19 +155,23 @@ test("2353 stale roots show the old entry against the authoritative live rating 
   assert.match(render(tie), /ramen &lt; sushi/);
 });
 
-test("2353 shows every cuisine heap together and preserves each heap's entries", () => {
+test("2353 shows cuisine tabs and only the selected heap with its entries", () => {
   const { render } = renderer();
   for (const step of run(2353).steps) {
     const v = step.pictureStudyView, html = render(step);
-    for (const cuisine of new Set(v.cuisines)) assert.ok(html.includes(`data-cuisine-heap="${cuisine}"`));
-    assert.equal((html.match(/<section class="study-cuisine-heap/g) || []).length, new Set(v.cuisines).size);
-    assert.equal((html.match(/data-heap-index=/g) || []).length, Object.values(v.heaps).reduce((total, heap) => total + heap.length, 0));
+    const cuisines = [...new Set(v.cuisines)], selected = v.local.cuisine || cuisines[0];
+    for (const cuisine of cuisines) assert.ok(html.includes(`data-study-cuisine-tab="${cuisine}"`));
+    assert.equal((html.match(/<section class="study-cuisine-heap/g) || []).length, 1);
+    assert.ok(html.includes(`data-cuisine-heap="${selected}"`));
+    assert.equal((html.match(/data-heap-index=/g) || []).length, (v.heaps[selected] || []).length);
+    assert.equal((html.match(/role="tab" aria-selected="true"/g) || []).length, 1);
+    assert.match(html, /role="tabpanel" aria-labelledby="study-cuisine-tab-\d+"/);
     assert.equal((html.match(/class="study-cuisine-heap focus(?: |")/g) || []).length, v.local.cuisine ? 1 : 0);
   }
 });
 
-test("2353 clicking a cuisine selects and scrolls to that cuisine's heap", () => {
-  const { render, clickCuisine } = renderer(), step = run(2353).steps.find(s => s.pictureStudyView.local.cuisine === "japanese");
+test("2353 cuisine cards, tabs and arrow keys switch the visible heap and retain selection", () => {
+  const { render, clickCuisine, clickTab, keyTab } = renderer(), step = run(2353).steps.find(s => s.pictureStudyView.local.cuisine === "japanese");
   assert.ok(step);
   const before = render(step);
   assert.match(before, /data-study-cuisine="japanese" aria-pressed="true"/);
@@ -169,7 +179,17 @@ test("2353 clicking a cuisine selects and scrolls to that cuisine's heap", () =>
   const after = render(step);
   assert.match(after, /data-study-cuisine="korean" aria-pressed="true"/);
   assert.match(after, /class="study-cuisine-heap [^"]*selected" data-cuisine-heap="korean"/);
-  assert.match(after, /class="study-cuisine-heap focus [^"]*" data-cuisine-heap="japanese"/);
+  assert.doesNotMatch(after, /data-cuisine-heap="japanese"/);
+  clickTab("greek");
+  assert.match(render(step), /data-cuisine-heap="greek"/);
+  keyTab("greek", "ArrowRight");
+  assert.match(render(step), /data-cuisine-heap="korean"/);
+  keyTab("korean", "ArrowLeft");
+  assert.match(render(step), /data-cuisine-heap="greek"/);
+  keyTab("greek", "Home");
+  assert.match(render(step), /data-cuisine-heap="korean"/);
+  keyTab("korean", "End");
+  assert.match(render(run(2353).steps.at(-1)), /data-cuisine-heap="greek"/);
 });
 
 test("all five diagrams stay deterministic in both languages and source snippets retain horizontal scrolling", () => {

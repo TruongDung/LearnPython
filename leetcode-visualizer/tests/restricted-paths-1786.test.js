@@ -23,8 +23,8 @@ function render(step, language = "vi") {
     })[char]),
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(require.resolve("../public/renderers-01.js"), "utf8"), context);
-  context.renderRestricted1786View(step);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-restricted-paths-1786.js"), "utf8"), context);
+  context.renderRestrictedPaths1786Pictures(step);
   return treeView.innerHTML;
 }
 
@@ -65,37 +65,36 @@ test("1786 renderer is picture-first across relax, DP, and result states", () =>
   const update = result.steps.find(step => step.restricted1786View.event === "dp-update");
   for (const language of ["vi", "en"]) {
     const html = render(relax, language);
-    assert.match(html, /rp1786-viz/);
-    assert.match(html, /rp1786-map/);
-    assert.match(html, /rp1786-edge road active/);
-    assert.match(html, /rp1786-action relax yes/);
-    assert.match(html, /rp1786-heap/);
+    assert.match(html, /r1786-viz/);
+    assert.match(html, /r1786-graph/);
+    assert.match(html, /r1786-edge road active/);
+    assert.match(html, /r1786-calc/);
+    assert.match(html, /r1786-heap/);
     assert.doesNotMatch(html, /restricted1786-title|restricted1786-formula|undefined|NaN|object Object/);
   }
   const dpHtml = render(update);
-  assert.match(dpHtml, /rp1786-edge downhill active/);
-  assert.match(dpHtml, /rp1786-action dp/);
-  assert.match(dpHtml, /rp1786-order/);
-  assert.match(dpHtml, /class="ways"/);
+  assert.match(dpHtml, /r1786-edge downhill active/);
+  assert.match(dpHtml, /r1786-calc/);
+  assert.match(dpHtml, /r1786-order/);
+  assert.match(dpHtml, /r1786-way/);
   const finalHtml = render(result.steps.at(-1));
-  assert.match(finalHtml, /rp1786-result/);
-  assert.match(finalHtml, /🚩1/);
-  assert.match(finalHtml, /🏁5/);
-  assert.match(finalHtml, /<strong>3<\/strong>/);
-  assert.match(finalHtml, /rp1786-edge downhill/);
+  assert.match(finalHtml, /r1786-result/);
+  assert.match(finalHtml, /1 → 5/);
+  assert.match(finalHtml, /3 đường ✓/);
+  assert.match(finalHtml, /r1786-edge downhill/);
+  assert.equal((finalHtml.match(/class="r1786-path /g) || []).length, 3);
 });
 
 test("1786 renderer, styles, and cache keys remain registered", () => {
   const script = fs.readFileSync(require.resolve("../public/script.js"), "utf8");
   const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
-  const css = fs.readFileSync(require.resolve("../public/style-04.css"), "utf8");
-  const renderer = fs.readFileSync(require.resolve("../public/renderers-01.js"), "utf8");
-  assert.match(script, /"renderers-01\.js":\[[^\]]*"renderRestricted1786View"/);
-  assert.match(script, /"style-04\.css":\[[^\]]*"renderRestricted1786View"/);
+  const css = fs.readFileSync(require.resolve("../public/restricted-paths-1786.css"), "utf8");
+  const renderer = fs.readFileSync(require.resolve("../public/renderer-restricted-paths-1786.js"), "utf8");
+  assert.match(script, /renderRestrictedPaths1786Pictures\(step\)/);
   assert.match(script, /restricted1786View/);
-  assert.match(html, /style-04\.css[^"\n]*restricted1786=picture-v1/);
-  assert.match(html, /renderers-01\.js[^"\n]*restricted1786=picture-v1/);
-  assert.match(css, /\.rp1786-viz\s*\{/);
-  assert.match(css, /#vizPanel:has\(\.rp1786-viz\) :is\(#codePanel, #codePanel2\)/);
-  assert.match(renderer, /function renderRestricted1786View\(step\)/);
+  assert.match(html, /restricted-paths-1786\.css\?v=restricted1786-line-pictures-v2/);
+  assert.match(html, /renderer-restricted-paths-1786\.js\?v=restricted1786-line-pictures-v2/);
+  assert.match(css, /\.r1786-viz\s*\{/);
+  assert.match(css, /#vizPanel:has\(\.r1786-viz\) :is\(#codePanel,#codePanel2\)/);
+  assert.match(renderer, /function renderRestrictedPaths1786Pictures\(step\)/);
 });

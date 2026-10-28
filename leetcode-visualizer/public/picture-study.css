@@ -107,6 +107,27 @@ body:has(.study-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
 .study-food b { overflow-wrap:anywhere; }
 .study-food span { font-size:10px; }
 .study-food i { position:absolute; left:0; bottom:1px; height:3px; background:var(--study-tone); border-radius:3px; }
+.study-food-map-help { margin:8px 0; color:var(--study-muted); font:11px/1.5 ui-monospace,monospace; }
+.study-food-assignment { margin:10px 0; padding:10px; border:1px dashed var(--study-line); border-radius:9px; }
+.study-food-assignment.written { border-style:solid; border-color:var(--study-green); }
+.study-food-assignment > small { color:var(--study-muted); font:11px ui-monospace,monospace; }
+.study-food-assignment > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
+.study-food-assignment code { color:var(--study-text); font:12px ui-monospace,monospace; }
+.study-food-assignment p { margin:8px 0 0; color:var(--study-muted); font:11px/1.5 ui-monospace,monospace; }
+.study-food-map-scroll { position:relative; max-height:220px; overflow:auto; }
+.study-food-map table { width:100%; border-collapse:separate; border-spacing:0 4px; font:12px ui-monospace,monospace; }
+.study-food-map th, .study-food-map td { padding:8px; text-align:left; white-space:nowrap; border-top:1px solid transparent; border-bottom:1px solid transparent; }
+.study-food-map thead th { position:sticky; top:0; z-index:1; background:var(--study-panel); color:var(--study-muted); font-size:10px; font-weight:400; }
+.study-food-map tbody th { border-left:3px solid transparent; border-radius:6px 0 0 6px; }
+.study-food-map tbody td { border-radius:0 6px 6px 0; }
+.study-food-map tr.current > * { background:color-mix(in srgb,var(--study-gold) 10%,var(--study-panel)); border-top-color:var(--study-gold); border-bottom-color:var(--study-gold); }
+.study-food-map tr.current > th { border-left-color:var(--study-gold); }
+.study-food-map tr.written > * { border-top-color:var(--study-green); border-bottom-color:var(--study-green); }
+.study-food-map tr.written > th { border-left-color:var(--study-green); }
+.study-food-rating { color:var(--study-c3); }
+.study-food-origin { color:var(--study-c2); }
+.study-food-previous { text-decoration:line-through; opacity:.65; }
+.study-food-saved { display:inline-block; margin-left:10px; color:var(--study-green); font-size:10px; }
 .study-legend { color:var(--study-muted); font:10px ui-monospace,monospace; margin-top:5px; }
 .study-stale { color:var(--study-red); text-decoration:line-through; }
 .study-lis-column { display:flex; flex:1 0 35px; flex-direction:column; justify-content:flex-end; align-items:center; min-height:112px; padding:5px; border:1px solid var(--study-line); border-radius:7px; font:13px ui-monospace,monospace; }
@@ -171,7 +192,14 @@ body:has(.study-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
 .study-query-nodes > strong { color:var(--study-gold); }
 .study-food-tie { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; padding:9px; border:1px dashed var(--study-line); border-radius:10px; color:var(--study-muted); font:11px ui-monospace,monospace; }
 .study-food-tie strong { color:var(--study-green); }
-.study-cuisine-heaps { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:8px; }
+.study-cuisine-tabs { display:flex; gap:6px; overflow-x:auto; margin:10px 0; padding:3px; }
+.study-cuisine-tab { flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:7px 11px; border:1px solid var(--study-line); border-radius:8px; background:var(--study-panel); color:var(--study-muted); font:12px ui-monospace,monospace; cursor:pointer; }
+.study-cuisine-tab small { padding:1px 5px; border-radius:5px; background:color-mix(in srgb,var(--study-tone) 10%,var(--study-panel)); font-size:10px; }
+.study-cuisine-tab.active-cuisine { border-color:var(--study-tone); }
+.study-cuisine-tab[aria-selected="true"] { background:color-mix(in srgb,var(--study-tone) 14%,var(--study-panel)); border-color:var(--study-tone); color:var(--study-tone); font-weight:600; }
+.study-cuisine-tab:hover { color:var(--study-tone); }
+.study-cuisine-tab:focus-visible { outline:2px solid var(--study-gold); outline-offset:1px; }
+.study-cuisine-heaps { min-width:0; }
 .study-cuisine-heap { min-width:0; padding:8px; border:1px solid var(--study-line); border-radius:10px; }
 .study-cuisine-heap > header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font:12px ui-monospace,monospace; }
 .study-cuisine-heap > header small { color:var(--study-muted); font-size:10px; }

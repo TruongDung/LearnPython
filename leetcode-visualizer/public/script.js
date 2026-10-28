@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.catMouse1728View), surface: "treeView", render: (step) => { renderCatMouse1728Pictures(step); } },
     { predicate: (step) => Boolean(step.reduceZero1342View), surface: "treeView", render: (step) => { renderReduceZero1342Pictures(step); } },
     { predicate: (step) => Boolean(step.uniquePaths980View), surface: "treeView", render: (step) => { renderUniquePaths980Pictures(step); } },
     { predicate: (step) => Boolean(step.letterCase784View), surface: "treeView", render: (step) => { renderLetterCase784Pictures(step); } },
@@ -915,7 +916,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderMaze499View(step);
     } },
     { predicate: (step) => Boolean(step.restricted1786View), surface: "treeView", render: (step) => {
-      renderRestricted1786View(step);
+      renderRestrictedPaths1786Pictures(step);
     } },
     { predicate: (step) => Boolean(step.multiDijkstra2203View), surface: "treeView", render: (step) => {
       renderMultiDijkstra2203View(step);
@@ -1122,7 +1123,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderTreeDpLessonView(step);
     } },
     { predicate: (step) => Boolean(step.cycle2360View), surface: "treeView", render: (step) => {
-      renderCycle2360View(step);
+      renderLongestCycle2360Pictures(step);
     } },
     { predicate: (step) => Boolean(step.countPaths1976View), surface: "treeView", render: (step) => {
       renderCountPaths1976View(step);

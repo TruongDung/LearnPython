@@ -1,4 +1,4 @@
-const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
+const { readFrontendJavaScript } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
@@ -43,15 +43,13 @@ test('2360 displayed Python agrees with the visualization', () => {
   const source = `from typing import List\n${problem.code.join('\n')}\n` + cases.map(([, edges, answer]) => (
     `assert Solution().longestCycle(${JSON.stringify(edges)}) == ${answer}`
   )).join('\n');
-  const python = spawnSync('python', ['-c', source], { encoding: 'utf8' });
+  const python = spawnSync(process.env.PYTHON || 'python', ['-c', source], { encoding: 'utf8' });
   assert.equal(python.status, 0, python.stderr);
 });
 
 test('2360 custom renderer explains every event in English and Vietnamese', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderCycle2360View(step)');
-  const end = source.indexOf('\n// ---- Graph renderer', start);
-  const element = {};
+  const source = fs.readFileSync(require.resolve('../public/renderer-longest-cycle-2360.js'), 'utf8');
+  const element = { clientWidth: 240 };
   const context = {
     lang: 'en',
     $: () => element,
@@ -59,17 +57,17 @@ test('2360 custom renderer explains every event in English and Vietnamese', () =
     pick: value => value?.en ?? value?.vi ?? value ?? '',
   };
   vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext(source, context);
 
   for (const language of ['en', 'vi']) {
     context.lang = language;
     for (const [input] of cases.slice(0, 2)) {
       for (const step of problem.builder(input).steps) {
-        context.renderCycle2360View(step);
-        assert.match(element.innerHTML, /lc2360-viz/);
-        assert.match(element.innerHTML, /lc2360-rule/);
-        assert.match(element.innerHTML, /lc2360-path/);
-        assert.match(element.innerHTML, /lc2360-node/);
+        context.renderLongestCycle2360Pictures(step);
+        assert.match(element.innerHTML, /c2360-viz/);
+        assert.match(element.innerHTML, /c2360-graph/);
+        assert.match(element.innerHTML, /c2360-path/);
+        assert.match(element.innerHTML, /c2360-node/);
         assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
       }
     }
@@ -89,16 +87,17 @@ test('2360 line-by-line expansion activates at most one code line', () => {
 
   const raw = problem.builder(cases[0][0]).steps;
   const expanded = context.expandStepsLineByLine(raw);
-  assert.ok(expanded.length > raw.length);
+  assert.equal(expanded.length, raw.length);
+  assert.ok(raw.every(step => step.codeLines.length === 1));
   assert.ok(expanded.every(step => !step.codeLines || step.codeLines.length <= 1));
   assert.equal(expanded.filter(step => step.final).length, 1);
 });
 
 test('2360 has responsive, scoped styles for path, cycle, and node states', () => {
-  const css = readFrontendStyles();
-  assert.match(css, /\.lc2360-viz \{/);
-  assert.match(css, /\.lc2360-path > div \{[\s\S]*?overflow-x: auto;/);
-  assert.match(css, /\.lc2360-node\.cycle \{/);
-  assert.match(css, /@container \(max-width: 430px\)/);
-  assert.match(css, /\.code-mode-bar \{[\s\S]*?padding:\s*4px 4px 0;/);
+  const css = fs.readFileSync(require.resolve('../public/longest-cycle-2360.css'), 'utf8');
+  assert.match(css, /\.c2360-viz \{/);
+  assert.match(css, /\.c2360-board-scroll \{[^}]*overflow:auto;/);
+  assert.match(css, /\.c2360-node\.in-cycle>circle \{/);
+  assert.match(css, /@media\(max-width:480px\)/);
+  assert.match(css, /\[data-theme="light"\] \.c2360-viz/);
 });
