@@ -1,4 +1,6 @@
 let selectedFoodRatingsCuisine2353 = null;
+let selectedFoodRatingsAccess2353 = "live";
+let renderedFoodRatingsStep2353 = null;
 
 const studyWord = (vi, en) => lang === "vi" ? vi : en;
 function studyToken(value, sub = "", cls = "", tone = null) {
@@ -107,14 +109,31 @@ function study3619Picture(v) {
   return `<div class="study-pair"><section class="study-panel"><header><b>${studyWord("Bản đồ đảo", "Island map")}</b><small>0 ≋</small></header><div class="study-grid-scroll"><svg class="study-island-grid" style="max-width:${Math.min(w, 440)}px" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${studyWord("Đảo gồm các ô dương nối theo bốn hướng", "Islands contain positive cells connected in four directions")}"><defs><marker id="study-island-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 8 4 0 8Z"/></marker><marker id="study-island-reject" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 8 4 0 8Z"/></marker></defs>${axes}${cells}${arrow}</svg></div></section><section class="study-panel"><header><b>Σ ${v.total ?? "?"}</b><small>k = ${v.k}</small></header>${study3619Buckets(v.total, v.k, activeRecord?.complete, activeRecord?.accepted)}<div class="study-action">${action}</div><header><b>FIFO</b><small>${v.queue.length}</small></header><div class="study-stream">${queue || "∅"}</div></section></div><div class="study-island-records">${records || '<span class="study-empty">🏝 ?</span>'}</div><div class="study-score">✓ <strong>${v.answer}</strong> <small>${studyWord("đảo", "islands")}</small></div>`;
 }
 
-function study2353FoodMap(v) {
+function study2353IndexAccess(v, cuisine) {
+  const esc=escapeHtml, heap=v.heaps[cuisine]||[],root=heap[0],mode=selectedFoodRatingsAccess2353;
+  const options=[...new Set(v.cuisines)].map(name=>`<option value="${esc(name)}" ${name===cuisine?'selected':''}>${esc(name)}</option>`).join('');
+  const header=`<header><b>${studyWord('Đọc chỉ số từng bước','Read the indices step by step')}</b><select data-study-access-cuisine aria-label="${studyWord('Heap đang minh họa','Heap to illustrate')}">${options}</select></header>`;
+  if(!root)return `<section class="study-panel study-access2353" data-access-cuisine="${esc(cuisine)}">${header}<div class="study-empty"><code>heap = []</code> → ${studyWord('chưa có heap[0]','no heap[0] yet')}</div></section>`;
+  const [negative,name]=root,[live,origin]=v.food[name],cached=-negative,stale=cached!==live;
+  const checking=v.line===16&&v.action?.kind==='check'&&v.local.cuisine===cuisine;
+  const fields=(index,value,label,kind,expression='')=>`<div class="study-access-field ${kind} ${mode==='raw'&&kind==='negative'||mode==='name'&&kind==='name'||mode==='live'&&['name','live'].includes(kind)?'access-focus':''}" ${expression?`data-study-access-value="${esc(expression)}" data-value="${esc(String(value))}"`:''}><code>[${index}]</code><b style="font-size:${Math.min(22,130/Math.max(1,String(value).length))}px">${esc(String(value))}</b><small>${label}</small></div>`;
+  const buttons=[['raw','heap[0][0]'],['name','heap[0][1]'],['live','self.food[heap[0][1]][0]']].map(([key,expression])=>`<button type="button" data-study-access="${key}" aria-pressed="${mode===key}"><code>${expression}</code></button>`).join('');
+  const context=v.local.cuisine&&v.local.cuisine!==cuisine?`<small class="study-access-context">${studyWord('Code đang xử lý','Code is using')}: ${esc(v.local.cuisine)}</small>`:'';
+  return `<section class="study-panel study-access2353" data-access-cuisine="${esc(cuisine)}" data-access-mode="${mode}">${header}<code class="study-access-binding">heap = self.heaps[&quot;${esc(cuisine)}&quot;]</code>${context}<nav class="study-access-buttons" aria-label="${studyWord('Chọn biểu thức để tô đường đọc','Choose an expression to highlight')}">${buttons}</nav>
+    <div class="study-access-root"><div class="study-access-label"><code>heap<span>[0]</span></code><small>${studyWord('gốc heap','heap root')}</small></div><div class="study-access-tuple">${fields(0,negative,'−rating','negative','heap[0][0]')}${fields(1,name,'food','name','heap[0][1]')}</div></div>
+    <div class="study-access-paths"><div class="study-access-path ${mode==='raw'?'access-focus':''}"><strong class="study-access-arrow negative">↓ [0]</strong><code>heap[0][0]</code><b class="negative">${negative}</b><span class="study-access-sign">${studyWord('đổi dấu','negate')} ↓</span><code>-heap[0][0]</code><div class="study-access-math">−(${negative}) = <strong data-study-access-rating="${cached}">${cached}</strong></div><small>${studyWord('điểm lưu trong heap','rating saved in heap')}</small></div>
+    <div class="study-access-path ${mode==='name'||mode==='live'?'access-focus':''}"><strong class="study-access-arrow name">↓ [1]</strong><code>heap[0][1]</code><b class="name">&quot;${esc(name)}&quot;</b><span class="study-access-sign">${studyWord('lấy tên làm key','use the name as key')} ↓</span><code class="study-access-lookup">self.food[&quot;${esc(name)}&quot;]</code><div class="study-access-tuple">${fields(0,live,'rating','live','self.food[heap[0][1]][0]')}${fields(1,origin,'cuisine','origin')}</div><code class="study-access-expanded">self.food[<span class="name">heap[0][1]</span>]<span class="live">[0]</span></code><strong class="study-access-live live">${live}</strong><small>${studyWord('điểm hiện tại trong self.food','current rating in self.food')}</small></div></div>
+    <div class="study-access-compare ${stale?'stale':'fresh'}" data-access-stale="${stale}" data-access-executing="${checking}"><small>${checking?'while · '+studyWord('đang kiểm tra','checking now'):studyWord('Nếu kiểm tra gốc đang xem','If checking the displayed root')}</small><code><span>-heap[0][0]</span> != <span>self.food[heap[0][1]][0]</span></code><div><b>${cached}</b><strong>${stale?'≠':'='}</strong><b>${live}</b><span>${stale?'True':'False'}</span></div><strong>${stale?'✕ '+studyWord('bản cũ → bỏ gốc','stale entry → pop root'):'✓ '+studyWord('đúng điểm → giữ gốc','current rating → keep root')}</strong></div></section>`;
+}
+
+function study2353FoodMap(v, lookupName = null) {
   const esc = escapeHtml, name = v.local.food, writing = v.line === 8 || v.line === 12;
   const tuple = (rating, cuisine) => `<span class="study-food-tuple">(<span class="study-food-rating">${rating}</span>, <span class="study-food-origin">&quot;${esc(cuisine)}&quot;</span>)</span>`;
   const assignment = name && (writing || v.line === 7 && !Object.hasOwn(v.food, name)) ? `<div class="study-food-assignment ${writing ? "written" : ""}"><small>${writing ? studyWord(v.line === 8 ? "Thêm vào bảng" : "Cập nhật trong bảng", v.line === 8 ? "Add to the dictionary" : "Update the dictionary") : studyWord("Chuẩn bị ghi", "About to write")}</small><div><code>self.food[</code>${studyToken(`"${name}"`, "food · key")}<code>] = (</code>${studyToken(v.line === 12 ? v.local.newRating : v.local.rating, `${v.line === 12 ? "newRating" : "rating"} · [0]`, "", 3)}<code>,</code>${studyToken(`"${v.local.cuisine}"`, "cuisine · [1]", "", 2)}<code>)</code></div><p>${studyWord("Dùng tên món làm key, lưu cặp (điểm, loại ẩm thực).", "Use the food name as the key and store (rating, cuisine).")}</p></div>` : "";
   const rows = Object.entries(v.food).map(([food, [rating, cuisine]]) => {
     const focused = food === name;
     const previous = focused && v.line === 12 ? `<span class="study-food-previous">${tuple(v.action.from, cuisine)}</span><span aria-hidden="true"> → </span>` : "";
-    return `<tr class="${focused ? "current" : ""} ${focused && writing ? "written" : ""}" data-food-map-key="${esc(food)}"><th scope="row">&quot;${esc(food)}&quot;</th><td>${previous}${tuple(rating, cuisine)}${focused && writing ? `<small class="study-food-saved">✓ ${studyWord("đã lưu", "saved")}</small>` : ""}</td></tr>`;
+    return `<tr class="${focused ? "current" : ""} ${focused && writing ? "written" : ""} ${food===lookupName?'lookup':''}" data-food-map-key="${esc(food)}"${food===lookupName?' data-food-lookup="true"':''}><th scope="row">&quot;${esc(food)}&quot;</th><td>${previous}${tuple(rating, cuisine)}${focused && writing ? `<small class="study-food-saved">✓ ${studyWord("đã lưu", "saved")}</small>` : ""}</td></tr>`;
   }).join("");
   return `<section class="study-panel study-food-map"><header><b>self.food</b><small>${Object.keys(v.food).length} ${studyWord("món đã lưu", "stored foods")}</small></header><p class="study-food-map-help">${studyWord("self = đối tượng FoodRatings này; self.food = dictionary của đối tượng.", "self = this FoodRatings object; self.food = its dictionary.")}</p>${assignment}<div class="study-food-map-scroll">${rows ? `<table><thead><tr><th scope="col">food · key</th><th scope="col">(rating, cuisine) · value</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="study-empty">{} · ${studyWord("Chưa lưu món nào", "No foods stored yet")}</div>`}</div><div class="study-legend"><span class="study-food-rating">[0] = rating</span> · <span class="study-food-origin">[1] = cuisine</span></div></section>`;
 }
@@ -124,6 +143,7 @@ function study2353Picture(v) {
   const displayCuisine = cuisines.includes(selectedFoodRatingsCuisine2353) ? selectedFoodRatingsCuisine2353 : active || cuisines[0];
   const cards = cuisines.map((cuisine, i) => `<section class="study-cuisine ${active === cuisine ? "focus" : ""} ${displayCuisine === cuisine ? "selected" : ""}" style="--study-tone:var(--study-c${i % 6})"><header><button type="button" data-study-cuisine="${esc(cuisine)}" aria-pressed="${displayCuisine === cuisine}">🍽 ${esc(cuisine)}</button></header>${v.foods.filter(name => v.food[name]?.[1] === cuisine).map(name => `<div class="study-food ${v.local.food === name || a?.kind === "return" && a.food === name ? "focus" : ""}" data-food="${esc(name)}"><b>${esc(name)}</b><span>★ ${v.food[name][0]}</span><i style="width:${100 * v.food[name][0] / max}%"></i></div>`).join("") || '<span class="study-empty">∅</span>'}</section>`).join("");
   const tabs = cuisines.map((cuisine, i) => `<button type="button" class="study-cuisine-tab ${active === cuisine ? "active-cuisine" : ""}" id="study-cuisine-tab-${i}" role="tab" aria-selected="${displayCuisine === cuisine}" aria-controls="study-cuisine-panel" tabindex="${displayCuisine === cuisine ? 0 : -1}" data-study-cuisine-tab="${esc(cuisine)}" style="--study-tone:var(--study-c${i % 6})">${esc(cuisine)}<small>${(v.heaps[cuisine] || []).length}</small></button>`).join("");
+  const preview = selectedFoodRatingsCuisine2353 !== null ? `<div class="study-cuisine-preview"><small>${studyWord("Xem thử", "Preview")}: <b>${esc(displayCuisine)}</b> · ${studyWord("Next sẽ theo code", "Next follows the code")}</small><button type="button" data-study-follow-cuisine>↩ ${studyWord("Theo code", "Follow code")}</button></div>` : "";
   const heaps = cuisines.filter(cuisine => cuisine === displayCuisine).map(cuisine => {
     const i = cuisines.indexOf(cuisine);
     const heap = v.heaps[cuisine] || [], stale = heap.map((e, index) => -e[0] !== v.food[e[1]][0] ? index : -1).filter(index => index >= 0);
@@ -141,7 +161,7 @@ function study2353Picture(v) {
   const tied = a?.kind === "return" ? members.filter(name => v.food[name][0] === v.food[a.food][0]).sort() : [];
   const tie = tied.length > 1 ? `<div class="study-food-tie">★ ${v.food[a.food][0]} = ★ ${v.food[a.food][0]} <span>${esc(tied[0])} &lt; ${esc(tied[1])}</span><strong>→ ${esc(tied[0])}</strong></div>` : "";
   const history = v.history.map(record => studyToken(record.food, `${record.cuisine} · ★${record.rating}`, "winner")).join("");
-  return `<div class="study-ops">${rail || "🍽 ?"}</div>${study2353FoodMap(v)}<div class="study-cuisines">${cards}</div><div class="study-action">${action}</div>${tie}<section class="study-panel"><header><b>${studyWord("Heap theo cuisine", "Heaps by cuisine")}</b><small>✕ ${studyWord("bản cũ", "stale entry")} · (−rating, food)</small></header><div class="study-cuisine-tabs" role="tablist" aria-label="${studyWord("Heap theo cuisine", "Heaps by cuisine")}">${tabs}</div><div class="study-cuisine-heaps">${heaps}</div></section><div class="study-stream">${history || "🏆 ?"}</div>`;
+  return `<div class="study-ops">${rail || "🍽 ?"}</div><div class="study-cuisines">${cards}</div><div class="study-action">${action}</div>${tie}<section class="study-panel"><header><b>${studyWord("Heap theo cuisine", "Heaps by cuisine")}</b><small>✕ ${studyWord("bản cũ", "stale entry")} · (−rating, food)</small></header>${preview}<div class="study-cuisine-tabs" role="tablist" aria-label="${studyWord("Heap theo cuisine", "Heaps by cuisine")}">${tabs}</div><div class="study-cuisine-heaps">${heaps}</div></section><div class="study-stream">${history || "🏆 ?"}</div>${study2353IndexAccess(v,displayCuisine)}${study2353FoodMap(v,v.heaps[displayCuisine]?.[0]?.[1])}`;
 }
 
 function study2407Picture(v) {
@@ -164,6 +184,10 @@ function study2407Picture(v) {
 
 function renderPictureStudy(step) {
   const v = step.pictureStudyView, host = $("treeView"), esc = escapeHtml;
+  if (v.id === 2353 && renderedFoodRatingsStep2353 !== step) {
+    selectedFoodRatingsCuisine2353 = null;
+    renderedFoodRatingsStep2353 = step;
+  }
   const names = { 378: "▦ → heap → #k", 3619: "🏝 → Σ → ✓", 2407: "[x−k, x−1] → MAX → +1", 977: "L ⇢ 0 ⇠ R → x²", 2353: "🍽 → ★ → 🏆" };
   const render = { 378: study378Picture, 3619: study3619Picture, 2407: study2407Picture, 977: study977Picture, 2353: study2353Picture }[v.id];
   host.innerHTML = `<section class="study-viz" data-study-id="${v.id}" aria-label="#${v.id} ${esc(names[v.id])}"><header class="study-heading"><b>#${v.id} · ${names[v.id]}</b><small>${lang === "vi" ? "Dòng" : "Line"} ${v.line}</small></header>${render(v)}</section>`;
@@ -177,24 +201,43 @@ function renderPictureStudy(step) {
   const ops = host.querySelector(".study-ops"), active = ops?.querySelector(".focus");
   if (active) { ops.scrollLeft = Math.max(0, active.offsetLeft - ops.clientWidth / 2 + active.clientWidth / 2); }
   if (v.id === 2353) {
-    const row = host.querySelector(".study-food-map tr.current"), dictionary = host.querySelector(".study-food-map-scroll");
+    const row = host.querySelector(".study-food-map tr.current") || host.querySelector(".study-food-map tr.lookup"), dictionary = host.querySelector(".study-food-map-scroll");
     if (row && dictionary) dictionary.scrollTop = Math.max(0, row.offsetTop - dictionary.clientHeight / 2 + row.offsetHeight / 2);
-    const selectCuisine = (cuisine, focusTab = false) => {
+    const selectCuisine = (cuisine, focusTarget = null) => {
       selectedFoodRatingsCuisine2353 = cuisine;
       renderPictureStudy(step);
-      if (focusTab) host.querySelector(`[data-study-cuisine-tab="${esc(cuisine)}"]`)?.focus();
+      if (focusTarget === "tab") host.querySelector(`[data-study-cuisine-tab="${esc(cuisine)}"]`)?.focus({preventScroll:true});
+      if (focusTarget === "panel") host.querySelector(".study-cuisine-heap.selected")?.focus({preventScroll:true});
     };
+    host.querySelectorAll("[data-study-follow-cuisine]").forEach(button=>button.addEventListener("click",()=>selectCuisine(null,"panel")));
+    host.querySelectorAll("[data-study-access]").forEach(button=>{
+      button.addEventListener("keydown",event=>{if(event.key===' '||event.key==='Enter')event.stopPropagation?.();});
+      button.addEventListener("click",()=>{
+        selectedFoodRatingsAccess2353=button.dataset.studyAccess;
+        renderPictureStudy(step);
+        host.querySelector(`[data-study-access="${selectedFoodRatingsAccess2353}"]`)?.focus({preventScroll:true});
+      });
+    });
+    host.querySelectorAll("[data-study-access-cuisine]").forEach(select=>{
+      select.addEventListener("keydown",event=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End',' ','Enter'].includes(event.key))event.stopPropagation?.();});
+      select.addEventListener("change",()=>{
+        selectCuisine(select.value);
+        host.querySelector("[data-study-access-cuisine]")?.focus({preventScroll:true});
+      });
+    });
     host.querySelectorAll("[data-study-cuisine]").forEach(button => button.addEventListener("click", () => {
-      selectCuisine(button.dataset.studyCuisine, true);
+      selectCuisine(button.dataset.studyCuisine, "panel");
     }));
     const tabs = [...host.querySelectorAll("[data-study-cuisine-tab]")];
     tabs.forEach((button, index) => {
-      button.addEventListener("click", () => selectCuisine(button.dataset.studyCuisineTab, true));
+      button.addEventListener("click", event => selectCuisine(button.dataset.studyCuisineTab, event?.detail === 0 ? "tab" : "panel"));
       button.addEventListener("keydown", event => {
+        if (event.key === " " || event.key === "Enter") { event.stopPropagation?.(); return; }
         const next = { ArrowRight: (index + 1) % tabs.length, ArrowLeft: (index - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[event.key];
         if (next === undefined) return;
         event.preventDefault();
-        selectCuisine(tabs[next].dataset.studyCuisineTab, true);
+        event.stopPropagation?.();
+        selectCuisine(tabs[next].dataset.studyCuisineTab, "tab");
       });
     });
   }

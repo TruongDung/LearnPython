@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.distanceCycle2204View), surface: "treeView", render: (step) => { renderDistanceCycle2204Pictures(step); } },
     { predicate: (step) => Boolean(step.coins2603View), surface: "treeView", render: (step) => { renderCoins2603Pictures(step); } },
     { predicate: (step) => Boolean(step.runes3383View), surface: "treeView", render: (step) => { renderRunes3383Pictures(step); } },
     { predicate: (step) => Boolean(step.supersequences3435View), surface: "treeView", render: (step) => { renderSupersequences3435Pictures(step); } },
@@ -453,6 +454,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.validParenthesis678View), surface: "treeView", render: (step) => {
       renderValidParenthesis678View(step);
+    } },
+    { predicate: (step) => Boolean(step.equalSubset416DfsView), surface: "treeView", render: (step) => {
+      renderEqualSubset416DfsView(step);
     } },
     { predicate: (step) => Boolean(step.equalSubset416View), surface: "treeView", render: (step) => {
       renderEqualSubset416View(step);

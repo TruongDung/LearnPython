@@ -287,6 +287,7 @@ module.exports = {
       options: [
         { value: 1, label: bi("Cách 1: DP mảng boolean", "Approach 1: Boolean-array DP") },
         { value: 2, label: bi("Cách 2: Bitset (dịch + OR)", "Approach 2: Bitset (shift + OR)") },
+        { value: 3, label: bi("Cách 3: DFS chọn / bỏ (≤12 số)", "Approach 3: Take / skip DFS (≤12 numbers)") },
       ],
     }], debugMode: "line-by-line",
     approach: [
@@ -295,6 +296,7 @@ module.exports = {
       bi("Với số num: dp[j] = dp[j] or dp[j−num]. Không chọn num, hoặc thêm num vào nhóm tổng j−num.", "For num: dp[j] = dp[j] or dp[j−num]. Skip num, or add it to a group totaling j−num."),
       bi("Duyệt j từ phải sang trái để nguồn j−num chưa dùng số hiện tại. Nhờ đó không chọn cùng một phần tử hai lần.", "Scan j from right to left so source j−num has not used this occurrence. This prevents using one occurrence twice."),
       bi("Cách 2: biểu diễn mọi tổng bằng bitset số nguyên. bits |= bits << num bật đồng thời các tổng mới trong một phép dịch và OR.", "Approach 2: encode reachable sums in an integer bitset. bits |= bits << num marks all new sums with one shift and OR."),
+      bi("DFS: chọn số → trừ remain; bỏ số → giữ remain. remain = 0 trả True. Hết số hoặc remain < 0 trả False. O(2^n) thời gian, O(n) ngăn xếp.", "DFS: take a number → subtract from remain; skip it → keep remain. Return True at remain = 0, False when out of numbers or remain < 0. O(2^n) time, O(n) stack."),
     ],
     complexity: { time: "O(n × target)", space: "O(target)", note: bi("Độ phức tạp của mã Python. Mô phỏng thêm bản sao và nhóm minh họa; trace dài được rút gọn nhưng vẫn tính đầy đủ đáp án.", "Complexity of the Python solution. The visualization also stores snapshots and witness groups; long traces are shortened while the full answer is computed.") },
     code: SOURCE,
@@ -302,6 +304,7 @@ module.exports = {
     code2: BITSET_SOURCE,
     builder: buildSteps,
     builder2: buildBitsetSteps,
+    ...require('./partition-equal-subset-416-dfs'),
     liveArgs: input => [parseNums(input)],
   },
 };

@@ -170,7 +170,7 @@ test("2353 shows cuisine tabs and only the selected heap with its entries", () =
   }
 });
 
-test("2353 cuisine cards, tabs and arrow keys switch the visible heap and retain selection", () => {
+test("2353 cuisine selection survives rerendering the same step and follows code when the step changes", () => {
   const { render, clickCuisine, clickTab, keyTab } = renderer(), step = run(2353).steps.find(s => s.pictureStudyView.local.cuisine === "japanese");
   assert.ok(step);
   const before = render(step);
@@ -189,7 +189,8 @@ test("2353 cuisine cards, tabs and arrow keys switch the visible heap and retain
   keyTab("greek", "Home");
   assert.match(render(step), /data-cuisine-heap="korean"/);
   keyTab("korean", "End");
-  assert.match(render(run(2353).steps.at(-1)), /data-cuisine-heap="greek"/);
+  assert.match(render(step), /data-cuisine-heap="greek"/);
+  assert.match(render(run(2353).steps.at(-1)), /data-cuisine-heap="japanese"/);
 });
 
 test("all five diagrams stay deterministic in both languages and source snippets retain horizontal scrolling", () => {

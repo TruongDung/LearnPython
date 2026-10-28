@@ -44,7 +44,7 @@ test('416 keeps the DP learning category and supplies validated line-by-line Pyt
 test('416 bitset approach matches subset enumeration and exposes the shift-OR Python solution', () => {
   const approach = problem.extraParams.find(param => param.key === 'approach');
   assert.equal(approach.default, 1);
-  assert.deepEqual(approach.options.map(option => option.value), [1, 2]);
+  assert.deepEqual(approach.options.map(option => option.value), [1, 2, 3]);
   assert.equal(problem.builder2(problem.defaultInput, { approach: 2 }).answer, true);
   assert.match(problem.code2Label.vi, /Cách 2/);
   assert.match(problem.code2Label.en, /Approach 2/);
@@ -270,8 +270,8 @@ test('416 renderer assets are loaded ahead of the generic renderer with responsi
   assert.ok(registry.indexOf('step.equalSubset416BitsetView') < registry.indexOf('step.hardProblemView'));
   assert.match(readFrontendIndex(), /renderer-partition-equal-subset-416\.js/);
   assert.match(readFrontendIndex(), /partition-equal-subset-416\.css/);
-  assert.match(readFrontendIndex(), /equalSubset=equal-subset-416-v3/);
-  assert.match(readFrontendIndex(), /partition-equal-subset-416\.css\?v=equal-subset-416-v3/);
+  assert.match(readFrontendIndex(), /equalSubset=equal-subset-416-v4/);
+  assert.match(readFrontendIndex(), /partition-equal-subset-416\.css\?v=equal-subset-416-v4/);
   assert.match(readFrontendStyles(), /\[data-theme="light"\] \.pe416-viz/);
   assert.match(readFrontendStyles(), /\.pe416-cells \{[^}]*flex-wrap:wrap/);
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'partition-equal-subset-416.css'), 'utf8');

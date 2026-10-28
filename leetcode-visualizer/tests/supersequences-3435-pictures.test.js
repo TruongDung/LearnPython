@@ -71,6 +71,25 @@ test('3435 pictures expose cycles, duplicated letters, queues and frequency bars
     }
   }
 });
+test('3435 trial controls target recorded Python states and proof tiles identify actual subsequence positions',()=>{
+  const host={innerHTML:'',dataset:{},clientWidth:550},ctx={$:()=>host,lang:'vi',steps:[],stepIndex:0};vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-supersequences-3435.js'),'utf8'),ctx);
+  for(const words of examples){
+    const run=problem.builder(words);ctx.steps=run.steps;
+    const cycleIndex=run.steps.findIndex(s=>view(s).cycle?.length);
+    if(cycleIndex>=0){ctx.stepIndex=cycleIndex;const step=run.steps[cycleIndex];ctx.renderSupersequences3435Pictures(step);
+      for(const match of host.innerHTML.matchAll(/data-ss3435-try="(-?\d+)"[^>]*>([a-z]) ×2/g)){
+        const index=Number(match[1]);if(index<0)continue;assert.ok(index>cycleIndex);const target=run.steps[index],letter=view(step).letters.indexOf(match[2]);
+        assert.equal(view(target).event,'keep');assert.equal(view(target).repeat,view(step).repeat|(1<<letter));assert.match(target.source.text,/keep =/);
+      }
+    }
+    ctx.stepIndex=run.steps.length-1;ctx.renderSupersequences3435Pictures(run.steps.at(-1));
+    const sequence=host.innerHTML.match(/<div class="ss3435-sequence">([\s\S]*?)<\/div>/)[1],text=[...sequence.matchAll(/<b>([a-z])<\/b>/g)].map(m=>m[1]).join('');
+    const checks=[...host.innerHTML.matchAll(/class="ss3435-check[^\"]*"[^>]*data-ss3435-word="(\d+)"[^>]*>([\s\S]*?)<\/button>/g)];assert.equal(checks.length,words.length);
+    for(const check of checks){const word=words[Number(check[1])],positions=[...check[2].matchAll(/<small>(\d+)<\/small>/g)].map(m=>Number(m[1]));assert.equal(positions.length,2);assert.ok(positions[0]<positions[1]);assert.equal(text[positions[0]]+text[positions[1]],word);}
+  }
+});
+
 test('3435 accepts all 16 letters and caps only the presentation, preserving a complete result',()=>{
   const words=[...'abcdefghijklmnop'].map(ch=>ch+ch),start=Date.now(),run=problem.builder(words);
   assert.equal(run.answer.length,1);assert.deepEqual(run.answer[0],[...Array(16).fill(2),...Array(10).fill(0)]);
