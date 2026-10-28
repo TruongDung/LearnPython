@@ -76,6 +76,10 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.coins2603View), surface: "treeView", render: (step) => { renderCoins2603Pictures(step); } },
+    { predicate: (step) => Boolean(step.runes3383View), surface: "treeView", render: (step) => { renderRunes3383Pictures(step); } },
+    { predicate: (step) => Boolean(step.supersequences3435View), surface: "treeView", render: (step) => { renderSupersequences3435Pictures(step); } },
+    { predicate: (step) => Boolean(step.topologyLessonView), surface: "treeView", render: (step) => { renderTopologyLessonPictures(step); } },
     { predicate: (step) => Boolean(step.catMouse1728View), surface: "treeView", render: (step) => { renderCatMouse1728Pictures(step); } },
     { predicate: (step) => Boolean(step.reduceZero1342View), surface: "treeView", render: (step) => { renderReduceZero1342Pictures(step); } },
     { predicate: (step) => Boolean(step.uniquePaths980View), surface: "treeView", render: (step) => { renderUniquePaths980Pictures(step); } },
@@ -1129,7 +1133,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderCountPaths1976View(step);
     } },
     { predicate: (step) => Boolean(step.substitutions3481View), surface: "treeView", render: (step) => {
-      renderSubstitutions3481View(step);
+      renderTopologyLessonPictures(step);
     } },
     { predicate: (step) => Boolean(step.differentParentheses241View), surface: "treeView", render: (step) => {
       renderDifferentParentheses241View(step);

@@ -60,9 +60,10 @@ function buildSteps(input, params) {
   const steps = [], stack = [], memo = {}, states = {}, history = [];
   let nextId = 0, answer = null;
   const frame = (kind, key, source = null) => ({ id: nextId++, kind, key, source, parts: [], start: null, cursor: 0, match: null, result: null, locals: kind === 'resolve' ? { key } : { source } });
-  function emit(f, line, event, title, note, final = false) {
-    steps.push({ arr: [], highlight: [], mark: [], codeLines: [line], title, note, final,
-      vars: Object.entries(f?.locals || {}).map(([name, value]) => ({ name, value: Array.isArray(value) ? [...value] : value })),
+  function emit(f, line, event, final = false) {
+    const locals = JSON.parse(JSON.stringify(f ? f.kind === 'resolve' ? { ...f.locals, values: Object.fromEntries(values), memo } : f.locals : { replacements, text, values: Object.fromEntries(values), ...(line >= 5 ? { memo } : {}) }));
+    steps.push({ source: { line, text: SOURCE[line - 1], scope: f?.kind || 'applySubstitutions' }, locals, arr: [], highlight: [], mark: [], codeLines: [line], title: bi(final ? 'Kết quả' : 'Dòng '+line, final ? 'Result' : 'Line '+line), note: bi('', ''), final,
+      vars: Object.entries(locals).map(([name, value]) => ({ name, value: Array.isArray(value) ? [...value] : value })),
       substitutions3481View: { text, line, event, activeId: f?.id ?? null, answer,
         stack: stack.map(item => ({ id: item.id, kind: item.kind, key: item.key, source: item.source, start: item.start, cursor: item.cursor, result: item.result,
           parts: item.parts.map(part => ({ ...part })), match: item.match ? { ...item.match } : null })),
@@ -71,57 +72,56 @@ function buildSteps(input, params) {
       },
     });
   }
-  emit(null, 4, 'values', bi('Tạo bảng key → value', 'Build the key → value table'), bi('Value có thể chứa biến khác. Cần mở rộng biến con trước.', 'A value can contain another variable. Expand the child before completing its parent.'));
-  emit(null, 5, 'memo-init', bi('memo = {}', 'memo = {}'), bi('Chưa có kết quả nào được nhớ.', 'No expanded values are cached yet.'));
+  emit(null, 4, 'values');
+  emit(null, 5, 'memo-init');
+  emit(null, 6, 'define-resolve');
+  emit(null, 11, 'define-expand');
   function resolve(key) {
     const f = frame('resolve', key); stack.push(f);
-    emit(f, 6, 'resolve-call', bi(`Gọi resolve('${key}')`, `Call resolve('${key}')`), bi(`Tìm chuỗi cuối cùng thay cho %${key}%.`, `Find the final string that replaces %${key}%.`));
     const hit = Object.hasOwn(memo, key);
-    emit(f, 7, 'memo-check', bi(`${key} in memo → ${hit ? 'True' : 'False'}`, `${key} in memo → ${hit ? 'True' : 'False'}`), bi(hit ? 'Đã có chuỗi hoàn chỉnh. Dùng lại, không đi sâu nữa.' : 'Chưa có. Mở rộng value và chờ các biến con.', hit ? 'The full string is cached. Reuse it without descending again.' : 'Not cached. Expand its value and wait for child variables.'));
+    emit(f, 7, 'memo-check');
     if (hit) {
       f.result = memo[key]; history.push({ event: 'hit', key, value: f.result });
-      emit(f, 8, 'cache-return', bi(`Dùng lại ${key} = '${f.result}'`, `Reuse ${key} = '${f.result}'`), bi('Chỉ trả về chuỗi đã nhớ; chưa ghép vào parts của cha.', 'Return the cached string; it has not been appended to the parent parts yet.'));
+      emit(f, 8, 'cache-return');
     } else {
       states[key] = 'working';
-      emit(f, 9, 'expand-key', bi(`Mở rộng ${key}: '${values.get(key)}'`, `Expand ${key}: '${values.get(key)}'`), bi('Cha chờ expand trả về. Chưa lưu memo ở bước gọi con.', 'Wait for expand to return. The child call has not written memo yet.'));
       f.result = expand(values.get(key), key);
       memo[key] = f.result; states[key] = 'done'; history.push({ event: 'save', key, value: f.result });
-      emit(f, 9, 'memo-save', bi(`Nhớ ${key} = '${f.result}'`, `Cache ${key} = '${f.result}'`), bi('Value đã được thay hết biến. Bây giờ mới gán memo[key].', 'Every variable in the value is resolved. Assign memo[key] now.'));
-      emit(f, 10, 'resolve-return', bi(`Trả về '${f.result}' cho cha`, `Return '${f.result}' to the parent`), bi('Cha sẽ ghép chuỗi này tại dòng parts.append.', 'The parent will append this string on its parts.append line.'));
+      emit(f, 9, 'memo-save');
+      emit(f, 10, 'resolve-return');
     }
     stack.pop(); return f.result;
   }
   function expand(source, owner) {
     const f = frame('expand', owner, source); stack.push(f);
-    emit(f, 11, 'expand-call', bi(`Gọi expand cho ${owner === null ? 'text' : owner}`, `Call expand for ${owner === null ? 'text' : owner}`), bi('Đọc từ trái sang phải. Giữ nguyên ký tự thường, thay mỗi %key% bằng chuỗi hoàn chỉnh.', 'Read left to right. Keep literal characters and replace each %key% with its fully expanded string.'));
     f.locals.parts = [];
-    emit(f, 12, 'parts-init', bi('parts = []', 'parts = []'), bi('Các đoạn sẽ được ghép khi expand kết thúc.', 'Join the chunks when expand finishes.'));
+    emit(f, 12, 'parts-init');
     f.start = 0; f.locals.start = 0;
-    emit(f, 13, 'start-init', bi('start = 0', 'start = 0'), bi('start là đầu đoạn thường chưa ghép.', 'start marks the next literal chunk to append.'));
+    emit(f, 13, 'start-init');
     for (const match of source.matchAll(/%([A-Z])%/g)) {
-      f.match = { key: match[1], token: match[0], from: match.index, to: match.index + match[0].length, value: null, appended: false };
+      const from = Array.from(source.slice(0, match.index)).length;
+      f.match = { key: match[1], token: match[0], from, to: from + match[0].length, value: null, appended: false };
       f.locals.match = match[0];
-      emit(f, 14, 'match', bi(`Gặp ${match[0]} trong ${owner === null ? 'text' : owner}`, `Found ${match[0]} inside ${owner === null ? 'text' : owner}`), bi(`Vị trí [${f.match.from}, ${f.match.to}). Chuỗi gốc không bị sửa khi duyệt.`, `Positions [${f.match.from}, ${f.match.to}). The source string stays unchanged during scanning.`));
-      const literal = source.slice(f.start, f.match.from);
+      emit(f, 14, 'match');
+      const literal = Array.from(source).slice(f.start, f.match.from).join('');
       f.parts.push({ kind: 'literal', key: null, value: literal }); f.locals.parts.push(literal); f.cursor = f.match.from;
-      emit(f, 15, 'literal', bi(`Ghép đoạn thường '${literal}'`, `Append literal '${literal}'`), bi(literal ? 'Giữ nguyên đoạn trước biến.' : 'Đoạn trước biến rỗng; không tạo ký tự mới.', literal ? 'Keep the text before the variable.' : 'The preceding chunk is empty; it adds no characters.'));
-      emit(f, 16, 'call-child', bi(`Chờ resolve('${match[1]}')`, `Wait for resolve('${match[1]}')`), bi('Chưa append. Phải nhận kết quả con hoàn chỉnh trước.', 'No append yet. Receive the fully expanded child result first.'));
+      emit(f, 15, 'literal');
       const replacement = resolve(match[1]); f.match.value = replacement;
       f.parts.push({ kind: 'replacement', key: match[1], value: replacement }); f.locals.parts.push(replacement); f.match.appended = true; f.cursor = f.match.to;
-      emit(f, 16, 'append-child', bi(`${match[0]} → '${replacement}'`, `${match[0]} → '${replacement}'`), bi('Con đã trả về. Ghép kết quả vào parts của đúng lời gọi cha.', 'The child returned. Append its result to this parent call’s parts.'));
+      emit(f, 16, 'append-child');
       f.start = f.match.to; f.locals.start = f.start;
-      emit(f, 17, 'advance', bi(`start = ${f.start}`, `start = ${f.start}`), bi('Lần tiếp theo lấy đoạn thường sau biến vừa xử lý.', 'The next literal chunk begins after this variable.'));
+      emit(f, 17, 'advance');
     }
-    const tail = source.slice(f.start);
-    f.parts.push({ kind: 'literal', key: null, value: tail }); f.locals.parts.push(tail); f.cursor = source.length; f.match = null;
-    emit(f, 18, 'tail', bi(`Ghép đoạn cuối '${tail}'`, `Append tail '${tail}'`), bi('Không còn biến. Giữ nguyên phần còn lại.', 'No placeholders remain. Keep the rest of the source.'));
+    emit(f, 14, 'matches-done');
+    const tail = Array.from(source).slice(f.start).join('');
+    f.parts.push({ kind: 'literal', key: null, value: tail }); f.locals.parts.push(tail); f.cursor = Array.from(source).length; f.match = null;
+    emit(f, 18, 'tail');
     f.result = f.parts.map(part => part.value).join('');
-    emit(f, 19, 'expand-return', bi(`Ghép parts → '${f.result}'`, `Join parts → '${f.result}'`), bi('Trả chuỗi hoàn chỉnh cho lời gọi đang chờ.', 'Return the completed string to the waiting caller.'));
+    emit(f, 19, 'expand-return');
     stack.pop(); return f.result;
   }
-  emit(null, 20, 'expand-text', bi('Bắt đầu mở rộng text', 'Start expanding text'), bi('Mỗi biến có thể dẫn tới một chuỗi lời gọi DFS.', 'Each placeholder can lead to a chain of DFS calls.'));
   answer = expand(text, null);
-  emit(null, 20, 'return', bi(`Kết quả: ${answer}`, `Result: ${answer}`), bi('Tất cả biến đã được thay. Trả về chuỗi kết quả.', 'All placeholders are resolved. Return the resulting string.'), true);
+  emit(null, 20, 'return', true);
   return { original: text, answer, steps };
 }
 
@@ -135,10 +135,8 @@ module.exports = { 3481: {
   extraParams: [{ key: 'replacements', type: 'string', label: bi('replacements — JSON [[key,value], ...]', 'replacements — JSON [[key,value], ...]'), default: JSON.stringify(DEFAULT_PAIRS) }],
   debugMode: 'line-by-line',
   approach: [
-    bi('Đọc text từ trái sang phải. Ký tự thường giữ nguyên; gặp %A% thì gọi resolve(A).', 'Read text left to right. Keep literal text; call resolve(A) for %A%.'),
-    bi('DFS: nếu A chứa %B%, tạm chờ A, xử lý B trước. Khi con trả về mới ghép vào chuỗi của cha.', 'DFS: if A contains %B%, suspend A and resolve B first. Append the child result only after it returns.'),
-    bi('Memo: chỉ nhớ chuỗi đã mở rộng hoàn chỉnh. Lần sau gặp cùng key thì dùng lại kết quả.', 'Memo: cache only fully expanded strings. Reuse a cached result whenever the same key appears again.'),
-    bi('Ví dụ mặc định A=%B%x, B=%C%y, C=z: C→z, B→zy, A→zyx; text→zyx_zy_z.', 'Default example A=%B%x, B=%C%y, C=z: C→z, B→zy, A→zyx; text→zyx_zy_z.'),
+    bi('Thay %key% bằng value; mở rộng biến con trước.', 'Replace %key% with its value; expand children first.'),
+    bi('Lưu chuỗi hoàn chỉnh vào memo để dùng lại.', 'Cache the completed string in memo for reuse.'),
   ],
   complexity: { time: 'O(N + S)', space: 'O(N + S)', note: bi('N là tổng độ dài input; S là tổng độ dài mọi chuỗi đã mở rộng (memo và đáp án). DFS sâu tối đa số key. Chuỗi mở rộng có thể lớn hơn input nhiều lần. Không tính bản sao visualization.', 'N is total input length; S is the combined size of expanded strings (memo and answer). DFS depth is at most the number of keys. Expansion can greatly exceed the input size. Excludes visualization snapshots.') },
   code: SOURCE, builder: buildSteps, liveArgs: (input, params) => { const parsed = parseInput(input, params); return [parsed.replacements, parsed.text]; },
