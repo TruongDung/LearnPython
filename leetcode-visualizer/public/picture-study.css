@@ -99,7 +99,10 @@ body:has(.study-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
 .study-op.future { opacity:.45; }
 .study-cuisines { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr)); gap:8px; max-height:245px; overflow:auto; padding:3px; }
 .study-cuisine { min-width:0; padding:8px; border:1px solid var(--study-tone); border-radius:10px; }
-.study-cuisine > header { color:var(--study-tone); font:12px ui-monospace,monospace; margin-bottom:9px; }
+.study-cuisine.selected, .study-cuisine-heap.selected { outline:2px solid var(--study-gold); outline-offset:1px; }
+.study-cuisine > header { margin-bottom:9px; }
+.study-cuisine > header button { padding:0; border:0; background:none; color:var(--study-tone); font:12px ui-monospace,monospace; cursor:pointer; }
+.study-cuisine > header button:focus-visible { outline:2px solid var(--study-gold); outline-offset:3px; }
 .study-food { display:grid; grid-template-columns:minmax(0,1fr) auto; position:relative; gap:5px; padding:5px 3px 9px; margin:4px 0; font:11px ui-monospace,monospace; }
 .study-food b { overflow-wrap:anywhere; }
 .study-food span { font-size:10px; }
@@ -168,6 +171,10 @@ body:has(.study-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
 .study-query-nodes > strong { color:var(--study-gold); }
 .study-food-tie { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; padding:9px; border:1px dashed var(--study-line); border-radius:10px; color:var(--study-muted); font:11px ui-monospace,monospace; }
 .study-food-tie strong { color:var(--study-green); }
+.study-cuisine-heaps { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:8px; }
+.study-cuisine-heap { min-width:0; padding:8px; border:1px solid var(--study-line); border-radius:10px; }
+.study-cuisine-heap > header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font:12px ui-monospace,monospace; }
+.study-cuisine-heap > header small { color:var(--study-muted); font-size:10px; }
 @media (max-width:520px) {
   #vizPanel:has(.study-viz) #varsGrid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
   #vizPanel:has(.study-viz) #varsPanel { padding:8px; }
