@@ -89,7 +89,7 @@ test('407 compact cell CSS keeps the level visible instead of clipping it', () =
   assert.match(css, /\.trw407-viz\.simple \.trw407-cell > footer \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;/);
 });
 
-test('407 expands semantic snapshots so only one code line is active per debug step', () => {
+test('407 preserves actual Python statement snapshots with one active line per debug step', () => {
   const source = readFrontendJavaScript();
   const start = source.indexOf('function shouldUseLineByLineDebug()');
   const end = source.indexOf('\n// ---- Run algorithm ----', start);
@@ -103,7 +103,8 @@ test('407 expands semantic snapshots so only one code line is active per debug s
   const raw = problem.builder(examples[0].input).steps;
   const expanded = context.expandStepsLineByLine(raw);
   assert.equal(context.shouldUseLineByLineDebug(), true);
-  assert.ok(expanded.length > raw.length);
+  assert.equal(expanded.length, raw.length);
+  assert.deepEqual(JSON.parse(JSON.stringify(expanded)), raw);
   assert.ok(expanded.every(step => !step.codeLines || step.codeLines.length <= 1));
   assert.equal(expanded.filter(step => step.final).length, 1);
 });

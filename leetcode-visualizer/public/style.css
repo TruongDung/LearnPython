@@ -1471,7 +1471,7 @@ button:disabled {
   z-index: 80;
   top: calc(100% + 7px);
   left: 0;
-  display: flex;
+  display: none;
   flex-wrap: wrap;
   gap: 5px;
   width: max-content;
@@ -1492,6 +1492,7 @@ button:disabled {
 .problem-tags-hover:hover .problem-tags-tooltip,
 .problem-tags-hover:focus-visible .problem-tags-tooltip,
 .prob-chip:focus-visible .problem-tags-tooltip {
+  display: flex;
   opacity: 1;
   visibility: visible;
   transform: translateY(0);

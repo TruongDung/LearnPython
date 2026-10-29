@@ -46,6 +46,7 @@ test("Watch reads recorded variables, nested arrays, dynamic indices, properties
   assert.equal(c.formatVarValue(c.resolveDebugWatch("queue[0]", step).value), "[5, 0]");
   assert.equal(c.formatVarValue(step.vars[2].value), "[[5, 0], [7, 0]]");
   assert.equal(c.formatVarValue({ zero: 0, flag: false }), '{"zero":0,"flag":false}');
+  assert.equal(c.formatVarValue({ __pairs__: [[['row', 0], ['col', 2]]] }), '{("row", 0): ("col", 2)}');
   assert.deepEqual(Array.from(c.splitDebugWatches('h, node.data["a,b"], len(queue)')), ["h", 'node.data["a,b"]', "len(queue)"]);
 });
 

@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.finishing3668View), surface: "treeView", render: (step) => { renderFinishing3668Pictures(step); } },
+    { predicate: (step) => Boolean(step.absolute3667View), surface: "treeView", render: (step) => { renderAbsolute3667Pictures(step); } },
+    { predicate: (step) => Boolean(step.floodBatchView), surface: "treeView", render: (step) => { renderFloodBatchPictures(step); } },
     { predicate: (step) => Boolean(step.distanceCycle2204View), surface: "treeView", render: (step) => { renderDistanceCycle2204Pictures(step); } },
     { predicate: (step) => Boolean(step.coins2603View), surface: "treeView", render: (step) => { renderCoins2603Pictures(step); } },
     { predicate: (step) => Boolean(step.runes3383View), surface: "treeView", render: (step) => { renderRunes3383Pictures(step); } },
@@ -86,6 +89,8 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.uniquePaths980View), surface: "treeView", render: (step) => { renderUniquePaths980Pictures(step); } },
     { predicate: (step) => Boolean(step.letterCase784View), surface: "treeView", render: (step) => { renderLetterCase784Pictures(step); } },
     { predicate: (step) => Boolean(step.combinations77View), surface: "treeView", render: (step) => { renderCombinations77Pictures(step); } },
+    { predicate: (step) => Boolean(step.descendantSum1973View?.debug), surface: "treeView", render: (step) => { renderDescendants1973Pictures(step); } },
+    { predicate: (step) => Boolean(step.genetic2003View), surface: "treeView", render: (step) => { renderGenetic2003Pictures(step); } },
     { predicate: (step) => Boolean(step.path1971View), surface: "treeView", render: (step) => { renderPath1971Pictures(step); } },
     { predicate: (step) => Boolean(step.perimeter463View), surface: "treeView", render: (step) => { renderPerimeter463Pictures(step); } },
     { predicate: (step) => Boolean(step.subIslands1905View), surface: "treeView", render: (step) => { renderSubIslands1905Pictures(step); } },

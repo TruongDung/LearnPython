@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "compression": "^1.8.2",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "pyodide": "0.26.4"
   }
 }

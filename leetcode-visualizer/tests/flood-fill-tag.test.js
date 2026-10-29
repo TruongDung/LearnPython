@@ -46,7 +46,7 @@ const requested = [
   [864, "Shortest Path to Get All Keys", "hard"],
 ];
 
-const expectedMissing = [529, 1034, 1992, 2658, 711, 1559];
+const expectedMissing = [];
 
 test("all built requested problems carry the Flood Fill tag", () => {
   const available = requested.filter(([id]) => SUPPORTED[id]).map(([id]) => id);

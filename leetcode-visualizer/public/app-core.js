@@ -3424,6 +3424,12 @@ function updateCodeHighlight(activeLines, codeBlock) {
 function formatVarValue(value) {
   if (Array.isArray(value)) return `[${value.map(item => typeof item === "string" ? JSON.stringify(item) : formatVarValue(item)).join(", ")}]`;
   if (value === null) return "null";
+  if (Array.isArray(value?.__pairs__) && Object.keys(value).length === 1) {
+    const tuple = item => Array.isArray(item)
+      ? `(${item.map(part => typeof part === "string" ? JSON.stringify(part) : formatVarValue(part)).join(", ")}${item.length === 1 ? "," : ""})`
+      : typeof item === "string" ? JSON.stringify(item) : formatVarValue(item);
+    return `{${value.__pairs__.map(([key, item]) => `${tuple(key)}: ${tuple(item)}`).join(", ")}}`;
+  }
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
