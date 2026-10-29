@@ -1,0 +1,58 @@
+.s1905-counters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.s1905-counters .ffp-counter { min-width:0; }
+.s1905-counters .ffp-counter>header { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:25px; }
+.s1905-counters .ffp-counter>small { display:block; min-height:25px; padding-top:4px; }
+.s1905-counters .ffp-counter>div { min-height:40px; }
+.s1905-counters .ffp-counter strong { font-size:30px; }
+.s1905-counters button { padding:3px 6px; border:1px solid var(--ff-line); border-radius:6px; color:var(--ff-gold); background:transparent; font:10px ui-monospace,monospace; cursor:pointer; }
+.s1905-counters header small { color:var(--ff-muted); font:11px ui-monospace,monospace; }
+.s1905-status { border-color:var(--ff-line); }
+.s1905-status.bad { border-color:var(--ff-red); } .s1905-status.bad strong { color:var(--ff-red); }
+.s1905-status.good { border-color:var(--ff-green); } .s1905-status.good strong { color:var(--ff-green); }
+.s1905-status footer { text-align:center; color:var(--ff-muted); font:9px ui-monospace,monospace; margin-top:4px; }
+.s1905-action { min-height:54px; gap:7px; } .s1905-action>strong { font-size:23px; }
+.s1905-action nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:5px; margin-left:auto; } .s1905-action button { margin:0; white-space:nowrap; }
+.s1905-board { width:100%; max-width:570px; display:block; margin:auto; }
+.s1905-viz.compact .s1905-board { max-height:295px; }
+.s1905-cell .tile { fill:var(--ff-water); stroke:var(--ff-line); stroke-width:.5; }
+.s1905-cell .g1-outline { fill:color-mix(in srgb,var(--ff-blue) 5%,transparent); stroke:var(--ff-blue); stroke-width:1.5; }
+.s1905-cell .g2-land { fill:var(--ff-land); stroke:var(--ff-muted); stroke-width:.5; }
+.s1905-cell.visiting:not(.grid1) .g2-land { fill:color-mix(in srgb,var(--ff-purple) 40%,var(--ff-paper)); stroke:var(--ff-purple); }
+.s1905-cell.accepted:not(.grid1) .g2-land { fill:color-mix(in srgb,var(--ff-green) 55%,var(--ff-paper)); stroke:var(--ff-green); }
+.s1905-cell.rejected:not(.grid1) .g2-land { fill:color-mix(in srgb,var(--ff-red) 45%,var(--ff-paper)); stroke:var(--ff-red); }
+.s1905-cell.grid1 .g2-land { fill:color-mix(in srgb,var(--ff-blue) 25%,var(--ff-paper)); stroke:var(--ff-blue); }
+.s1905-cell .value { fill:var(--ff-ink); text-anchor:middle; font:14px ui-monospace,monospace; }
+.s1905-cell .value.empty { opacity:.55; fill:var(--ff-muted); font-size:10px; }
+.s1905-cell .g1-value { fill:var(--ff-blue); text-anchor:middle; font:6px ui-monospace,monospace; }
+.s1905-cell .coverage { text-anchor:middle; font:bold 11px ui-monospace,monospace; }
+.s1905-cell .coverage.good { fill:var(--ff-green); } .s1905-cell .coverage.bad { fill:var(--ff-red); }
+.s1905-cell.mismatch .g2-land { stroke:var(--ff-red); stroke-width:1.7; }
+.s1905-cell .water { fill:none; stroke:var(--ff-blue); stroke-width:1; opacity:.3; }
+.s1905-cell.active .tile { stroke:var(--ff-gold); stroke-width:2.7; }
+.s1905-cell.neighbor .tile { stroke:var(--ff-gold); stroke-width:2; stroke-dasharray:3 2; }
+.s1905-cell .queued { fill:var(--ff-gold); stroke:var(--ff-paper); stroke-width:.8; }
+.s1905-index { fill:var(--ff-muted); text-anchor:middle; font:10px ui-monospace,monospace; }
+.s1905-route { fill:none; stroke:var(--ff-gold); stroke-width:2.3; } .s1905-route.bad { stroke:var(--ff-red); }
+.s1905-blue { color:var(--ff-blue); }
+.s1905-pair { display:grid; grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr); gap:5px; align-items:center; }
+.s1905-pair>div { display:grid; justify-items:center; gap:5px; min-width:0; }
+.s1905-pair small { font:9px ui-monospace,monospace; color:var(--ff-muted); white-space:nowrap; }
+.s1905-pair>div>b { display:grid; place-items:center; width:36px; height:38px; font:24px ui-monospace,monospace; border:1.5px solid var(--ff-blue); border-radius:7px; }
+.s1905-pair>div:last-child>b { border-color:var(--ff-purple); background:color-mix(in srgb,var(--ff-purple) 12%,var(--ff-paper)); }
+.s1905-pair>strong { text-align:center; font:20px ui-monospace,monospace; color:var(--ff-gold); }
+.s1905-pair+footer { margin-top:8px; text-align:center; }
+.s1905-booleans { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }
+.s1905-booleans>span { display:grid; justify-items:center; gap:5px; padding:5px 1px; border:1px solid var(--ff-line); border-radius:6px; }
+.s1905-booleans small { color:var(--ff-muted); font-size:10px; } .s1905-booleans b { font:14px ui-monospace,monospace; }
+.s1905-history { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(95px,100%),1fr)); gap:7px; max-height:225px; overflow:auto; }
+.s1905-history figure { padding:7px; margin:0; min-width:0; border:1px solid var(--ff-line); border-radius:8px; background:var(--ff-paper); }
+.s1905-history figcaption { display:flex; justify-content:space-between; gap:4px; margin-bottom:5px; color:var(--ff-muted); font:10px ui-monospace,monospace; }
+.s1905-history figure.accepted { border-color:var(--ff-green); } .s1905-history figure.rejected { border-color:var(--ff-red); }
+.s1905-history figure.accepted figcaption strong { color:var(--ff-green); } .s1905-history figure.rejected figcaption strong { color:var(--ff-red); }
+.s1905-history svg { display:block; width:100%; height:46px; }
+.s1905-history rect { fill:var(--ff-purple); } .s1905-history figure.accepted rect { fill:var(--ff-green); } .s1905-history figure.rejected rect { fill:color-mix(in srgb,var(--ff-red) 45%,var(--ff-paper)); } .s1905-history rect.bad { fill:var(--ff-red); }
+.s1905-details>summary { cursor:pointer; color:var(--ff-muted); font:11px ui-monospace,monospace; }
+.s1905-matrices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:10px; }
+.s1905-matrices>section { min-width:0; } .s1905-matrices header { text-align:center; color:var(--ff-muted); font:11px ui-monospace,monospace; margin:4px 0; }
+@container floodpictures (max-width:520px) { .s1905-matrices { grid-template-columns:1fr; } }
+@container floodpictures (max-width:390px) { .s1905-action>strong { font-size:19px; } .s1905-action>code { font-size:9px; } .s1905-action button { font-size:11px; padding:5px 6px; } .s1905-counters .ffp-counter strong { font-size:28px; } .s1905-status footer { font-size:8px; } }

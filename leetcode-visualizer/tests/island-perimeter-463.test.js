@@ -1,0 +1,47 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
+const p=require('../problems').SUPPORTED[463],encode=grid=>grid.map(row=>row.join(',')).join('|'),build=(input,mode)=>mode===2?p.builder2(input):p.builder(input);
+const cases=[p.defaultInput,'0','1','11','1|1','101','10|01','11|11','111|101|111','000|000','01010|11111','1|0|1'];
+// Symmetric difference of square segments leaves exactly the exposed boundary.
+function oracle(grid){const segments=new Set();grid.forEach((row,r)=>row.forEach((land,c)=>{if(!land)return;for(const key of [`h:${r},${c}`,`h:${r+1},${c}`,`v:${r},${c}`,`v:${r},${c+1}`]){if(segments.has(key))segments.delete(key);else segments.add(key);}}));return segments.size;}
+test('463 both algorithms agree with geometric segment cancellation on every binary 3×3 grid and rectangular edge cases',()=>{
+ const grids=Array.from({length:512},(_,mask)=>Array.from({length:3},(_,r)=>Array.from({length:3},(_,c)=>mask>>(r*3+c)&1))).concat(cases.map(s=>p.liveArgs(s)[0]));
+ for(const grid of grids)for(const mode of [1,2]){const run=build(encode(grid),mode),v=run.steps.at(-1).perimeter463View;assert.equal(run.answer,oracle(grid),`${mode} ${encode(grid)}`);assert.deepEqual(run.original,grid);assert.deepEqual(v.grid,grid);assert.equal(run.steps.filter(s=>s.final).length,1);assert.equal(v.source.line,14);}
+});
+test('463 snapshots match every completed CPython statement and all actual locals in both source blocks',()=>{
+ const runs=[1,2].flatMap(mode=>cases.map(input=>({mode,input}))),payload=runs.map(r=>({source:p[r.mode===1?'code':'code2'].join('\n'),args:p.liveArgs(r.input)}));
+ const python=`import sys,json,copy
+payload=json.load(sys.stdin);runs=[]
+for case in payload:
+ scope={};filename='<perimeter463>';exec(compile(case['source'],filename,'exec'),scope);events=[];pending={}
+ def trace(frame,event,arg):
+  if frame.f_code.co_filename!=filename or frame.f_code.co_name!='islandPerimeter':return trace
+  if event in ('line','return'):
+   if frame in pending:events.append({'line':pending.pop(frame),'locals':copy.deepcopy({k:v for k,v in frame.f_locals.items() if k!='self'})})
+   if event=='line':pending[frame]=frame.f_lineno
+  return trace
+ sys.settrace(trace);answer=scope['Solution']().islandPerimeter(*case['args']);sys.settrace(None);runs.append({'answer':answer,'events':events})
+print(json.dumps(runs))`;
+ const proc=spawnSync('python3',['-c',python],{input:JSON.stringify(payload),encoding:'utf8',maxBuffer:32*1024*1024});assert.equal(proc.status,0,proc.stderr);
+ JSON.parse(proc.stdout).forEach((ref,j)=>{const r=runs[j],run=build(r.input,r.mode);assert.equal(run.answer,ref.answer);assert.equal(run.steps.length,ref.events.length,JSON.stringify(r));run.steps.forEach((s,i)=>{const e=ref.events[i],v=s.perimeter463View,label=`${JSON.stringify(r)} event ${i} L${e.line}`;assert.deepEqual(s.codeLines,[e.line],label);assert.deepEqual(v.locals,e.locals,label);assert.equal(v.source.text,payload[j].source.split('\n')[e.line-1]);assert.equal(v.source.timing,'after');assert.equal(v.total,e.locals[r.mode===1?'perimeter':'total']??null);for(const w of s.vars)assert.deepEqual(w.value,e.locals[w.name]??'—',label+' '+w.name);});});
+});
+test('463 edge tokens and arithmetic change only on the real +1, +4 and −2 statements, with no premature shared-edge removal',()=>{
+ for(const mode of [1,2])for(const input of cases){let before;const run=build(input,mode),initial=JSON.stringify(run.original);for(const s of run.steps){const v=s.perimeter463View,states=v.edges.flat(2);assert.equal(states.filter(e=>e==='counted').length,v.total??0);assert.equal(v.history.reduce((sum,h)=>sum+h.delta,0),v.total??0);if(mode===2)assert.equal(4*v.landAdded-2*v.pairsRemoved,v.total??0);
+  if(before){if(v.change){assert.equal(v.total,before.total+v.change.delta);assert.equal(v.history.length,before.history.length+1);assert.equal(v.change.from,before.total);assert.equal(v.change.to,v.total);assert.equal(s.codeLines[0],mode===1?13:v.change.delta===4?9:v.change.side===3?11:13);}else{assert.equal(v.history.length,before.history.length);assert.equal(v.total,v.phase==='init'?0:before.total);if(mode===2)assert.deepEqual(v.edges,before.edges);}}
+  if(v.phase==='check'){assert.equal(typeof v.check.allowed,'boolean');assert.equal(v.check.neighborValue===null,v.check.outside);if(mode===1){const [r,c]=v.active;assert.equal(v.edges[r][c][v.side],v.check.allowed?'candidate':'shared');}else if(v.check.allowed){const [r,c]=v.active;assert.equal(v.edges[r][c][v.side],'counted');}}
+  if(mode===2&&v.phase==='subtract'){const h=v.change,opposite=[1,0,3,2][h.side];assert.equal(h.delta,-2);assert.equal(v.edges[h.r][h.c][h.side],'removed');assert.equal(v.edges[h.other[0]][h.other[1]][opposite],'removed');}
+  assert.equal(JSON.stringify(run.original),initial);before=v;
+ }const done=run.steps.at(-1).perimeter463View;assert.equal(done.edges.flat(2).filter(x=>x==='candidate').length,0);assert.equal(run.answer,oracle(run.original));}
+ const pair=p.builder2('11').steps,condition=pair.find(s=>s.perimeter463View.phase==='check'&&s.perimeter463View.check.allowed),subtract=pair[pair.indexOf(condition)+1];assert.equal(condition.perimeter463View.total,8);assert.equal(subtract.perimeter463View.total,6);assert.equal(subtract.perimeter463View.change.delta,-2);
+});
+function renderer(lang,extra={}){const host={innerHTML:'',querySelector:()=>null},ctx={lang,$:()=>host,escapeHtml:x=>String(x),...extra};vm.createContext(ctx);for(const file of ['renderer-flood-pictures.js','renderer-island-perimeter-463.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+file),'utf8'),ctx);return {ctx,render:step=>{ctx.renderPerimeter463Pictures(step);return host.innerHTML;}};}
+test('463 renders the exact numeric grid, directed edge tokens, current total and updates in both languages and after rewind',()=>{
+ for(const lang of ['vi','en']){const {ctx,render}=renderer(lang);for(const mode of [1,2])for(const input of cases){const run=build(input,mode),before=JSON.stringify(run);for(const step of run.steps){const v=step.perimeter463View,html=render(step),board=ctx.p463Board(v);assert.doesNotMatch(html,/undefined|NaN|Infinity|object Object|<p\b|<table\b/);assert.equal(html.match(/data-total="([^"]*)"/)[1],v.total===null?'':String(v.total));assert.deepEqual([...board.matchAll(/data-cell="(\d+),(\d+)" data-value="([01])"/g)].map(m=>[+m[1],+m[2],+m[3]]),v.grid.flatMap((row,r)=>row.map((value,c)=>[r,c,value])));assert.deepEqual([...board.matchAll(/data-side="([0-3])" data-edge="(\w+)"/g)].map(m=>[+m[1],m[2]]),v.grid.flatMap((row,r)=>row.flatMap((land,c)=>land?v.edges[r][c].map((status,side)=>[side,status]):[])));assert.deepEqual([...html.matchAll(/data-delta="(-?\d+)"/g)].map(m=>+m[1]),v.history.slice(-16).map(h=>h.delta));}const initial=render(run.steps[0]);render(run.steps.at(-1));assert.equal(render(run.steps[0]),initial);assert.equal(JSON.stringify(run),before);}}
+});
+test('463 next check, update and subtraction controls land on actual source events and terminate safely for water',()=>{
+ for(const mode of [1,2]){const handlers={},host={innerHTML:'',querySelector:s=>({addEventListener:(event,fn)=>handlers[s]=fn})},run=build(p.defaultInput,mode),{ctx,render}=renderer('vi',{$:()=>host,steps:run.steps,stepIndex:0,stopPlay:()=>{},renderStep:()=>{}});render(run.steps[0]);handlers['#p463NextCheck']();assert.equal(ctx.steps[ctx.stepIndex].perimeter463View.phase,'check');handlers['#p463NextUpdate']();assert.ok(ctx.steps[ctx.stepIndex].perimeter463View.change);if(mode===2){handlers['#p463NextSubtract']();assert.equal(ctx.steps[ctx.stepIndex].perimeter463View.change.delta,-2);}for(let i=0;i<100;i++)handlers['#p463NextUpdate']();assert.equal(ctx.stepIndex,run.steps.length-1);ctx.steps=build('00|00',mode).steps;ctx.stepIndex=0;render(ctx.steps[0]);handlers['#p463NextUpdate']();assert.equal(ctx.stepIndex,ctx.steps.length-1);assert.equal(ctx.steps.at(-1).perimeter463View.total,0);}
+});
+test('463 validates typed grid arguments and lazily loads the scoped light/dark, horizontal-code visualizer',()=>{
+ assert.equal(p.debugMode,'line-by-line');assert.deepEqual(p.liveArgs('"1","0"|0,1'),[[[1,0],[0,1]]]);for(const input of ['',null,{},[],[[1]],'1|10','2','1,a','1,','1||1'])for(const fn of [p.builder,p.builder2,p.liveArgs])assert.throws(()=>fn(input));assert.deepEqual(p.builder(p.defaultInput,{approach:2}),p.builder2(p.defaultInput));
+ const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8'),css=fs.readFileSync(require.resolve('../public/flood-pictures.css'),'utf8'),script=fs.readFileSync(require.resolve('../public/script.js'),'utf8');assert.match(html,/flood-pictures\.css[^\n]*data-problem-ids="733 200 695 1020 1905 463(?: 1971)?"/);assert.match(html,/renderer-flood-pictures\.js[^\n]*data-problem-ids="733 200 695 1020 1905 463(?: 1971)?"/);assert.match(html,/island-perimeter-463\.css[^\n]*data-problem-ids="463"/);assert.match(html,/renderer-island-perimeter-463\.js[^\n]*data-problem-ids="463"/);assert.ok(html.indexOf('src="renderer-flood-pictures.js')<html.indexOf('src="renderer-island-perimeter-463.js'));assert.match(script,/Boolean\(step.perimeter463View\)[^\n]*renderPerimeter463Pictures\(step\)/);assert.match(css,/\[data-theme="light"\] \.ffp-viz/);assert.match(css,/\.code-panel\s*\{[^}]*overflow-x:auto/);assert.match(css,/\.code-line\s*\{[^}]*white-space:pre/);assert.match(css,/#varsPanel[^}]*position:sticky/);
+});
