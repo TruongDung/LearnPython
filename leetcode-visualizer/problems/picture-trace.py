@@ -10,7 +10,8 @@ def picture_trace(payload):
     code = payload['code']
     filename = '<picture-lesson>'
     scope = {}
-    exec(compile(code, filename, 'exec'), scope)
+    # Execute bundled lesson code so its real statements can be traced.
+    exec(compile(code, filename, 'exec'), scope)  # pylint: disable=exec-used
     branches = {}
     comprehension_targets = {}
     for node in ast.walk(ast.parse(code)):

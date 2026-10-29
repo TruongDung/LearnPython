@@ -35,14 +35,21 @@ def oracle(pid,args):
         seen=set()
         def reveal(r,c):
             if (r,c) in seen or board[r][c]!='E':return
-            seen.add((r,c));neighbors=[(r+dr,c+dc) for dr in (-1,0,1) for dc in (-1,0,1) if (dr or dc) and 0<=r+dr<len(board) and 0<=c+dc<len(board[0])]
+            seen.add((r,c))
+            neighbors=[
+                (r+dr,c+dc)
+                for dr in (-1,0,1) for dc in (-1,0,1)
+                if (dr or dc) and 0<=r+dr<len(board) and 0<=c+dc<len(board[0])
+            ]
             count=sum(board[a][b]=='M' for a,b in neighbors)
             board[r][c]=str(count) if count else 'B'
             if not count:
                 for a,b in neighbors:reveal(a,b)
         reveal(r,c);return board
     if pid==1034:
-        grid,r,c,color=args;old=grid[r][c];group=next(g for g in components([[v==old for v in row] for row in grid]) if (r,c) in g)
+        grid,r,c,color=args
+        old=grid[r][c]
+        group=next(g for g in components([[v==old for v in row] for row in grid]) if (r,c) in g)
         border=[(a,b) for a,b in group if any((a+da,b+db) not in group for da,db in DIRS)]
         for a,b in border:grid[a][b]=color
         return grid
@@ -116,7 +123,11 @@ def oracle(pid,args):
             for a in range(n):
                 for b in range(n):reach[a][b]|=reach[a][mid] and reach[mid][b]
         suspicious={i for i in range(n) if reach[k][i]}
-        return list(range(n)) if any(a not in suspicious and b in suspicious for a,b in edges) else [i for i in range(n) if i not in suspicious]
+        return (
+            list(range(n))
+            if any(a not in suspicious and b in suspicious for a,b in edges)
+            else [i for i in range(n) if i not in suspicious]
+        )
     if pid==261:
         n,edges=args;reach=graph_components(n,edges);return len(edges)==n-1 and all(reach[0])
     if pid==305:
@@ -131,7 +142,11 @@ def oracle(pid,args):
                 for b in range(n):dist[a][b]=min(dist[a][b],dist[a][k]+dist[k][b])
         heights=list(map(max,dist));return [i for i,h in enumerate(heights) if h==min(heights)]
     if pid==675:
-        forest=args[0];rows,cols=len(forest),len(forest[0]);targets=sorted((forest[r][c],r,c) for r in range(rows) for c in range(cols) if forest[r][c]>1)
+        forest=args[0]
+        rows,cols=len(forest),len(forest[0])
+        targets=sorted(
+            (forest[r][c],r,c) for r in range(rows) for c in range(cols) if forest[r][c]>1
+        )
         if not targets:return 0
         if not forest[0][0]:return -1
         inf=10000;dist=[[inf]*(rows*cols) for _ in range(rows*cols)]
@@ -152,9 +167,18 @@ def oracle(pid,args):
             answer+=dist[at][target];at=target
         return answer
     if pid==947:
-        stones=args[0];edges=[(a,b) for a in range(len(stones)) for b in range(a) if stones[a][0]==stones[b][0] or stones[a][1]==stones[b][1]];reach=graph_components(len(stones),edges);groups={tuple(row) for row in reach};return len(stones)-len(groups)
+        stones=args[0]
+        edges=[
+            (a,b) for a in range(len(stones)) for b in range(a)
+            if stones[a][0]==stones[b][0] or stones[a][1]==stones[b][1]
+        ]
+        reach=graph_components(len(stones),edges)
+        groups={tuple(row) for row in reach}
+        return len(stones)-len(groups)
     if pid==990:
-        equations=args[0];reach=graph_components(26,[(ord(s[0])-97,ord(s[3])-97) for s in equations if s[1:3]=='==']);return all(s[1:3]=='==' or not reach[ord(s[0])-97][ord(s[3])-97] for s in equations)
+        equations=args[0]
+        reach=graph_components(26,[(ord(s[0])-97,ord(s[3])-97) for s in equations if s[1:3]=='=='])
+        return all(s[1:3]=='==' or not reach[ord(s[0])-97][ord(s[3])-97] for s in equations)
     if pid==1284:
         mat=args[0];m,n=len(mat),len(mat[0]);start=sum(mat[r][c]<<(r*n+c) for r in range(m) for c in range(n));best=None
         for subset in range(1<<(m*n)):
