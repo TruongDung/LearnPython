@@ -40,9 +40,10 @@ function buildSteps715(input) {
         { name: 'i', value: i ?? '—' }, { name: 'j', value: j ?? '—' },
         { name: 'boundary', value: replacement == null ? '—' : JSON.stringify(replacement) },
         { name: 'results', value: JSON.stringify(answer) },
+        { name: 'i % 2', value: i === null ? '—' : i % 2 },
       ],
       rangeModuleView: {
-        phase, callIndex, operations, coordinates, current,
+        phase, line: codeLine, callIndex, operations, coordinates, current,
         points: [...points], before: [...before], results: [...answer],
         i, j, replacement: replacement && [...replacement], binary,
         explanation: note,
@@ -50,17 +51,13 @@ function buildSteps715(input) {
     });
   };
 
-  // Trace the same lower/upper bounds used by Python's bisect module.
+  // Python's C-backed bisect is one assignment, so Next advances one source
+  // statement instead of inventing source steps for its internal comparisons.
   const bisect = (target, side, variable, line) => {
     let lo = 0, hi = points.length;
     while (lo < hi) {
       const mid = Math.floor((lo + hi) / 2);
       const moveRight = side === 'left' ? points[mid] < target : points[mid] <= target;
-      const comparison = `${points[mid]} ${side === 'left' ? '<' : '≤'} ${target}`;
-      snap('search', line, both(
-        `${variable} = bisect_${side}: ${comparison} là ${moveRight}. ${moveRight ? `Đổi lo thành ${mid + 1}` : `Đổi hi thành ${mid}`}; vùng tìm kiếm là [lo, hi).`,
-        `${variable} = bisect_${side}: ${comparison} is ${moveRight}. ${moveRight ? `Move lo to ${mid + 1}` : `Move hi to ${mid}`}; the search window is [lo, hi).`,
-      ), { target, side, variable, lo, hi, mid, moveRight });
       if (moveRight) lo = mid + 1;
       else hi = mid;
     }
@@ -82,10 +79,6 @@ function buildSteps715(input) {
     const query = method === 'queryRange', adding = method === 'addRange';
     const firstLine = query ? 17 : adding ? 7 : 22;
     before = [...points]; i = null; j = null; replacement = null;
-    snap('request', firstLine, both(
-      `Xử lý [${left}, ${right}): lấy left, không lấy right. ${query ? 'Truy vấn không sửa points.' : 'Tìm các mốc cần thay thế.'}`,
-      `Process [${left}, ${right}): include left, exclude right. ${query ? 'Queries do not mutate points.' : 'Find the endpoints to replace.'}`,
-    ));
     bisect(left, query ? 'right' : 'left', 'i', firstLine + 1);
     bisect(right, query ? 'left' : 'right', 'j', firstLine + 2);
 
@@ -129,11 +122,7 @@ function buildSteps715(input) {
       `points[${i}:${j}] = ${JSON.stringify(replacement)}. ${adding ? 'Merge overlapping and touching ranges.' : 'Removal may erase, trim, or split a range.'} The method returns no value: null.`,
     ));
   }
-  callIndex = -1; before = [...points]; i = null; j = null; replacement = null;
-  snap('done', null, both(
-    'Hoàn tất. Kết quả theo thứ tự lệnh; RangeModule() được khởi tạo tự động và không nằm trong output.',
-    'Complete. Results follow operation order; RangeModule() is constructed automatically and is omitted from the output.',
-  ));
+  steps.at(-1).final = true;
   return { original: operations, answer, steps };
 }
 
@@ -198,6 +187,7 @@ module.exports = {
       '            boundary.append(right)',
       '        self.points[i:j] = boundary',
     ],
+    debugMode: 'line-by-line',
     builder: buildSteps715, parseRangeOperations,
   },
 };

@@ -86,6 +86,8 @@ function buildSteps(input, params = {}) {
   const outputs = [];
   const history = [];
   let current = null;
+  let beforeHeap = [];
+  let heapReady = false;
 
   const emit = (line, phaseIndex, title, note, formula, final = false) => {
     tracer.emit({
@@ -101,10 +103,13 @@ function buildSteps(input, params = {}) {
       mark: heap.length ? [heap[0] - 1] : [],
       vars: [
         { name: "operation", value: current?.label ?? "—" },
-        { name: "heap_min", value: heap[0] ?? "—" },
-        { name: "available", value: JSON.stringify([...available].sort((a, b) => a - b)) },
-        { name: "reserved", value: JSON.stringify([...reserved].sort((a, b) => a - b)) },
-        { name: "outputs", value: JSON.stringify(outputs) },
+        { name: "self.available", value: JSON.stringify(heap) },
+        { name: "self.available[0]", value: heap[0] ?? "—" },
+        { name: "seatNumber", value: current?.name === "unreserve" ? current.seat : "—" },
+        { name: "return", value: current ? current.name === "reserve" ? current.seat : "None" : "—" },
+        { name: "free count", value: available.size },
+        { name: "reserved count", value: reserved.size },
+        { name: "min before", value: beforeHeap[0] ?? "—" },
       ],
       metrics: [
         { label: bi("Ghế trống", "Available"), value: available.size, state: available.size ? "success" : "danger" },
@@ -132,17 +137,27 @@ function buildSteps(input, params = {}) {
       final,
       answer: final ? [...outputs] : null,
     });
+    tracer.steps.at(-1).seatManager1845View = {
+      line, source: SOURCE[line - 1], n, heapReady,
+      event: ({5:"list",6:"heapify",9:"reserve",12:"unreserve"})[line],
+      heap: [...heap], beforeHeap: [...beforeHeap],
+      free: [...available].sort((a,b)=>a-b), reserved: [...reserved].sort((a,b)=>a-b),
+      current: current ? {...current,args:[...current.args],result:current.name === "reserve" ? current.seat : null} : null,
+      operations: operations.map(op=>({...op,args:[...op.args]})),
+      outputs: [...outputs], explanation: {...note},
+    };
   };
 
-  emit(1, 0, bi("Import heap", "Import heap tools"), bi("Min-heap luôn đưa số ghế nhỏ nhất lên gốc.", "The min-heap always exposes the smallest seat at its root."), bi("root = min(available)", "root = min(available)"));
   emit(5, 0, bi(`Tạo ghế 1..${n}`, `Create seats 1..${n}`), bi("Ban đầu mọi ghế đều trống.", "Every seat starts available."), bi(`available = [1, ..., ${n}]`, `available = [1, ..., ${n}]`));
+  beforeHeap = [...heap];
+  heapReady = true;
   emit(6, 0, bi("Heapify danh sách ghế", "Heapify the seat list"), bi("Heapify xây heap trong O(n).", "Heapify builds the heap in O(n)."), bi(`heap_min = ${heap[0]}`, `heap_min = ${heap[0]}`));
 
   operations.forEach((operation, index) => {
     current = { ...operation, index, seat: operation.args[0] ?? null };
+    beforeHeap = [...heap];
     if (operation.name === "reserve") {
       if (!heap.length) throw new RangeError(`#${PROBLEM_ID}: reserve operation ${index + 1} has no available seat.`);
-      emit(8, 1, bi("Gọi reserve", "Call reserve"), bi(`Ghế nhỏ nhất hiện tại là ${heap[0]}.`, `The smallest available seat is ${heap[0]}.`), bi("answer = heap[0]", "answer = heap[0]"));
       const seat = heapPop(heap);
       available.delete(seat);
       reserved.add(seat);
@@ -157,7 +172,6 @@ function buildSteps(input, params = {}) {
     if (seat < 1 || seat > n || !reserved.has(seat)) {
       throw new RangeError(`#${PROBLEM_ID}: unreserve operation ${index + 1} must target a reserved seat in 1..${n}.`);
     }
-    emit(11, 2, bi(`Gọi unreserve(${seat})`, `Call unreserve(${seat})`), bi("Ghế đang được giữ sẽ quay lại heap trống.", "The reserved seat returns to the available heap."), bi(`seatNumber = ${seat}`, `seatNumber = ${seat}`));
     reserved.delete(seat);
     available.add(seat);
     heapPush(heap, seat);
@@ -166,8 +180,9 @@ function buildSteps(input, params = {}) {
     emit(12, 2, bi(`Trả ghế ${seat}`, `Return seat ${seat}`), bi(`Gốc heap mới là ${heap[0]}.`, `The new heap root is ${heap[0]}.`), bi(`heappush(available, ${seat})`, `heappush(available, ${seat})`));
   });
 
-  current = null;
-  emit(9, 3, bi("Hoàn tất mô phỏng", "Simulation complete"), bi(`Kết quả: ${JSON.stringify(outputs)}.`, `Outputs: ${JSON.stringify(outputs)}.`), bi("return outputs", "return outputs"), true);
+  const last = tracer.steps.at(-1);
+  last.final = true;
+  last.hardProblemView.answer = [...outputs];
   return {
     original: { n, operations: operations.map((operation) => [operation.name, ...operation.args]) },
     operations: operations.map((operation) => ({ name: operation.name, args: [...operation.args] })),

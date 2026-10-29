@@ -72,7 +72,7 @@ function buildSteps(input) {
     problemId: PROBLEM_ID,
     source: SOURCE,
     phases: [bi("Khởi tạo", "Initialize"), bi("Lưu log", "Store log"), bi("Chuẩn hóa khoảng", "Normalize range"), bi("Quét log", "Scan logs"), bi("Hoàn tất", "Complete")],
-    maxSteps: 320,
+    maxSteps: 1200,
   });
   const logs = [];
   const outputs = [];
@@ -92,27 +92,29 @@ function buildSteps(input) {
       sub: logs.map((log) => {
         if (!query) return log.timestamp;
         const key = log.timestamp.slice(0, query.length);
-        return query.matches.includes(log.id) ? `${key} · match` : `${key} · outside`;
+        return query.matches?.includes(log.id) ? `${key} · match` : `${key} · pending`;
       }),
       highlight: Number.isInteger(query?.activeIndex) && query.activeIndex >= 0 ? [query.activeIndex] : [],
-      mark: query ? logs.map((log, index) => query.matches.includes(log.id) ? index : -1).filter((index) => index >= 0) : [],
+      mark: query ? logs.map((log, index) => query.matches?.includes(log.id) ? index : -1).filter((index) => index >= 0) : [],
       vars: [
-        { name: "operation", value: current?.label ?? "—" },
-        { name: "granularity", value: query?.granularity ?? "—" },
+        { name: "self.logs", value: JSON.stringify(logs.map(log=>[log.id,log.timestamp])) },
         { name: "length", value: query?.length ?? "—" },
         { name: "start_key", value: query?.startKey ?? "—" },
         { name: "end_key", value: query?.endKey ?? "—" },
-        { name: "result", value: query ? JSON.stringify(query.matches) : "—" },
+        { name: "log_id", value: query?.logId ?? current?.logId ?? "—" },
+        { name: "timestamp", value: query?.timestamp ?? (current?.name === "put" ? current.args[1] : "—") },
+        { name: "key", value: query?.key ?? "—" },
+        { name: "result", value: query?.matches === null || !query ? "—" : JSON.stringify(query.matches) },
       ],
       metrics: [
         { label: bi("Log đã lưu", "Stored logs"), value: logs.length, state: "default" },
         { label: bi("Đã quét", "Scanned"), value: query?.scanned ?? 0, state: query ? "active" : "muted" },
-        { label: bi("Khớp khoảng", "Range matches"), value: query?.matches.length ?? 0, state: query?.matches.length ? "success" : "muted" },
+        { label: bi("Khớp khoảng", "Range matches"), value: query?.matches?.length ?? 0, state: query?.matches?.length ? "success" : "muted" },
       ],
       groups: [
         {
           title: bi("Log storage", "Log storage"),
-          items: logs.length ? logs.map((log) => ({ label: `id ${log.id}`, value: log.timestamp, state: query?.matches.includes(log.id) ? "success" : log.id === current?.logId ? "active" : "default" })) : [{ label: bi("Chưa có log", "No logs"), value: "—", state: "muted" }],
+          items: logs.length ? logs.map((log) => ({ label: `id ${log.id}`, value: log.timestamp, state: query?.matches?.includes(log.id) ? "success" : log.id === current?.logId ? "active" : "default" })) : [{ label: bi("Chưa có log", "No logs"), value: "—", state: "muted" }],
         },
         {
           title: bi("Khoảng truy vấn đã cắt", "Truncated query range"),
@@ -128,13 +130,22 @@ function buildSteps(input) {
         columns: [bi("#", "#"), bi("Thao tác", "Operation"), bi("Kết quả", "Result")],
         rows: history.map((entry, index) => [index + 1, entry.label, Array.isArray(entry.result) ? JSON.stringify(entry.result) : "None"]),
       },
-      sequence: logs.map((log) => ({ label: `id ${log.id}`, value: query ? log.timestamp.slice(0, query.length) : log.timestamp, state: query?.matches.includes(log.id) ? "success" : "default" })),
+      sequence: logs.map((log) => ({ label: `id ${log.id}`, value: query ? log.timestamp.slice(0, query.length) : log.timestamp, state: query?.matches?.includes(log.id) ? "success" : "default" })),
       final,
       answer: final ? outputs.map((value) => Array.isArray(value) ? [...value] : value) : null,
     });
+    tracer.steps.at(-1).logSystem635View = {
+      line, source: SOURCE[line - 1],
+      event: ({6:"init",9:"put",12:"length",13:"start-key",14:"end-key",15:"result-init",16:query?.loopDone?"loop-end":"next-log",17:"key",18:"condition",19:"append",20:"return"})[line],
+      logs: logs.map(log=>({...log})),
+      current: current ? {...current,args:[...current.args]} : null,
+      query: query ? {...query,matches:query.matches===null?null:[...query.matches],decisions:query.decisions.map(decision=>({...decision}))} : null,
+      operations: operations.map(op=>({...op,args:[...op.args]})),
+      outputs: outputs.map(value=>Array.isArray(value)?[...value]:value),
+      explanation: {...note},
+    };
   };
 
-  emit(2, 0, bi("Khai báo độ dài granularity", "Define granularity lengths"), bi("Timestamp cố định độ rộng nên có thể so sánh prefix bằng chuỗi.", "Fixed-width timestamps let us compare prefixes lexicographically."), bi("Year=4, Month=7, ..., Second=19", "Year=4, Month=7, ..., Second=19"));
   emit(6, 0, bi("Tạo log storage", "Create log storage"), bi("Danh sách giữ thứ tự put để output dễ theo dõi.", "The list preserves put order for deterministic output."), bi("logs = []", "logs = []"));
 
   operations.forEach((operation, operationIndex) => {
@@ -142,7 +153,6 @@ function buildSteps(input) {
       const [logId, timestamp] = operation.args;
       current = { ...operation, operationIndex, logId };
       query = null;
-      emit(8, 1, bi(`Gọi put(${logId})`, `Call put(${logId})`), bi("Lưu nguyên timestamp để mọi granularity dùng lại được.", "Store the full timestamp so every granularity can reuse it."), bi(`id ${logId} → ${timestamp}`, `id ${logId} → ${timestamp}`));
       logs.push({ id: logId, timestamp });
       outputs.push(null);
       history.push({ label: operation.label, result: null });
@@ -153,8 +163,8 @@ function buildSteps(input) {
     const [start, end, granularity] = operation.args;
     const length = GRANULARITIES[granularity];
     current = { ...operation, operationIndex, logId: null };
-    query = { start, end, granularity, length: null, startKey: "", endKey: "", matches: [], scanned: 0, activeIndex: -1 };
-    emit(11, 2, bi(`Gọi retrieve theo ${granularity}`, `Retrieve by ${granularity}`), bi("Chỉ prefix tương ứng granularity tham gia so sánh.", "Only the prefix for the requested granularity participates in comparison."), bi(`${granularity} query`, `${granularity} query`));
+    query = { start, end, granularity, length: null, startKey: null, endKey: null, matches: null, scanned: 0, activeIndex: -1,
+      logId:null,timestamp:null,key:null,keyIndex:-1,verdict:null,loopDone:false,decisions:[] };
     query.length = length;
     emit(12, 2, bi(`Độ dài prefix = ${length}`, `Prefix length = ${length}`), bi("Các field nhỏ hơn granularity bị bỏ qua.", "Fields smaller than the granularity are ignored."), bi(`length = LENGTHS[${granularity}] = ${length}`, `length = LENGTHS[${granularity}] = ${length}`));
     query.startKey = start.slice(0, length);
@@ -167,12 +177,19 @@ function buildSteps(input) {
     logs.forEach((log, logIndex) => {
       query.activeIndex = logIndex;
       query.scanned = logIndex;
+      query.logId = log.id;
+      query.timestamp = log.timestamp;
+      query.verdict = null;
       current = { ...current, logId: log.id };
       emit(16, 3, bi(`Xét log ${log.id}`, `Inspect log ${log.id}`), bi("Duyệt storage theo thứ tự put.", "Scan storage in put order."), bi(`log_id = ${log.id}`, `log_id = ${log.id}`));
       const key = log.timestamp.slice(0, length);
-      query.scanned = logIndex + 1;
+      query.key = key;
+      query.keyIndex = logIndex;
       emit(17, 3, bi(`Key của log = ${key}`, `Log key = ${key}`), bi("Cắt timestamp bằng cùng length với hai biên.", "Truncate the timestamp with the same length as both bounds."), bi(`timestamp[:${length}] = ${key}`, `timestamp[:${length}] = ${key}`));
       const matches = query.startKey <= key && key <= query.endKey;
+      query.verdict = matches;
+      query.scanned = logIndex + 1;
+      query.decisions.push({index:logIndex,id:log.id,matches});
       emit(18, 3, bi(matches ? `Log ${log.id} nằm trong khoảng` : `Log ${log.id} ngoài khoảng`, matches ? `Log ${log.id} is inside the range` : `Log ${log.id} is outside the range`), bi(`${query.startKey} ≤ ${key} ≤ ${query.endKey} là ${matches}.`, `${query.startKey} ≤ ${key} ≤ ${query.endKey} is ${matches}.`), bi(`start_key <= key <= end_key → ${matches}`, `start_key <= key <= end_key → ${matches}`));
       if (matches) {
         query.matches.push(log.id);
@@ -180,16 +197,17 @@ function buildSteps(input) {
       }
     });
     query.activeIndex = -1;
-    current = { ...current, logId: null };
+    query.loopDone = true;
+    emit(16, 3, bi("Quét xong", "Scan complete"), bi("Vòng lặp đã duyệt hết log.", "The loop has exhausted the stored logs."), bi("for ... → done", "for ... → done"));
     const result = [...query.matches];
     outputs.push(result);
     history.push({ label: operation.label, result });
     emit(20, 2, bi(`Trả về ${JSON.stringify(result)}`, `Return ${JSON.stringify(result)}`), bi("Mọi timestamp khớp prefix inclusive đã được thu thập.", "Every timestamp matching the inclusive prefix range was collected."), bi(`return ${JSON.stringify(result)}`, `return ${JSON.stringify(result)}`));
   });
 
-  current = null;
-  query = null;
-  emit(20, 4, bi("Hoàn tất mô phỏng", "Simulation complete"), bi(`Kết quả: ${JSON.stringify(outputs)}.`, `Outputs: ${JSON.stringify(outputs)}.`), bi("return outputs", "return outputs"), true);
+  const last = tracer.steps.at(-1);
+  last.final = true;
+  last.hardProblemView.answer = outputs.map(value=>Array.isArray(value)?[...value]:value);
   return { original: operations.map((operation) => [operation.name, ...operation.args]), operations: operations.map((operation) => ({ name: operation.name, args: [...operation.args] })), answer: outputs, steps: tracer.finish() };
 }
 
