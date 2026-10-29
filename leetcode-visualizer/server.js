@@ -21,6 +21,8 @@ app.use(express.static(path.join(__dirname, "public"), {
 const {
   SUPPORTED,
   CATEGORY_ORDER,
+  FLOOD_FILL_SUBTABS,
+  FLOOD_FILL_TAG,
   PREFIX_MAX_TAG,
   PREFIX_MAX_SUBTABS,
   COMPANY_SUBTABS,
@@ -273,6 +275,23 @@ app.get("/api/problems", (req, res) => {
       };
     });
   }
+  const floodFillGroup = groups.find((group) => group.key === FLOOD_FILL_TAG.key) || {
+    key: FLOOD_FILL_TAG.key,
+    vi: FLOOD_FILL_TAG.vi,
+    en: FLOOD_FILL_TAG.en,
+    problems: [],
+  };
+  if (!groups.includes(floodFillGroup)) groups.push(floodFillGroup);
+  floodFillGroup.vi = FLOOD_FILL_TAG.vi;
+  floodFillGroup.en = FLOOD_FILL_TAG.en;
+  floodFillGroup.recommendedOrderLabel = CATEGORY_ORDER[FLOOD_FILL_TAG.key].label;
+  floodFillGroup.subTabs = FLOOD_FILL_SUBTABS.map((tab) => {
+    const roster = tab.roster.map((entry) => ({
+      ...entry,
+      premium: entry.available ? isPremium(SUPPORTED[entry.id]) : false,
+    }));
+    return { ...tab, roster, count: roster.filter((entry) => entry.available).length, total: roster.length };
+  });
   // Reuse the catalog's sub-tab roster support so every requested lesson is
   // visible, with missing visualizations shown as disabled entries.
   const prefixGroup = groups.find(group => group.key === PREFIX_MAX_TAG.key) || {

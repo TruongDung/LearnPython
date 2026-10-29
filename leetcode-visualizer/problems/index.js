@@ -42,6 +42,42 @@ const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming"
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
 const SEGMENT_TREE_TAG = { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" };
+const FLOOD_FILL_TAG = { key: "flood-fill", vi: "Flood Fill", en: "Flood Fill" };
+const FLOOD_FILL_ROSTER_RAW = [
+  [733, "Flood Fill", "easy"],
+  [200, "Number of Islands", "medium"],
+  [695, "Max Area of Island", "medium"],
+  [1254, "Number of Closed Islands", "medium"],
+  [1020, "Number of Enclaves", "medium"],
+  [130, "Surrounded Regions", "medium"],
+  [417, "Pacific Atlantic Water Flow", "medium"],
+  [994, "Rotting Oranges", "medium"],
+  [1905, "Count Sub Islands", "medium"],
+  [827, "Making A Large Island", "hard"],
+  [934, "Shortest Bridge", "medium"],
+  [1568, "Minimum Number of Days to Disconnect Island", "hard"],
+  [463, "Island Perimeter", "easy"],
+  [529, "Minesweeper", "medium"],
+  [1034, "Coloring A Border", "medium"],
+  [1162, "As Far from Land as Possible", "medium"],
+  [1971, "Find if Path Exists in Graph", "easy"],
+  [1992, "Find All Groups of Farmland", "medium"],
+  [2658, "Maximum Number of Fish in a Grid", "medium"],
+  [2812, "Find the Safest Path in a Grid", "medium"],
+  [286, "Walls and Gates", "medium"],
+  [305, "Number of Islands II", "hard"],
+  [694, "Number of Distinct Islands", "medium"],
+  [711, "Number of Distinct Islands II", "hard"],
+  [489, "Robot Room Cleaner", "hard"],
+  [3619, "Count Islands With Total Value Divisible by K", "medium"],
+  [1559, "Detect Cycles in 2D Grid", "medium"],
+  [542, "01 Matrix", "medium"],
+  [1765, "Map of Highest Peak", "medium"],
+  [329, "Longest Increasing Path in a Matrix", "hard"],
+  [778, "Swim in Rising Water", "hard"],
+  [407, "Trapping Rain Water II", "hard"],
+  [864, "Shortest Path to Get All Keys", "hard"],
+];
 // Full Segment Tree study roster. Built problems receive the tag; unbuilt ones
 // stay in the roster so the catalog can render them as dimmed placeholders.
 // Format: [id, title, difficulty]
@@ -432,6 +468,35 @@ for (const problem of Object.values(SUPPORTED)) {
     });
 }
 
+for (const [id] of FLOOD_FILL_ROSTER_RAW) {
+  const problem = SUPPORTED[id];
+  if (!problem) continue;
+  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+  if (!tags.some((tag) => tag && tag.key === FLOOD_FILL_TAG.key)) {
+    problem.tags = [...tags, FLOOD_FILL_TAG];
+  }
+}
+
+CATEGORY_ORDER[FLOOD_FILL_TAG.key] = {
+  ...CATEGORY_ORDER[FLOOD_FILL_TAG.key],
+  order: FLOOD_FILL_ROSTER_RAW.map(([id]) => id),
+  label: { vi: "Lộ trình Flood Fill", en: "Flood Fill learning path" },
+};
+
+const FLOOD_FILL_SUBTABS = [
+  {
+    key: "all",
+    vi: "Tất cả",
+    en: "All",
+    roster: FLOOD_FILL_ROSTER_RAW.map(([id, title, difficulty]) => ({
+      id,
+      title,
+      difficulty,
+      available: Boolean(SUPPORTED[id]),
+    })),
+  },
+];
+
 // COMPANY_SUBTABS carries the full roster (including not-yet-built problems) so
 // the catalog can render the complete company list.
 const COMPANY_SUBTABS = Object.values(COMPANY_LISTS).map((list) => ({
@@ -671,6 +736,8 @@ const SEGMENT_TREE_SUBTABS = [
 module.exports = {
   SUPPORTED,
   CATEGORY_ORDER,
+  FLOOD_FILL_SUBTABS,
+  FLOOD_FILL_TAG,
   PREFIX_MAX_TAG,
   PREFIX_MAX_SUBTABS,
   COMPANY_SUBTABS,
