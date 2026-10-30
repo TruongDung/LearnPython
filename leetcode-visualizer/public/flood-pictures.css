@@ -28,7 +28,7 @@ body:has(.ffp-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
 .ffp-counter>small,.ffp-color-key>small { color:var(--ff-muted); font:11px ui-monospace,monospace; }
 .ffp-counter>div,.ffp-color-key>div { display:flex; align-items:center; justify-content:center; gap:7px; margin-top:6px; }
 .ffp-counter strong { color:var(--ff-green); font:36px ui-monospace,monospace; } .ffp-counter span { color:var(--ff-muted); font:18px ui-monospace,monospace; }
-.ffp-counter.increment { border:2px solid var(--ff-green); }
+.ffp-counter.increment { border:2px solid var(--ff-green); } .ffp-counter.decrement { border:2px solid var(--ff-gold); }
 .ffp-action { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:9px; min-height:78px; padding:10px; border-radius:10px; background:var(--ff-paper); }
 .ffp-action>strong { font:27px ui-monospace,monospace; color:var(--ff-gold); } .ffp-action>code { color:var(--ff-muted); font-size:11px; }
 .ffp-viz .good { color:var(--ff-green); } .ffp-viz .bad { color:var(--ff-red); }
@@ -67,6 +67,7 @@ body:has(.ffp-viz) #catalogJumpNav .catalog-quick-jump { position:static; }
 .ffp-guards>span { display:grid; justify-items:center; flex:1; padding:5px; border:1px solid var(--ff-line); border-radius:7px; }
 .ffp-guards small { font:9px ui-monospace,monospace; } .ffp-guards b { font-size:16px; }
 .ffp-work { display:flex; gap:5px; align-items:center; min-height:51px; overflow-x:auto; padding-bottom:5px; }
+.ffp-visited-set { display:block; max-height:70px; overflow:auto; margin:0 0 7px; color:var(--ff-muted); font:9px ui-monospace,monospace; }
 .ffp-work-cell { display:grid; gap:4px; justify-items:center; flex:0 0 auto; padding:6px; border:1px solid var(--ff-line); border-radius:7px; background:var(--ff-paper); }
 .ffp-work-cell.next { border-color:var(--ff-gold); } .ffp-work-cell small { color:var(--ff-muted); font:8px ui-monospace,monospace; } .ffp-work-cell b { font:11px ui-monospace,monospace; }
 .ffp-card footer { margin-top:4px; font:9px ui-monospace,monospace; } .ffp-empty { padding:7px; color:var(--ff-muted); font:18px ui-monospace,monospace; }
