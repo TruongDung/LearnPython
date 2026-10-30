@@ -7,6 +7,36 @@ function oracle(grid){const rows=grid.length,cols=grid[0].length,parent=Array.fr
 test('695 both approaches find the largest area for all 512 binary 3×3 grids and preserve four-edge connectivity',()=>{
  for(let mask=0;mask<512;mask++){const grid=Array.from({length:3},(_,r)=>Array.from({length:3},(_,c)=>mask>>r*3+c&1)),areas=oracle(grid),expected=Math.max(0,...areas);for(const mode of [1,2]){const input=encode(grid),run=build(input,mode),v=run.steps.at(-1).maxIsland695View;assert.equal(run.answer,expected,`${mode} ${mask}`);assert.deepEqual(v.history.map(h=>h.area).sort((a,b)=>a-b),areas);assert.equal(v.maxArea,expected);assert.ok(v.image.flat().every(x=>x===0));assert.equal(run.steps.filter(s=>s.final).length,1);assert.deepEqual(run.original,grid);assert.deepEqual(v.history.map(h=>h.units),v.history.map(h=>h.area));if(expected)assert.equal(v.history.find(h=>h.id===v.bestOwner).area,expected);else assert.equal(v.bestOwner,null);}}
 });
+test('695 five added approaches match every 3×3 binary grid and preserve their own visited, label and union-find state',()=>{
+ for(let mask=0;mask<512;mask++){
+  const grid=Array.from({length:3},(_,r)=>Array.from({length:3},(_,c)=>mask>>r*3+c&1)),input=encode(grid),areas=oracle(grid),expected=Math.max(0,...areas);
+  for(let approach=3;approach<=7;approach++){
+   const run=p.builder(input,{approach}),v=run.steps.at(-1).maxIsland695View,code=p[`code${approach}`];
+   assert.equal(run.answer,expected,`approach ${approach}, mask ${mask}`);
+   assert.equal(v.approach,approach);
+   assert.equal(v.maxArea,expected);
+   assert.equal(v.source.text,code[v.source.line-1]);
+   assert.equal(run.steps.at(-1).final,true);
+   assert.deepEqual(v.history.map(h=>h.area).sort((a,b)=>a-b),areas);
+   grid.forEach((row,r)=>row.forEach((land,c)=>{
+    assert.equal(v.owners[r][c]>0,Boolean(land),`approach ${approach}, mask ${mask}, cell ${r},${c}`);
+    assert.equal(v.counted[r][c],Boolean(land),`counted ${approach}, mask ${mask}, cell ${r},${c}`);
+    assert.equal(v.image[r][c],approach===3?0:land);
+   }));
+   if(approach===4||approach===5)assert.deepEqual(v.visited,grid.map(row=>row.map(Boolean)));
+   if(approach===7)assert.deepEqual(v.labels,v.owners);
+   if(approach===6){
+    const root=id=>{let current=id;while(v.parent[current]!==current)current=v.parent[current];return current;};
+    for(let r=0;r<3;r++)for(let c=0;c<3;c++)if(grid[r][c])for(const[dr,dc]of [[1,0],[0,1]]){const nr=r+dr,nc=c+dc;if(nr<3&&nc<3&&grid[nr][nc])assert.equal(root(r*3+c),root(nr*3+nc));}
+   }
+  }
+ }
+});
+test('695 all seven Python code blocks execute to the same largest-area answer',()=>{
+ const grid=[[1,0,1,1],[1,1,0,0],[0,1,1,0]],payload=Array.from({length:7},(_,i)=>({source:p[`code${i+1===1?'':i+1}`].join('\n'),grid}));
+ const python=`import json,sys\ncases=json.load(sys.stdin)\nfor case in cases:\n scope={};exec(case['source'],scope);print(scope['Solution']().maxAreaOfIsland([row[:] for row in case['grid']]))`;
+ const result=spawnSync('python3',['-c',python],{input:JSON.stringify(payload),encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.deepEqual(result.stdout.trim().split('\n').map(Number),Array(7).fill(Math.max(...oracle(grid))));
+});
 test('695 matches every completed CPython line, live grid, local area, outer maximum and recursive return across both approaches',()=>{
  const runs=[1,2].flatMap(mode=>cases.map(input=>({mode,input}))),keys=['grid','rows','cols','directions','max_area','r','c','stack','area','cr','cc','dr','dc','nr','nc'];
  const payload=runs.map(r=>({source:p[r.mode===1?'code':'code2'].join('\n'),args:p.liveArgs(r.input)}));
@@ -47,10 +77,13 @@ test('695 renders real per-frame counters, counted squares, live numeric grid an
  for(const lang of ['vi','en']){const {render}=renderer(lang);for(const mode of [1,2])for(const input of cases){const run=build(input,mode),before=JSON.stringify(run);for(const step of run.steps){const v=step.maxIsland695View,html=render(step);assert.match(html,/ff695-viz/);assert.doesNotMatch(html,/undefined|NaN|Infinity|object Object|<p\b|<table\b/);assert.equal(html.match(/data-area="([^"]*)"/)[1],v.area===null?'':String(v.area));assert.equal(html.match(/data-max="([^"]*)"/)[1],v.maxArea===null?'':String(v.maxArea));assert.equal((html.match(/data-counted="true"/g)||[]).length,v.counted.flat().filter(Boolean).length);const cells=[...html.matchAll(/data-cell="(\d+),(\d+)" data-value="([01])" data-owner="(\d+)"/g)];assert.equal(cells.length,v.image.length*v.image[0].length);for(const m of cells){assert.equal(Number(m[3]),v.image[Number(m[1])][Number(m[2])]);assert.equal(Number(m[4]),v.owners[Number(m[1])][Number(m[2])]);}assert.deepEqual([...html.matchAll(/data-island="(\d+)" data-units="(\d+)"/g)].map(m=>[Number(m[1]),Number(m[2])]),v.history.map(h=>[h.id,h.units]));if(v.phase==='island-return'){assert.match(html,/area = dfs/);assert.doesNotMatch(html,/<code>return 0/);}}
  const first=render(run.steps[0]);render(run.steps.at(-1));assert.equal(render(run.steps[0]),first);assert.equal(JSON.stringify(run),before);}}
 });
+test('695 added approaches render their own work state and rewind in both languages',()=>{
+ for(const lang of ['vi','en']){const {render}=renderer(lang);for(let approach=3;approach<=7;approach++){const run=p.builder('110|010|001',{approach}),before=JSON.stringify(run);for(const step of run.steps){const html=render(step);assert.match(html,/ff695-viz/);assert.doesNotMatch(html,/undefined|NaN|Infinity|object Object/);assert.match(html,new RegExp(['BFS queue · in-place','DFS stack · visited','BFS queue · visited','Union-Find','Component labels'][approach-3]));if(approach===6)assert.match(html,/data-parent=/);if(approach===7)assert.match(html,/component labels/);}const first=render(run.steps[0]);render(run.steps.at(-1));assert.equal(render(run.steps[0]),first);assert.equal(JSON.stringify(run),before);}}
+});
 test('695 unit and maximum navigation visits only actual completed source updates, including the smaller second island and all-water input',()=>{
  for(const mode of [1,2]){const handlers={},host={innerHTML:'',querySelector:selector=>({addEventListener:(event,fn)=>handlers[selector]=fn})},run=build('00100|01110|00100|00011',mode);const {ctx,render}=renderer('vi',{$:()=>host,steps:run.steps,stepIndex:0,stopPlay:()=>{},renderStep:()=>{}});render(run.steps[0]);handlers['#ff695NextArea']();assert.ok(ctx.steps[ctx.stepIndex].maxIsland695View.areaDelta.unit);handlers['#ff695NextBest']();assert.equal(ctx.steps[ctx.stepIndex].maxIsland695View.maxArea,5);handlers['#ff695NextBest']();assert.deepEqual(ctx.steps[ctx.stepIndex].maxIsland695View.bestDelta,{from:5,candidate:2,to:5,improved:false,owner:2});handlers['#ff695NextBest']();assert.equal(ctx.stepIndex,run.steps.length-1);ctx.steps=build('00|00',mode).steps;ctx.stepIndex=0;render(ctx.steps[0]);handlers['#ff695NextArea']();assert.equal(ctx.stepIndex,ctx.steps.length-1);assert.equal(ctx.steps[ctx.stepIndex].maxIsland695View.maxArea,0);}
 });
-test('695 validates the same typed grid for both source blocks, correctly labels DFS and lazily shares day/night boards with horizontal code',()=>{
- assert.equal(p.debugMode,'line-by-line');assert.deepEqual(p.liveArgs('10|01'),[[[1,0],[0,1]]]);assert.deepEqual(p.liveArgs('"1","0"'),[[[1,0]]]);for(const input of ['',null,{},[],[[1]],'1|10','2','-1','0,a']){assert.throws(()=>p.builder(input));assert.throws(()=>p.builder2(input));assert.throws(()=>p.liveArgs(input));}assert.deepEqual(p.builder('11',{approach:2}),p.builder2('11'));assert.doesNotMatch(JSON.stringify(p.extraParams)+JSON.stringify(p.codeLabel),/BFS/);
+test('695 validates the same typed grid for all seven code blocks, correctly labels approaches and lazily shares day/night boards with horizontal code',()=>{
+ assert.equal(p.debugMode,'line-by-line');assert.deepEqual(p.liveArgs('10|01'),[[[1,0],[0,1]]]);assert.deepEqual(p.liveArgs('"1","0"'),[[[1,0]]]);for(const input of ['',null,{},[],[[1]],'1|10','2','-1','0,a']){assert.throws(()=>p.builder(input));assert.throws(()=>p.liveArgs(input));for(let approach=3;approach<=7;approach++)assert.throws(()=>p[`builder${approach}`](input));}assert.deepEqual(p.builder('11',{approach:2}),p.builder2('11'));assert.equal(p.extraParams[0].options.length,7);assert.ok(p.code7.length);assert.match(JSON.stringify(p.extraParams),/BFS/);
  const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8'),script=fs.readFileSync(require.resolve('../public/script.js'),'utf8'),css=fs.readFileSync(require.resolve('../public/flood-pictures.css'),'utf8');assert.match(html,/flood-pictures\.css[^\n]*data-problem-ids="733 200 695(?: 1020)?(?: 1905)?(?: 463)?(?: 1971)?(?: 1973 2003)?(?: 529 1034 1992 2658 711 1559 407 4003 3310 261 305 310 675 947 990 1284 1466)?"/);assert.match(html,/renderer-flood-pictures\.js[^\n]*data-problem-ids="733 200 695(?: 1020)?(?: 1905)?(?: 463)?(?: 1971)?(?: 1973 2003)?(?: 529 1034 1992 2658 711 1559 407 4003 3310 261 305 310 675 947 990 1284 1466)?"/);assert.match(html,/max-area-island-695\.css[^\n]*data-problem-ids="695"/);assert.match(html,/renderer-max-area-island-695\.js[^\n]*data-problem-ids="695"/);assert.ok(html.indexOf('src="renderer-flood-pictures.js')<html.indexOf('src="renderer-max-area-island-695.js'));assert.match(script,/Boolean\(step.maxIsland695View\)[^\n]*renderMaxIsland695Pictures\(step\)/);assert.match(css,/\[data-theme="light"\] \.ffp-viz/);assert.match(css,/\.code-panel\s*\{[^}]*overflow-x:auto/);assert.match(css,/\.code-line\s*\{[^}]*white-space:pre/);assert.match(css,/#varsPanel[^}]*position:sticky/);
 });

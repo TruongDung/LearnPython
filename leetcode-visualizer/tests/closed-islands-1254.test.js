@@ -49,6 +49,39 @@ test("1254 keeps the correct answer while attaching a picture-first state to eve
   assert.equal(run.steps.at(-1).closedIsland1254View.done, true);
 });
 
+test("1254 all five approaches count every binary 3×3 grid and record valid source lines", () => {
+  for (let mask = 0; mask < 512; mask++) {
+    const grid = Array.from({ length: 3 }, (_, r) => Array.from({ length: 3 }, (_, c) => mask >> (r * 3 + c) & 1));
+    const expected = grid[1][1] === 0 && [1, 3, 5, 7].every(bit => (mask >> bit) & 1) ? 1 : 0;
+    const input = grid.map(row => row.join("")).join("|");
+    for (let approach = 1; approach <= 5; approach++) {
+      const run = problem.builder(input, { approach });
+      assert.equal(run.answer, expected, `approach ${approach}, mask ${mask}`);
+      assert.ok(run.steps.every(step => step.closedIsland1254View));
+      for (const step of run.steps) {
+        const code = problem[`code${approach === 1 ? "" : approach}`];
+        assert.equal(step.codeBlock, approach);
+        assert.equal(step.codeLines.length, 1);
+        assert.ok(step.codeLines[0] >= 1 && step.codeLines[0] <= code.length);
+      }
+      assert.equal(run.steps.at(-1).closedIsland1254View.count, expected);
+      assert.equal(run.steps.at(-1).closedIsland1254View.done, true);
+    }
+  }
+});
+
+test("1254 exposes five runnable Python code blocks and approach metadata", () => {
+  assert.equal(problem.extraParams[0].options.length, 5);
+  assert.equal(problem.approach.length, 5);
+  const grid = [[1, 1, 1, 1, 1], [1, 0, 1, 0, 1], [1, 1, 1, 1, 1]];
+  const sources = Array.from({ length: 5 }, (_, i) => problem[`code${i + 1 === 1 ? "" : i + 1}`].join("\n"));
+  const python = `import json,sys\ncases=json.load(sys.stdin)\nfor source in cases:\n scope={};exec(source,scope);print(scope['Solution']().closedIsland([row[:] for row in ${JSON.stringify(grid)}]))`;
+  const { spawnSync } = require("node:child_process");
+  const result = spawnSync("python3", ["-c", python], { input: JSON.stringify(sources), encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.stdout.trim().split("\n").map(Number), [2, 2, 2, 2, 2]);
+});
+
 test("1254 renders a compact illustrated map instead of emoji-filled text labels", () => {
   const run = problem.builder(problem.defaultInput);
   const active = run.steps.find((step) => step.bfsGrid.cells.flat().some((cell) => cell.isCurrent));
@@ -68,6 +101,22 @@ test("1254 renders a compact illustrated map instead of emoji-filled text labels
   assert.match(css, /\.ci1254-cell\.is-water \.ci1254-mark::before/);
   assert.match(css, /\.ci1254-cell\.is-land \.ci1254-mark/);
   assert.match(css, /#vizPanel:has\(\.ci1254-viz\) #stepNote/);
+});
+
+test("1254 renders approach-specific traversal state for all five algorithms", () => {
+  const input = "11111|10001|10101|10001|11111";
+  for (let approach = 1; approach <= 5; approach++) {
+    if (approach === 1) {
+      const step = problem.builder(input).steps.find(item => item.bfsGrid.cells.flat().some(cell => cell.isCurrent));
+      assert.match(render(step), /ci1254-scene/);
+      continue;
+    }
+    const step = problem.builder(input, { approach }).steps.find(item => item.bfsGrid && item.closedIsland1254View.approach);
+    const html = render(step);
+    assert.match(html, /ci1254-approach/);
+    if (approach === 2 || approach === 3 || approach === 4) assert.match(html, /ci1254-state/);
+    if (approach === 5) assert.match(html, /parent ·/);
+  }
 });
 
 test("1254 watches follow recursive coordinates, flooding, and count initialization", () => {

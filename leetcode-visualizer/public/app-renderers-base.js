@@ -1039,9 +1039,24 @@ function renderBfsGrid(step) {
       </div>`;
     }).join("")).join("");
     const sceneState = view.done ? "is-finished" : countPhase ? "is-counting" : "is-flooding";
+    const approachNames = [
+      vi ? "DFS đệ quy từ biên" : "Recursive DFS from border",
+      vi ? "BFS từ biên" : "BFS from border",
+      vi ? "DFS + visited" : "DFS + visited",
+      vi ? "BFS + visited" : "BFS + visited",
+      "Union-Find + ocean",
+    ];
+    const worklistHtml = view.approach === 5
+      ? `<div class="ci1254-state"><small>parent · ${view.parent?.length ?? 0}</small><span>${(view.parent || []).slice(0, 18).map(([id, parent]) => `${Math.floor(id / cols)},${id % cols}→${Math.floor(parent / cols)},${parent % cols}`).join(" · ") || "∅"}</span></div>`
+      : view.approach === 3 || view.approach === 4
+        ? `<div class="ci1254-state"><small>${view.approach === 3 ? "DFS stack" : "BFS queue"} · ${view.worklist?.length ?? 0}</small><span>${(view.worklist || []).slice(0, 10).map(([r, c]) => `(${r},${c})`).join(" · ") || "∅"}${(view.worklist?.length ?? 0) > 10 ? " · …" : ""}</span><small>visited · ${view.visited?.flat().filter(Boolean).length ?? 0}</small></div>`
+        : view.approach === 2
+          ? `<div class="ci1254-state"><small>BFS queue · ${view.worklist?.length ?? 0}</small><span>${(view.worklist || []).slice(0, 10).map(([r, c]) => `(${r},${c})`).join(" · ") || "∅"}${(view.worklist?.length ?? 0) > 10 ? " · …" : ""}</span></div>`
+          : "";
     el.innerHTML = `<section class="ci1254-viz ${sceneState}" role="img" aria-label="${vi ? "Bản đồ nước và đất: đất nối ra biên bị nhấn chìm, đảo nằm trong được đếm" : "Land connected to the border is flooded; islands left inside are counted"}">
-      <div class="ci1254-phases">${phaseHtml}</div>
+      <div class="ci1254-phases">${phaseHtml}</div>${view.approach ? `<small class="ci1254-approach">${escapeXml(approachNames[view.approach - 1])}</small>` : ""}
       <div class="ci1254-board-scroll"><div class="ci1254-scene"><div class="ci1254-tide" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="ci1254-board" style="--ci-cols:${cols}">${cellsHtml}</div></div></div>
+      ${worklistHtml}
       <div class="ci1254-footer">
         <div class="ci1254-legend" aria-label="${vi ? "Chú giải" : "Legend"}">
           <span class="is-water" title="${vi ? "nước" : "water"}" aria-label="${vi ? "nước" : "water"}"><i></i></span>
