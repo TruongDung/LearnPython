@@ -54,13 +54,15 @@ function buildSteps(input, params = {}) {
     problemId: PROBLEM_ID,
     source: SOURCE,
     phases: [bi("Khởi tạo", "Initialize"), bi("Cấp số", "Get"), bi("Kiểm tra", "Check"), bi("Thu hồi", "Release"), bi("Hoàn tất", "Complete")],
-    maxSteps: 220,
+    maxSteps: 400,
   });
-  const queue = Array.from({ length: maxNumbers }, (_, index) => index);
-  const free = new Set(queue);
+  const queue = [];
+  const free = new Set();
+  let freeReady = false;
   const outputs = [];
   const history = [];
   let current = null;
+  let before = { available: [], free: null };
 
   const emit = (line, phaseIndex, title, note, formula, final = false) => {
     tracer.emit({
@@ -76,9 +78,13 @@ function buildSteps(input, params = {}) {
       mark: queue.length ? [queue[0]] : [],
       vars: [
         { name: "operation", value: current?.label ?? "—" },
-        { name: "queue", value: JSON.stringify(queue) },
-        { name: "free", value: JSON.stringify([...free].sort((a, b) => a - b)) },
-        { name: "outputs", value: JSON.stringify(outputs) },
+        { name: "number", value: current?.number ?? "—" },
+        { name: "self.available", value: JSON.stringify(queue) },
+        { name: "self.free", value: freeReady ? JSON.stringify([...free].sort((a, b) => a - b)) : "—" },
+        { name: "front", value: queue[0] ?? "—" },
+        { name: "queue size", value: queue.length },
+        { name: "set size", value: freeReady ? free.size : "—" },
+        { name: "return", value: current?.resultReady ? current.result === null ? "None" : current.result : "—" },
       ],
       metrics: [
         { label: bi("Số còn trống", "Free numbers"), value: free.size, state: free.size ? "success" : "danger" },
@@ -102,21 +108,34 @@ function buildSteps(input, params = {}) {
       final,
       answer: final ? [...outputs] : null,
     });
+    tracer.steps.at(-1).phoneDirectory379View = {
+      line, maxNumbers, source: SOURCE[line - 1],
+      event: ({5:"queue-init",6:"set-init",9:"empty-check",10:"exhausted",11:"dequeue",12:"assign",13:"return",16:"check",19:"release-check",20:"duplicate",21:"free",22:"enqueue"})[line],
+      current: current ? { ...current, args: [...current.args] } : null,
+      operations: operations.map(op => ({ ...op, args: [...op.args] })),
+      available: [...queue], free: freeReady ? [...free].sort((a,b)=>a-b) : null,
+      before: { available: [...before.available], free: before.free === null ? null : [...before.free] },
+      outputs: [...outputs], history: history.map(entry=>({...entry})),
+      explanation: {...note},
+    };
   };
 
-  emit(1, 0, bi("Import deque", "Import deque"), bi("Deque cấp và thu hồi số trong O(1).", "A deque allocates and recycles numbers in O(1)."), bi("queue front → next allocation", "queue front → next allocation"));
+  queue.push(...Array.from({ length: maxNumbers }, (_, index) => index));
   emit(5, 0, bi("Tạo queue số trống", "Create the free-number queue"), bi(`Queue ban đầu chứa 0..${maxNumbers - 1}.`, `The initial queue contains 0..${maxNumbers - 1}.`), bi(`available = deque(range(${maxNumbers}))`, `available = deque(range(${maxNumbers}))`));
+  queue.forEach(number=>free.add(number));
+  freeReady = true;
   emit(6, 0, bi("Tạo set tra cứu", "Create the lookup set"), bi("Set trả lời check và chống release trùng.", "The set answers check and prevents duplicate release."), bi("free = set(available)", "free = set(available)"));
 
   operations.forEach((operation, index) => {
     const number = operation.args[0];
     if (number !== undefined && (number < 0 || number >= maxNumbers)) throw new RangeError(`#${PROBLEM_ID}: operation ${index + 1} number must be in 0..${maxNumbers - 1}.`);
-    current = { ...operation, index, number: number ?? null };
+    current = { ...operation, index, number: number ?? null, resultReady: false, result: null };
+    before = { available: [...queue], free: [...free].sort((a,b)=>a-b) };
     if (operation.name === "get") {
-      emit(8, 1, bi("Gọi get", "Call get"), bi("Lấy đầu queue nếu còn số.", "Take the queue front when a number remains."), bi("get next available number", "get next available number"));
       const empty = queue.length === 0;
       emit(9, 1, bi(empty ? "Queue rỗng" : "Queue còn số", empty ? "The queue is empty" : "The queue has a number"), bi(empty ? "Không còn số để cấp." : `Số kế tiếp là ${queue[0]}.`, empty ? "No number remains for allocation." : `The next number is ${queue[0]}.`), bi(`not available = ${empty}`, `not available = ${empty}`));
       if (empty) {
+        current.resultReady = true; current.result = -1;
         outputs.push(-1); history.push({ label: operation.label, result: -1 });
         emit(10, 1, bi("Trả về -1", "Return -1"), bi("Directory đã cấp hết số.", "The directory has no available numbers."), bi("return -1", "return -1"));
         return;
@@ -126,23 +145,24 @@ function buildSteps(input, params = {}) {
       emit(11, 1, bi(`Lấy ${allocated} khỏi queue`, `Remove ${allocated} from the queue`), bi("popleft bảo toàn thứ tự tái sử dụng.", "popleft preserves recycling order."), bi(`number = ${allocated}`, `number = ${allocated}`));
       free.delete(allocated);
       emit(12, 1, bi(`Đánh dấu ${allocated} đã cấp`, `Mark ${allocated} assigned`), bi("Set và queue lại đồng bộ.", "The set and queue are synchronized again."), bi(`free.remove(${allocated})`, `free.remove(${allocated})`));
+      current.resultReady = true; current.result = allocated;
       outputs.push(allocated); history.push({ label: operation.label, result: allocated });
       emit(13, 1, bi(`Trả về ${allocated}`, `Return ${allocated}`), bi("Số này không còn available cho tới khi release.", "This number remains unavailable until release."), bi(`return ${allocated}`, `return ${allocated}`));
       return;
     }
 
     if (operation.name === "check") {
-      emit(15, 2, bi(`Gọi check(${number})`, `Call check(${number})`), bi("Set membership cho kết quả O(1).", "Set membership answers in O(1)."), bi(`${number} in free`, `${number} in free`));
       const result = free.has(number);
+      current.resultReady = true; current.result = result;
       outputs.push(result); history.push({ label: operation.label, result });
       emit(16, 2, bi(result ? `${number} còn trống` : `${number} đã được cấp`, result ? `${number} is available` : `${number} is assigned`), bi(`check trả về ${result}.`, `check returns ${result}.`), bi(`return ${result}`, `return ${result}`));
       return;
     }
 
-    emit(18, 3, bi(`Gọi release(${number})`, `Call release(${number})`), bi("Release lặp lại phải là no-op.", "Repeated release must be a no-op."), bi(`number = ${number}`, `number = ${number}`));
     const alreadyFree = free.has(number);
     emit(19, 3, bi(alreadyFree ? "Số đã trống" : "Số đang được cấp", alreadyFree ? "The number is already free" : "The number is assigned"), bi(alreadyFree ? "Không thêm trùng vào queue." : "Có thể trả số về directory.", alreadyFree ? "Do not duplicate it in the queue." : "Return the number to the directory."), bi(`${number} in free = ${alreadyFree}`, `${number} in free = ${alreadyFree}`));
     if (alreadyFree) {
+      current.resultReady = true;
       outputs.push(null); history.push({ label: operation.label, result: null });
       emit(20, 3, bi("No-op", "No-op"), bi("Queue và set giữ nguyên.", "The queue and set stay unchanged."), bi("return None", "return None"));
       return;
@@ -150,12 +170,14 @@ function buildSteps(input, params = {}) {
     free.add(number);
     emit(21, 3, bi(`Đánh dấu ${number} trống`, `Mark ${number} free`), bi("Set cho phép check thấy số ngay lập tức.", "The set makes the number immediately checkable."), bi(`free.add(${number})`, `free.add(${number})`));
     queue.push(number);
+    current.resultReady = true;
     outputs.push(null); history.push({ label: operation.label, result: null });
     emit(22, 3, bi(`Đưa ${number} vào cuối queue`, `Append ${number} to the queue`), bi("Số được thu hồi sẽ được cấp lại theo thứ tự FIFO.", "The released number will be reused in FIFO order."), bi(`available.append(${number})`, `available.append(${number})`));
   });
 
-  current = null;
-  emit(13, 4, bi("Hoàn tất mô phỏng", "Simulation complete"), bi(`Kết quả: ${JSON.stringify(outputs)}.`, `Outputs: ${JSON.stringify(outputs)}.`), bi("return outputs", "return outputs"), true);
+  const last = tracer.steps.at(-1);
+  last.final = true;
+  last.hardProblemView.answer = [...outputs];
   return { original: { maxNumbers, operations: operations.map((operation) => [operation.name, ...operation.args]) }, operations: operations.map((operation) => ({ name: operation.name, args: [...operation.args] })), answer: outputs, steps: tracer.finish() };
 }
 

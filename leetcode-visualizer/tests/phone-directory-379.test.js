@@ -52,6 +52,7 @@ test('379 trace is line-by-line and queue/set resynchronize after mutation lines
   assert.ok(run.steps.every((step) => step.codeLines.length === 1));
   assert.equal(run.steps.filter((step) => step.final).length, 1);
   const transitionLines = new Set([
+    5, // The constructor has initialized the queue but not the set yet.
     problem.code.findIndex((line) => line.includes('popleft()')) + 1,
     problem.code.findIndex((line) => line.includes('self.free.add')) + 1,
   ]);
