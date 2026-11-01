@@ -3798,16 +3798,18 @@ function buildSteps1386(input, params) {
   const reservedRows = [...reservedByRow.keys()].sort((a, b) => a - b);
   const emptyRows = n - reservedRows.length;
 
-  const seatBoard = (reservedSet, chosen) => {
+  const seatBoard = (reservedSet, chosen, activeWindow = null) => {
     // chosen: array of {name, cols}
     const chosenCols = new Map();
     (chosen || []).forEach((g) => g.cols.forEach((c) => chosenCols.set(c, g.name)));
+    const activeCols = new Set((CINEMA_WINDOWS_1386.find((window) => window.name === activeWindow) || {}).cols || []);
     return Array.from({ length: 10 }, (_, idx) => {
       const col = idx + 1;
       return {
         col,
         reserved: reservedSet ? reservedSet.has(col) : false,
         group: chosenCols.get(col) || null,
+        active: activeCols.has(col),
         aisle: col === 1 || col === 10,
       };
     });
@@ -3826,6 +3828,9 @@ function buildSteps1386(input, params) {
         windows: meta.windows || null,
         chosen: meta.chosen || [],
         rowGroups: meta.rowGroups ?? null,
+        activeWindow: meta.activeWindow || null,
+        decision: meta.decision || null,
+        approach: 1,
         answer,
         final: Boolean(meta.final),
       },
@@ -3871,23 +3876,46 @@ function buildSteps1386(input, params) {
     const rightFree = ![6, 7, 8, 9].some((c) => reserved.has(c));
     const midFree = ![4, 5, 6, 7].some((c) => reserved.has(c));
 
-    push({ phase: "inspect", currentRow: row, seats: seatBoard(reserved, []), windows: { left: leftFree, right: rightFree, mid: midFree } }, {
-      title: { vi: `Hàng ${row}: kiểm tra 3 cửa sổ`, en: `Row ${row}: check the 3 windows` },
-      arr: [],
-      highlight: [], mark: [],
-      codeLines: [9, 10, 11],
-      vars: [
-        { name: "hàng", value: row },
-        { name: "ghế đã đặt", value: `[${[...reserved].sort((a, b) => a - b).join(", ")}]` },
-        { name: "2–5 trống?", value: leftFree ? "có" : "không" },
-        { name: "6–9 trống?", value: rightFree ? "có" : "không" },
-        { name: "4–7 trống?", value: midFree ? "có" : "không" },
-      ],
-      note: {
-        vi: `Hàng ${row} có ghế đặt tại [${[...reserved].sort((a, b) => a - b).join(", ")}]. Xét từng cửa sổ: 2–5 ${leftFree ? "trống" : "bị chặn"}, 6–9 ${rightFree ? "trống" : "bị chặn"}, 4–7 ${midFree ? "trống" : "bị chặn"}.`,
-        en: `Row ${row} has reserved seats [${[...reserved].sort((a, b) => a - b).join(", ")}]. Check each window: 2–5 ${leftFree ? "free" : "blocked"}, 6–9 ${rightFree ? "free" : "blocked"}, 4–7 ${midFree ? "free" : "blocked"}.`,
-      },
-    });
+    const windowStates = [
+      { name: "left", seats: [2, 3, 4, 5], free: leftFree, line: 9, label: "2–5" },
+      { name: "right", seats: [6, 7, 8, 9], free: rightFree, line: 10, label: "6–9" },
+      { name: "mid", seats: [4, 5, 6, 7], free: midFree, line: 11, label: "4–7" },
+    ];
+    for (const window of windowStates) {
+      const blockingSeats = window.seats.filter((col) => reserved.has(col));
+      push({
+        phase: "inspect",
+        currentRow: row,
+        seats: seatBoard(reserved, [], window.name),
+        windows: { left: leftFree, right: rightFree, mid: midFree },
+        activeWindow: window.name,
+        decision: blockingSeats.length
+          ? { status: "blocked", blockingSeats }
+          : { status: "free", blockingSeats: [] },
+      }, {
+        title: {
+          vi: `Hàng ${row}: kiểm tra ghế ${window.label} → ${window.free ? "trống" : "bị chặn"}`,
+          en: `Row ${row}: check seats ${window.label} → ${window.free ? "free" : "blocked"}`,
+        },
+        arr: [],
+        highlight: [], mark: [],
+        codeLines: [window.line],
+        vars: [
+          { name: "hàng", value: row },
+          { name: "cửa sổ", value: window.label },
+          { name: "ghế đặt cản trở", value: blockingSeats.length ? `[${blockingSeats.join(", ")}]` : "không" },
+          { name: "có thể xếp?", value: window.free ? "có" : "không" },
+        ],
+        note: {
+          vi: window.free
+            ? `Cả 4 ghế ${window.label} đều chưa bị đặt, nên cửa sổ này hợp lệ.`
+            : `Ghế ${blockingSeats.join(", ")} đã bị đặt và nằm trong cửa sổ ${window.label}, nên không thể xếp nhóm ở đây.`,
+          en: window.free
+            ? `All four seats ${window.label} are unreserved, so this window is available.`
+            : `Reserved seat(s) ${blockingSeats.join(", ")} overlap window ${window.label}, so a family cannot use it.`,
+        },
+      });
+    }
 
     let chosen = [];
     let rowGroups = 0;
@@ -3921,7 +3949,7 @@ function buildSteps1386(input, params) {
           ? `Only ${chosen[0].name === "left" ? "2–5" : "6–9"} is free → place 1 group.`
           : "No window is free → 0 groups.";
 
-    push({ phase: "assign", currentRow: row, seats: seatBoard(reserved, chosen), windows: { left: leftFree, right: rightFree, mid: midFree }, chosen, rowGroups }, {
+    push({ phase: "assign", currentRow: row, seats: seatBoard(reserved, chosen), windows: { left: leftFree, right: rightFree, mid: midFree }, chosen, rowGroups, decision: { rowGroups, runningTotal: answer } }, {
       title: { vi: `Hàng ${row}: +${rowGroups} nhóm`, en: `Row ${row}: +${rowGroups} groups` },
       arr: [],
       highlight: [], mark: [],
@@ -3953,6 +3981,388 @@ function buildSteps1386(input, params) {
   });
 
   return { original: n, answer, steps };
+}
+
+const CINEMA_WINDOWS_1386 = [
+  { name: "left", label: "2–5", start: 2, end: 5, cols: [2, 3, 4, 5] },
+  { name: "mid", label: "4–7", start: 4, end: 7, cols: [4, 5, 6, 7] },
+  { name: "right", label: "6–9", start: 6, end: 9, cols: [6, 7, 8, 9] },
+].map((window) => ({
+  ...window,
+  mask: window.cols.reduce((mask, col) => mask | (1 << (col - 1)), 0),
+}));
+
+function buildSteps1386Alternative(input, params, approach) {
+  const n = Number(Array.isArray(input) ? input[0] : input) || 1;
+  const reservedRaw = String((params && params.reserved) || "").trim();
+  const reservedByRow = new Map();
+  if (reservedRaw) {
+    for (const token of reservedRaw.split(";")) {
+      const [rowStr, colStr] = token.split(",");
+      const row = Number(String(rowStr).trim());
+      const col = Number(String(colStr).trim());
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 1 || row > n || col < 1 || col > 10) continue;
+      if (!reservedByRow.has(row)) reservedByRow.set(row, new Set());
+      reservedByRow.get(row).add(col);
+    }
+  }
+
+  const reservedRows = [...reservedByRow.keys()].sort((a, b) => a - b);
+  const emptyRows = n - reservedRows.length;
+  const steps = [];
+  let answer = emptyRows * 2;
+  const codeBlock = approach;
+  const copyChosen = (chosen) => chosen.map((window) => ({ name: window.name, cols: [...window.cols] }));
+  const freeWindowsFor = (reserved) => CINEMA_WINDOWS_1386.filter((window) =>
+    window.cols.every((col) => !reserved.has(col))
+  );
+  const compatible = (a, b) => a.end < b.start || b.end < a.start;
+
+  const makeSeats = (reserved, chosen = [], activeWindow = null) => {
+    const chosenAt = new Map();
+    chosen.forEach((window) => window.cols.forEach((col) => chosenAt.set(col, window.name)));
+    const active = activeWindow
+      ? CINEMA_WINDOWS_1386.find((window) => window.name === activeWindow)
+      : null;
+    return Array.from({ length: 10 }, (_, index) => {
+      const col = index + 1;
+      return {
+        col,
+        reserved: reserved.has(col),
+        group: chosenAt.get(col) || null,
+        active: Boolean(active && active.cols.includes(col)),
+        aisle: col === 1 || col === 10,
+      };
+    });
+  };
+
+  const push = (meta, data) => {
+    steps.push({
+      title: data.title,
+      note: data.note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeBlock,
+      codeLines: data.codeLines,
+      vars: data.vars || [],
+      final: Boolean(meta.final),
+      cinemaSeatView: {
+        n,
+        emptyRows,
+        emptyContribution: emptyRows * 2,
+        reservedRowCount: reservedRows.length,
+        phase: meta.phase,
+        currentRow: meta.currentRow ?? null,
+        seats: meta.seats || null,
+        windows: meta.windows || null,
+        chosen: meta.chosen || [],
+        rowGroups: meta.rowGroups ?? null,
+        activeWindow: meta.activeWindow || null,
+        decision: meta.decision || null,
+        approach,
+        answer,
+        final: Boolean(meta.final),
+      },
+    });
+  };
+
+  const approachNames = {
+    2: { vi: "Bitmask từng hàng", en: "Per-row bitmask" },
+    3: { vi: "Bảng tra 1024 trạng thái", en: "1024-state lookup table" },
+    4: { vi: "Duyệt mọi tổ hợp cửa sổ", en: "Enumerate window combinations" },
+    5: { vi: "Quy hoạch động theo ghế", en: "Seat-by-seat dynamic programming" },
+    6: { vi: "Backtracking chọn nhóm", en: "Backtracking over families" },
+  };
+  const approachDescriptions = {
+    2: {
+      vi: "Mỗi hàng được mã hóa thành 10 bit: bit 1 nghĩa là ghế tương ứng đã đặt. Dùng AND với mask của từng cửa sổ để phát hiện ghế bị chặn.",
+      en: "Encode each row as 10 bits: a 1 means that seat is reserved. AND with each window mask to detect conflicts.",
+    },
+    3: {
+      vi: "Tiền xử lý đáp án cho cả 2^10 mẫu đặt ghế có thể có. Sau đó mỗi hàng chỉ cần tạo mask và tra bảng.",
+      en: "Precompute the best count for all 2^10 possible reservation patterns. Each row then needs only a mask and a lookup.",
+    },
+    4: {
+      vi: "Chỉ có tối đa 3 cửa sổ. Liệt kê các tập cửa sổ hợp lệ rồi chọn tập lớn nhất không chồng lấn.",
+      en: "There are at most three candidate windows. Enumerate their subsets and choose the largest non-overlapping valid set.",
+    },
+    5: {
+      vi: "Quét ghế 1→10. dp[i] là số nhóm tối đa đến ghế i; mỗi cửa sổ hợp lệ có thể nối vào dp trước ghế bắt đầu.",
+      en: "Scan seats 1→10. dp[i] is the maximum families through seat i; a valid window can extend the best result before its start.",
+    },
+    6: {
+      vi: "Thử lần lượt chọn hoặc bỏ từng cửa sổ hợp lệ; nhánh chọn chỉ đi tiếp nếu không chồng lấn với nhóm đã chọn.",
+      en: "For each valid window, branch on taking or skipping it; a take branch continues only if it does not overlap a chosen family.",
+    },
+  };
+
+  push({ phase: "intro" }, {
+    title: { vi: `Cách ${approach}: ${approachNames[approach].vi}`, en: `Approach ${approach}: ${approachNames[approach].en}` },
+    note: approachDescriptions[approach],
+    codeLines: [2],
+    vars: [
+      { name: "n (số hàng)", value: n },
+      { name: "hàng có ghế đặt", value: reservedRows.length ? `[${reservedRows.join(", ")}]` : "không" },
+    ],
+  });
+  push({ phase: "empty" }, {
+    title: { vi: `${emptyRows} hàng trống × 2 = ${emptyRows * 2} nhóm`, en: `${emptyRows} empty rows × 2 = ${emptyRows * 2} families` },
+    note: {
+      vi: "Hàng không có ghế đặt luôn xếp được hai nhóm ở hai bên: 2–5 và 6–9. Tính gộp để không cần duyệt từng hàng trống.",
+      en: "A row without reservations always fits two side families: 2–5 and 6–9. Count these rows in bulk instead of scanning each one.",
+    },
+    codeLines: [5],
+    vars: [{ name: "hàng trống", value: emptyRows }, { name: "answer", value: answer }],
+  });
+
+  let lookup = null;
+  if (approach === 3) {
+    lookup = Array.from({ length: 1 << 10 }, (_, rowMask) => {
+      const available = CINEMA_WINDOWS_1386.filter((window) => (rowMask & window.mask) === 0);
+      let best = 0;
+      for (let subset = 0; subset < (1 << available.length); subset += 1) {
+        const selected = available.filter((_, index) => subset & (1 << index));
+        if (selected.every((window, index) => selected.slice(index + 1).every((other) => compatible(window, other)))) {
+          best = Math.max(best, selected.length);
+        }
+      }
+      return best;
+    });
+    push({ phase: "precompute" }, {
+      title: { vi: "Tiền xử lý bảng tra 1024 mẫu", en: "Precompute the 1024-entry table" },
+      note: {
+        vi: "Có 10 ghế nên chỉ có 2¹⁰ = 1024 mask. Mỗi mask lưu số nhóm tốt nhất; các hàng trống đã được tính gộp riêng.",
+        en: "Ten seats produce only 2¹⁰ = 1024 masks. Each stores the best family count; empty rows are counted separately.",
+      },
+      codeLines: [3, 4],
+      vars: [{ name: "mask states", value: lookup.length }, { name: "lookup[0]", value: lookup[0] }],
+    });
+  }
+
+  for (const row of reservedRows) {
+    const reserved = reservedByRow.get(row);
+    const rowMask = [...reserved].reduce((mask, col) => mask | (1 << (col - 1)), 0);
+    const available = freeWindowsFor(reserved);
+    const windows = Object.fromEntries(CINEMA_WINDOWS_1386.map((window) => [
+      window.name,
+      window.cols.every((col) => !reserved.has(col)),
+    ]));
+    const reservedList = [...reserved].sort((a, b) => a - b);
+    const baseMeta = { phase: "inspect", currentRow: row, windows };
+    const show = (titleVi, titleEn, noteVi, noteEn, codeLines, vars, activeWindow = null, decision = null) => {
+      push({ ...baseMeta, seats: makeSeats(reserved, [], activeWindow), activeWindow, decision }, {
+        title: { vi: titleVi, en: titleEn },
+        note: { vi: noteVi, en: noteEn },
+        codeLines,
+        vars,
+      });
+    };
+
+    show(
+      `Hàng ${row}: ghế đã đặt [${reservedList.join(", ")}]`,
+      `Row ${row}: reserved seats [${reservedList.join(", ")}]`,
+      "Chuyển các ghế đã đặt thành mask để xét riêng hàng này.",
+      "Convert the reserved seats into a mask for this row.",
+      approach === 2 || approach === 3 ? [6, 7] : [5, 6],
+      [{ name: "row", value: row }, { name: "reserved", value: `[${reservedList.join(", ")}]` }, { name: "row mask", value: `0b${rowMask.toString(2).padStart(10, "0")}` }],
+    );
+
+    let chosen = [];
+    if (approach === 2) {
+      for (const window of CINEMA_WINDOWS_1386) {
+        const conflictMask = rowMask & window.mask;
+        const free = conflictMask === 0;
+        show(
+          `Kiểm tra ${window.label}: ${free ? "mask không giao nhau" : `ghế ${window.cols.find((col) => reserved.has(col))} bị đặt`}`,
+          `Check ${window.label}: ${free ? "masks do not overlap" : `seat ${window.cols.find((col) => reserved.has(col))} is reserved`}`,
+          free
+            ? `row_mask & window_mask = 0, nên cả 4 ghế ${window.label} đều trống.`
+            : `row_mask & window_mask = ${conflictMask.toString(2)}, khác 0 nên cửa sổ bị chặn.`,
+          free
+            ? `row_mask & window_mask = 0, so all four seats ${window.label} are free.`
+            : `row_mask & window_mask = ${conflictMask.toString(2)}, which is non-zero, so this window is blocked.`,
+          [8, 9],
+          [{ name: "window", value: window.label }, { name: "row_mask & window_mask", value: `0b${conflictMask.toString(2).padStart(10, "0")}` }, { name: "available?", value: free }],
+          window.name,
+          { status: free ? "free" : "blocked", conflictMask },
+        );
+      }
+      if (windows.left && windows.right) chosen = [CINEMA_WINDOWS_1386[0], CINEMA_WINDOWS_1386[2]];
+      else if (windows.mid) chosen = [CINEMA_WINDOWS_1386[1]];
+      else if (windows.left) chosen = [CINEMA_WINDOWS_1386[0]];
+      else if (windows.right) chosen = [CINEMA_WINDOWS_1386[2]];
+    } else if (approach === 3) {
+      const count = lookup[rowMask];
+      show(
+        `lookup[${rowMask}] = ${count}`,
+        `lookup[${rowMask}] = ${count}`,
+        `Mask ${rowMask} đã có kết quả trong bảng tiền xử lý: hàng này xếp tối đa ${count} nhóm.`,
+        `Mask ${rowMask} is already in the precomputed table: this row fits at most ${count} families.`,
+        [8],
+        [{ name: "row_mask", value: rowMask }, { name: "lookup[row_mask]", value: count }],
+      );
+      chosen = chooseWindowsForCount(available, count, compatible);
+    } else if (approach === 4) {
+      let bestCount = -1;
+      const totalSubsets = 1 << available.length;
+      for (let subset = 0; subset < totalSubsets; subset += 1) {
+        const candidate = available.filter((_, index) => subset & (1 << index));
+        const isCompatible = candidate.every((window, index) =>
+          candidate.slice(index + 1).every((other) => compatible(window, other))
+        );
+        if (isCompatible && candidate.length > bestCount) {
+          bestCount = candidate.length;
+          chosen = candidate;
+        }
+        show(
+          `Thử tổ hợp ${subset.toString(2).padStart(available.length, "0")}: ${isCompatible ? candidate.length : "chồng lấn"} nhóm`,
+          `Try subset ${subset.toString(2).padStart(available.length, "0")}: ${isCompatible ? candidate.length : "overlap"}`,
+          isCompatible
+            ? `Tổ hợp hợp lệ có ${candidate.length} nhóm${candidate.length > bestCount ? "; đây là kỷ lục mới." : "."}`
+            : "Hai cửa sổ trong tổ hợp dùng chung ghế, nên loại tổ hợp này.",
+          isCompatible
+            ? `This compatible subset has ${candidate.length} families${candidate.length === bestCount ? "; it is a best candidate." : "."}`
+            : "Two windows in this subset share seats, so reject this subset.",
+          [10, 11],
+          [{ name: "subset", value: subset }, { name: "windows", value: candidate.map((window) => window.label).join(" + ") || "none" }, { name: "compatible?", value: isCompatible }, { name: "best so far", value: Math.max(bestCount, 0) }],
+        );
+      }
+    } else if (approach === 5) {
+      const dp = Array(11).fill(0);
+      const pickedAt = Array(11).fill(null);
+      for (let seat = 1; seat <= 10; seat += 1) {
+        dp[seat] = dp[seat - 1];
+        for (const window of available) {
+          if (window.end !== seat) continue;
+          const candidateCount = dp[window.start - 1] + 1;
+          if (candidateCount > dp[seat]) {
+            dp[seat] = candidateCount;
+            pickedAt[seat] = window;
+          }
+        }
+        show(
+          `DP đến ghế ${seat}: dp[${seat}] = ${dp[seat]}`,
+          `DP through seat ${seat}: dp[${seat}] = ${dp[seat]}`,
+          pickedAt[seat]
+            ? `Chọn cửa sổ ${pickedAt[seat].label}: dp[${pickedAt[seat].start - 1}] + 1 = ${dp[seat]}.`
+            : "Không kết thúc nhóm mới ở ghế này; giữ kết quả tối ưu trước đó.",
+          pickedAt[seat]
+            ? `Take window ${pickedAt[seat].label}: dp[${pickedAt[seat].start - 1}] + 1 = ${dp[seat]}.`
+            : "No new family ends at this seat; keep the best result from the previous seat.",
+          [7, 8, 9],
+          [{ name: "seat", value: seat }, { name: "dp[seat]", value: dp[seat] }, { name: "chosen window", value: pickedAt[seat] ? pickedAt[seat].label : "none" }],
+          pickedAt[seat] ? pickedAt[seat].name : null,
+        );
+      }
+      let seat = 10;
+      while (seat > 0) {
+        const window = pickedAt[seat];
+        if (window) {
+          chosen.push(window);
+          seat = window.start - 1;
+        } else {
+          seat -= 1;
+        }
+      }
+      chosen.reverse();
+    } else {
+      let best = [];
+      function search(index, selected) {
+        if (index === available.length) {
+          if (selected.length > best.length) best = [...selected];
+          return;
+        }
+        const window = available[index];
+        const canTake = selected.every((other) => compatible(window, other));
+        show(
+          `${canTake ? "Thử chọn" : "Không thể chọn"} ${window.label}`,
+          `${canTake ? "Try taking" : "Cannot take"} ${window.label}`,
+          canTake
+            ? `Nhánh chọn được phép vì ${window.label} không giao ghế với nhóm đang chọn [${selected.map((item) => item.label).join(", ") || "rỗng"}].`
+            : `${window.label} dùng chung ghế với nhóm đã chọn, nên chỉ thử nhánh bỏ qua.`,
+          canTake
+            ? `${window.label} does not overlap the selected windows [${selected.map((item) => item.label).join(", ") || "none"}], so the take branch is valid.`
+            : `${window.label} overlaps an already selected family, so only the skip branch is valid.`,
+          [9, 10],
+          [{ name: "window", value: window.label }, { name: "selected", value: selected.map((item) => item.label).join(", ") || "none" }, { name: "take allowed?", value: canTake }],
+          window.name,
+          { status: canTake ? "try-take" : "overlap" },
+        );
+        if (canTake) search(index + 1, [...selected, window]);
+        search(index + 1, selected);
+      }
+      search(0, []);
+      chosen = best;
+    }
+
+    const rowGroups = chosen.length;
+    answer += rowGroups;
+    const chosenLabels = chosen.map((window) => window.label);
+    push({
+      phase: "assign",
+      currentRow: row,
+      seats: makeSeats(reserved, chosen),
+      windows,
+      chosen: copyChosen(chosen),
+      rowGroups,
+      decision: { chosen: chosenLabels, rowGroups, runningTotal: answer },
+    }, {
+      title: { vi: `Xếp ${rowGroups} nhóm ở hàng ${row}`, en: `Place ${rowGroups} families in row ${row}` },
+      note: {
+        vi: rowGroups
+          ? `Chọn ${chosenLabels.join(" và ")}. Các nhóm không dùng chung ghế, đóng góp ${rowGroups} vào tổng.`
+          : "Mọi cửa sổ đều bị chặn; hàng này không xếp được nhóm nào.",
+        en: rowGroups
+          ? `Choose ${chosenLabels.join(" and ")}. These windows do not share seats and add ${rowGroups} to the total.`
+          : "Every window is blocked; this row contributes no families.",
+      },
+      codeLines: approach === 2 ? [10, 11, 12] : approach === 3 ? [8, 9] : approach === 4 ? [12, 13] : approach === 5 ? [10] : [11, 12],
+      vars: [{ name: "row groups", value: rowGroups }, { name: "answer", value: answer }],
+    });
+  }
+
+  push({ phase: "done", final: true }, {
+    title: { vi: `Đáp án cuối: ${answer} nhóm`, en: `Final answer: ${answer} families` },
+    note: {
+      vi: `${emptyRows} hàng trống × 2 = ${emptyRows * 2}; các hàng có ghế đặt đóng góp ${answer - emptyRows * 2}; tổng = ${answer}.`,
+      en: `${emptyRows} empty rows × 2 = ${emptyRows * 2}; reserved rows contribute ${answer - emptyRows * 2}; total = ${answer}.`,
+    },
+    codeLines: [approach === 2 ? 13 : approach === 3 ? 9 : approach === 4 ? 14 : approach === 5 ? 11 : 13],
+    vars: [{ name: "empty-row contribution", value: emptyRows * 2 }, { name: "reserved-row contribution", value: answer - emptyRows * 2 }, { name: "answer", value: answer }],
+  });
+  return { original: n, answer, steps };
+}
+
+function chooseWindowsForCount(available, count, compatible) {
+  for (let subset = 0; subset < (1 << available.length); subset += 1) {
+    const selected = available.filter((_, index) => subset & (1 << index));
+    if (selected.length === count
+      && selected.every((window, index) => selected.slice(index + 1).every((other) => compatible(window, other)))) {
+      return selected;
+    }
+  }
+  return [];
+}
+
+function buildSteps1386Bitmask(input, params) {
+  return buildSteps1386Alternative(input, params, 2);
+}
+
+function buildSteps1386Lookup(input, params) {
+  return buildSteps1386Alternative(input, params, 3);
+}
+
+function buildSteps1386Enumerate(input, params) {
+  return buildSteps1386Alternative(input, params, 4);
+}
+
+function buildSteps1386DP(input, params) {
+  return buildSteps1386Alternative(input, params, 5);
+}
+
+function buildSteps1386Backtracking(input, params) {
+  return buildSteps1386Alternative(input, params, 6);
 }
 
 function parseMatrix(input) {
@@ -11399,16 +11809,30 @@ module.exports = {
     maxInput: 50,
     extraParams: [
       { key: "reserved", type: "string", label: { vi: "reservedSeats (hàng,ghế; ...)", en: "reservedSeats (row,seat; ...)" }, default: "1,2;1,3;1,8;2,6;3,1;3,10" },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1 · Greedy 3 cửa sổ", en: "Approach 1 · Three-window greedy" } },
+          { value: "2", label: { vi: "Cách 2 · Bitmask từng hàng", en: "Approach 2 · Per-row bitmask" } },
+          { value: "3", label: { vi: "Cách 3 · Bảng tra 1024 trạng thái", en: "Approach 3 · 1024-state lookup table" } },
+          { value: "4", label: { vi: "Cách 4 · Duyệt mọi tổ hợp", en: "Approach 4 · Enumerate combinations" } },
+          { value: "5", label: { vi: "Cách 5 · DP theo ghế", en: "Approach 5 · Seat-by-seat DP" } },
+          { value: "6", label: { vi: "Cách 6 · Backtracking", en: "Approach 6 · Backtracking" } },
+        ],
+      },
     ],
     approach: [
-      { vi: "Hàng trống xếp được 2 nhóm (2–5 và 6–9).", en: "An empty row fits 2 groups (2–5 and 6–9)." },
-      { vi: "Với hàng có ghế đặt, xét 3 cửa sổ: 2–5, 6–9, 4–7.", en: "For reserved rows, check 3 windows: 2–5, 6–9, 4–7." },
-      { vi: "Nếu cả hai bên trống → 2 nhóm; nếu chỉ giữa (4–7) trống → 1 nhóm.", en: "If both sides free → 2 groups; if only the middle (4–7) is free → 1 group." },
+      { vi: "Đánh dấu ba cửa sổ hợp lệ: 2–5, 4–7, 6–9. Hai cửa sổ hai bên không chồng lấn; cửa sổ giữa giao với cả hai.", en: "Check the three valid windows: 2–5, 4–7, 6–9. The side windows do not overlap; the middle overlaps both." },
+      { vi: "Một hàng trống xếp được 2 nhóm; chỉ duyệt các hàng có ghế đặt.", en: "An empty row fits two families; scan only rows with reservations." },
+      { vi: "Trực quan hóa tô rõ ghế đặt, cửa sổ đang kiểm tra, ghế gây xung đột và nhóm được chọn.", en: "The visualization highlights reserved seats, the window being checked, its conflicting seats, and the chosen families." },
     ],
     complexity: {
       time: "O(reserved)",
       space: "O(reserved)",
-      note: { vi: "Chỉ xét các hàng có ghế đặt; hàng trống tính gộp 2 nhóm mỗi hàng.", en: "Only reserved rows are examined; empty rows contribute 2 groups each in bulk." },
+      note: { vi: "Các cách 1, 2, 4, 5, 6 chạy tuyến tính theo số ghế đặt với tối đa 3 cửa sổ/hàng. Cách 3 tiền xử lý 1024 mask cố định rồi tra O(1) mỗi hàng.", en: "Approaches 1, 2, 4, 5, and 6 are linear in reservations with at most three windows per row. Approach 3 precomputes a fixed 1024-mask table, then looks up each row in O(1)." },
     },
     code: [
       "class Solution:",
@@ -11425,7 +11849,120 @@ module.exports = {
       "            total += 2 if left and right else 1 if left or right or mid else 0",
       "        return total",
     ],
+    code2Label: { vi: "Cách 2 · Bitmask từng hàng", en: "Approach 2 · Per-row bitmask" },
+    code2: [
+      "class Solution:",
+      "    def maxNumberOfFamilies(self, n, reservedSeats):",
+      "        rows = [0] * (n + 1)",
+      "        for r, c in reservedSeats:",
+      "            rows[r] |= 1 << (c - 1)",
+      "        left, mid, right = 30, 120, 480",
+      "        total = (n - sum(mask != 0 for mask in rows)) * 2",
+      "        for mask in rows:",
+      "            if mask == 0:",
+      "                continue",
+      "            l = (mask & left) == 0",
+      "            m = (mask & mid) == 0",
+      "            r = (mask & right) == 0",
+      "            total += 2 if l and r else int(l or m or r)",
+      "        return total",
+    ],
+    code3Label: { vi: "Cách 3 · Bảng tra 1024 trạng thái", en: "Approach 3 · 1024-state lookup table" },
+    code3: [
+      "class Solution:",
+      "    def maxNumberOfFamilies(self, n, reservedSeats):",
+      "        placements = [(0, 0), (30, 1), (120, 1), (480, 1), (510, 2)]",
+      "        best = [0] * 1024",
+      "        for mask in range(1024):",
+      "            best[mask] = max(",
+      "                count for placement, count in placements",
+      "                if mask & placement == 0",
+      "            )",
+      "        rows = [0] * (n + 1)",
+      "        for r, c in reservedSeats:",
+      "            rows[r] |= 1 << (c - 1)",
+      "        return sum(mask == 0 for mask in rows[1:]) * 2 + sum(",
+      "            best[mask] for mask in rows[1:] if mask",
+      "        )",
+    ],
+    code4Label: { vi: "Cách 4 · Duyệt mọi tổ hợp cửa sổ", en: "Approach 4 · Enumerate window combinations" },
+    code4: [
+      "from collections import defaultdict",
+      "class Solution:",
+      "    def maxNumberOfFamilies(self, n, reservedSeats):",
+      "        rows = defaultdict(set)",
+      "        for r, c in reservedSeats:",
+      "            rows[r].add(c)",
+      "        total = (n - len(rows)) * 2",
+      "        windows = [(2, 5), (4, 7), (6, 9)]",
+      "        for reserved in rows.values():",
+      "            valid = [w for w in windows if not any(",
+      "                c in reserved for c in range(w[0], w[1] + 1)",
+      "            )]",
+      "            best = 0",
+      "            for subset in range(1 << len(valid)):",
+      "                chosen = [valid[i] for i in range(len(valid)) if subset >> i & 1]",
+      "                if all(a[1] < b[0] or b[1] < a[0]",
+      "                       for i, a in enumerate(chosen) for b in chosen[i+1:]):",
+      "                    best = max(best, len(chosen))",
+      "            total += best",
+      "        return total",
+    ],
+    code5Label: { vi: "Cách 5 · DP theo ghế", en: "Approach 5 · Seat-by-seat DP" },
+    code5: [
+      "from collections import defaultdict",
+      "class Solution:",
+      "    def maxNumberOfFamilies(self, n, reservedSeats):",
+      "        rows = defaultdict(set)",
+      "        for r, c in reservedSeats:",
+      "            rows[r].add(c)",
+      "        total = (n - len(rows)) * 2",
+      "        for reserved in rows.values():",
+      "            dp = [0] * 11",
+      "            for seat in range(1, 11):",
+      "                dp[seat] = dp[seat - 1]",
+      "                for start in (2, 4, 6):",
+      "                    end = start + 3",
+      "                    if seat == end and all(c not in reserved",
+      "                                           for c in range(start, end + 1)):",
+      "                        dp[seat] = max(dp[seat], dp[start - 1] + 1)",
+      "            total += dp[10]",
+      "        return total",
+    ],
+    code6Label: { vi: "Cách 6 · Backtracking", en: "Approach 6 · Backtracking" },
+    code6: [
+      "from collections import defaultdict",
+      "class Solution:",
+      "    def maxNumberOfFamilies(self, n, reservedSeats):",
+      "        rows = defaultdict(set)",
+      "        for r, c in reservedSeats:",
+      "            rows[r].add(c)",
+      "        total = (n - len(rows)) * 2",
+      "        windows = [(2, 5), (4, 7), (6, 9)]",
+      "        for reserved in rows.values():",
+      "            valid = [w for w in windows if not any(",
+      "                c in reserved for c in range(w[0], w[1] + 1)",
+      "            )]",
+      "            best = 0",
+      "            def search(i, chosen):",
+      "                nonlocal best",
+      "                if i == len(valid):",
+      "                    best = max(best, len(chosen))",
+      "                    return",
+      "                search(i + 1, chosen)",
+      "                start, end = valid[i]",
+      "                if all(end < a or b < start for a, b in chosen):",
+      "                    search(i + 1, chosen + [valid[i]])",
+      "            search(0, [])",
+      "            total += best",
+      "        return total",
+    ],
     builder: buildSteps1386,
+    builder2: buildSteps1386Bitmask,
+    builder3: buildSteps1386Lookup,
+    builder4: buildSteps1386Enumerate,
+    builder5: buildSteps1386DP,
+    builder6: buildSteps1386Backtracking,
   },
   31: {
     id: 31,

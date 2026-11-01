@@ -648,6 +648,7 @@ function renderCinemaSeatView(step) {
   const phaseLabels = {
     intro: vi ? "Giới thiệu" : "Intro",
     empty: vi ? "Hàng trống" : "Empty rows",
+    precompute: vi ? "Tiền xử lý" : "Precompute",
     inspect: vi ? "Kiểm tra cửa sổ" : "Check windows",
     assign: vi ? "Xếp nhóm" : "Assign groups",
     done: vi ? "Hoàn tất" : "Complete",
@@ -659,11 +660,20 @@ function renderCinemaSeatView(step) {
       const classes = ["cin1386-seat"];
       if (seat.reserved) classes.push("reserved");
       else if (seat.group) classes.push("group", seat.group);
+      if (seat.active) classes.push("active-window");
+      if (seat.active && seat.reserved) classes.push("conflict");
       if (seat.aisle) classes.push("aisle");
       const icon = seat.reserved ? "✕" : seat.group ? "●" : "";
-      return `<span class="${classes.join(" ")}"><small>${seat.col}</small><b>${icon}</b></span>`;
+      const stateLabel = seat.reserved
+        ? (vi ? "đã đặt" : "reserved")
+        : seat.group
+          ? (vi ? `nhóm ${seat.group}` : `${seat.group} family`)
+          : seat.active
+            ? (vi ? "đang kiểm tra" : "checking")
+            : (vi ? "trống" : "available");
+      return `<span class="${classes.join(" ")}" aria-label="${vi ? `Ghế ${seat.col}: ${stateLabel}` : `Seat ${seat.col}: ${stateLabel}`}"><small>${seat.col}</small><b>${icon}</b></span>`;
     }).join("");
-    seatSection = `<section class="cin1386-row"><header><strong>${vi ? "HÀNG" : "ROW"} ${view.currentRow}</strong><span>${vi ? "✕ đã đặt · ● ghế trong nhóm · | lối đi" : "✕ reserved · ● seat in a group · | aisle"}</span></header><div class="cin1386-seats">${seatHtml}</div></section>`;
+    seatSection = `<section class="cin1386-row"><header><strong>${vi ? "HÀNG" : "ROW"} ${view.currentRow}</strong><span>${vi ? "✕ đã đặt · viền sáng đang kiểm tra · ● nhóm được xếp · khoảng trống giữa ghế 5–6 là lối đi" : "✕ reserved · bright outline is under review · ● assigned family · gap between seats 5–6 is the aisle"}</span></header><div class="cin1386-seats">${seatHtml}</div></section>`;
   }
 
   let windowSection = "";
@@ -673,7 +683,7 @@ function renderCinemaSeatView(step) {
     const box = (name, label, free) => {
       const state = chosenNames.has(name) ? "chosen" : free ? "free" : "blocked";
       const stateText = chosenNames.has(name) ? (vi ? "đã chọn" : "chosen") : free ? (vi ? "trống" : "free") : (vi ? "bị chặn" : "blocked");
-      return `<div class="cin1386-window ${state}"><small>${label}</small><em>${stateText}</em></div>`;
+      return `<div class="cin1386-window ${state}${view.activeWindow === name ? " active" : ""}"><small>${label}</small><em>${stateText}</em></div>`;
     };
     windowSection = `<section class="cin1386-windows">
       ${box("left", "2–5", w.left)}
@@ -682,13 +692,42 @@ function renderCinemaSeatView(step) {
     </section>`;
   }
 
+  let explanationSection = "";
+  if (view.currentRow !== null && view.currentRow !== undefined) {
+    const active = view.activeWindow
+      ? ({ left: "2–5", mid: "4–7", right: "6–9" }[view.activeWindow] || view.activeWindow)
+      : null;
+    const decision = view.decision || {};
+    let detail = vi
+      ? "Mỗi cửa sổ cần đủ 4 ghế chưa đặt."
+      : "Every window needs all four seats to be unreserved.";
+    if (Array.isArray(decision.blockingSeats) && decision.blockingSeats.length) {
+      detail = vi
+        ? `Bị chặn bởi ghế đã đặt: ${decision.blockingSeats.join(", ")}.`
+        : `Blocked by reserved seat(s): ${decision.blockingSeats.join(", ")}.`;
+    } else if (decision.status === "free") {
+      detail = vi ? "Không có ghế đặt nào trong cửa sổ này → có thể xếp." : "No reserved seat is in this window → a family can fit.";
+    } else if (decision.status === "blocked") {
+      detail = vi ? `Mask giao nhau khác 0 (${decision.conflictMask}).` : `The overlap mask is non-zero (${decision.conflictMask}).`;
+    } else if (Array.isArray(decision.chosen)) {
+      detail = vi
+        ? `Chọn ${decision.chosen.join(" và ") || "không có cửa sổ nào"}; số nhóm tối đa ở hàng này là ${decision.rowGroups}.`
+        : `Choose ${decision.chosen.join(" and ") || "no windows"}; this row's maximum is ${decision.rowGroups} family/families.`;
+    } else if (decision.status === "try-take") {
+      detail = vi ? "Đang xét nhánh chọn cửa sổ này trong backtracking." : "Explore the branch that takes this window.";
+    } else if (decision.status === "overlap") {
+      detail = vi ? "Cửa sổ này dùng chung ghế với nhóm đã chọn." : "This window overlaps an already selected family.";
+    }
+    explanationSection = `<section class="cin1386-explain"><small>${active ? (vi ? `ĐANG XÉT · ${active}` : `NOW CHECKING · ${active}`) : (vi ? "QUYẾT ĐỊNH HÀNG" : "ROW DECISION")}</small><strong>${escapeHtml(detail)}</strong></section>`;
+  }
+
   const answerLine = view.phase === "done"
     ? `<b>${view.answer}</b> ${vi ? "nhóm" : "groups"}`
     : `${vi ? "tổng hiện tại" : "running total"}: <b>${view.answer}</b>`;
 
   $("treeView").innerHTML = `<section class="cin1386-viz" role="img" aria-label="${vi ? "Trực quan hóa xếp ghế rạp phim" : "Cinema seat allocation visualization"}">
     <header><strong>CINEMA SEAT ALLOCATION</strong><span class="cin1386-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
-    <section class="cin1386-rule"><b>CORE RULE</b><strong>${vi ? "3 cửa sổ nhóm: 2–5 · 6–9 · 4–7" : "3 group windows: 2–5 · 6–9 · 4–7"}</strong><span>${vi ? "hai bên trống → 2 nhóm; chỉ giữa trống → 1 nhóm" : "both sides free → 2 groups; only middle free → 1 group"}</span></section>
+    <section class="cin1386-rule"><b>${vi ? "QUY TẮC" : "RULE"}</b><strong>${vi ? "Cửa sổ hợp lệ: 2–5 · 4–7 · 6–9" : "Valid windows: 2–5 · 4–7 · 6–9"}</strong><span>${vi ? "Cửa sổ cần đủ 4 ghế trống. Hai bên 2–5 và 6–9 không chồng lấn; 4–7 là phương án giữa nếu một bên bị chặn." : "Each window needs 4 free seats. Side windows 2–5 and 6–9 do not overlap; 4–7 is the middle alternative when a side is blocked."}</span></section>
     <section class="cin1386-stats">
       <div><small>${vi ? "hàng trống" : "empty rows"}</small><strong>${view.emptyRows} × 2 = ${view.emptyContribution}</strong></div>
       <div><small>${vi ? "hàng có ghế đặt" : "reserved rows"}</small><strong>${view.reservedRowCount}</strong></div>
@@ -696,6 +735,7 @@ function renderCinemaSeatView(step) {
     </section>
     ${seatSection}
     ${windowSection}
+    ${explanationSection}
   </section>`;
 }
 
