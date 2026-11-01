@@ -2415,10 +2415,12 @@ function renderMultiDijkstra2203View(step) {
   const view = step.multiDijkstra2203View || {};
   const vi = lang === "vi";
   const phases = vi
-    ? ["1. Dựng graph", "2. Từ src1", "3. Từ src2", "4. Tới dest", "5. Ghép"]
-    : ["1. Build graph", "2. From src1", "3. From src2", "4. To dest", "5. Combine"];
-  const phaseIndex = view.phase === "build" || view.phase === "invalid" ? 0
-    : view.activeRun === "src1" ? 1 : view.activeRun === "src2" ? 2 : view.activeRun === "dest" ? 3 : 4;
+    ? ["1. Dựng graph", "2. Khoảng cách từ src1", "3. Khoảng cách từ src2", "4. Khoảng cách tới dest", "5. Ghép tại node"]
+    : ["1. Build graph", "2. Distances from src1", "3. Distances from src2", "4. Distances to dest", "5. Combine at a node"];
+  const phaseIndex = view.phase === "build" || view.phase === "invalid" || view.phase === "matrix-init" ? 0
+    : view.phase === "combine" || view.phase === "done" ? 4
+      : view.activeRun === "src1" ? 1 : view.activeRun === "src2" ? 2 : view.activeRun === "dest" ? 3
+        : view.phase === "floyd-relax" ? 1 : 0;
   const phaseHtml = phases.map((label, index) => `<span class="${index === phaseIndex ? "active" : ""} ${index < phaseIndex ? "done" : ""}">${index < phaseIndex ? "✓ " : ""}${label}</span>`).join("");
   const distanceGroups = [
     ["src1", `FROM SRC1 · ${view.src1}`, view.distances?.src1 || []],
@@ -2427,14 +2429,25 @@ function renderMultiDijkstra2203View(step) {
   ];
   const distancesHtml = distanceGroups.map(([key, label, values]) => `<section class="multi2203-dist-group ${view.activeRun === key ? "active" : ""}"><header><strong>${label}</strong><span>${key === "dest" ? (vi ? "reverse graph" : "reversed graph") : (vi ? "graph gốc" : "original graph")}</span></header><div>${values.map((item) => `<span class="${item.node === view.currentNode && view.activeRun === key ? "current" : ""}"><small>${item.node}</small><b>${escapeHtml(item.value)}</b></span>`).join("")}</div></section>`).join("");
   const heap = view.heap || [];
+  const worklistLabel = view.approach === 5 ? (vi ? "SPFA QUEUE" : "SPFA QUEUE") : (vi ? "HEAP" : "HEAP");
   const heapHtml = heap.length
-    ? heap.slice(0, 8).map((item, index) => `<span class="${index === 0 ? "front" : ""}"><small>#${index + 1}</small><b>(${item.distance}, ${item.node})</b></span>`).join("")
-    : `<em>${vi ? "heap rỗng" : "empty heap"}</em>`;
+    ? heap.slice(0, 8).map((item, index) => `<span class="${index === 0 ? "front" : ""}"><small>${view.approach === 5 ? `#${index + 1}` : `#${index + 1}`}</small><b>(${item.distance}, ${item.node})</b></span>`).join("")
+    : `<em>${vi ? (view.approach === 5 ? "queue rỗng" : "heap rỗng") : (view.approach === 5 ? "empty queue" : "empty heap")}</em>`;
   const rows = view.combineRows || [];
   const combineHtml = rows.map((row) => `<div class="${row.node === view.combineNode ? "active" : ""} ${row.best ? "best" : ""}"><strong>${row.node}</strong><span>${escapeHtml(row.d1)}</span><i>+</i><span>${escapeHtml(row.d2)}</span><i>+</i><span>${escapeHtml(row.d3)}</span><b>${escapeHtml(row.total)}</b></div>`).join("");
   let action;
-  if (view.phase === "relax" && view.activeEdge) {
+  const relaxPhases = new Set(["relax", "bellman-relax", "matrix-relax", "spfa-relax"]);
+  if (relaxPhases.has(view.phase) && view.activeEdge) {
     action = `<strong>${view.activeRun === "dest" ? `${view.activeEdge.u} ⇢ ${view.activeEdge.v} (reversed)` : `${view.activeEdge.u} → ${view.activeEdge.v}`}</strong><span>${view.candidate} &lt; ${escapeHtml(view.oldDistance)} → ${view.improves ? "update" : "keep"}</span>`;
+  } else if (view.phase === "floyd-relax") {
+    const check = view.matrixCheck || {};
+    action = `<strong>dist[${check.from}][${check.to}] = min(${escapeHtml(check.oldDistance)}, dist[${check.from}][${check.intermediate}] + dist[${check.intermediate}][${check.to}])</strong><span>min(${escapeHtml(check.oldDistance)}, ${escapeHtml(check.leftDistance)} + ${escapeHtml(check.rightDistance)}) = ${escapeHtml(check.improves ? check.candidate : check.oldDistance)} → ${check.improves ? (vi ? "cập nhật" : "update") : (vi ? "giữ nguyên" : "keep")}</span>`;
+  } else if (view.phase === "bellman-relax" && view.currentPass) {
+    action = `<strong>${vi ? "LƯỢT" : "PASS"} ${view.currentPass.pass}/${view.currentPass.maxPasses}</strong><span>${vi ? "Thử mọi cạnh; n−1 lượt đủ cho đường đi đơn dài nhất." : "Try every edge; n−1 passes cover the longest simple path."}</span>`;
+  } else if (view.phase === "scan-select") {
+    action = `<strong>${vi ? "QUÉT TOÀN BỘ NODE" : "SCAN ALL NODES"} · ${view.currentNode}</strong><span>${vi ? "Chốt node chưa thăm có dist nhỏ nhất." : "Finalize the unvisited node with minimum tentative distance."}</span>`;
+  } else if (view.phase === "spfa-pop") {
+    action = `<strong>${vi ? "QUEUE →" : "QUEUE →"} ${view.currentNode}</strong><span>${vi ? "Chỉ node được cải thiện mới cần duyệt lại." : "Only nodes with improved distances need another scan."}</span>`;
   } else if (view.phase === "combine" && view.combineNode !== null) {
     const row = rows.find((item) => item.node === view.combineNode);
     action = `<strong>meet = ${view.combineNode}</strong><span>${escapeHtml(row?.d1)} + ${escapeHtml(row?.d2)} + ${escapeHtml(row?.d3)} = ${escapeHtml(row?.total)}</span>`;
@@ -2445,15 +2458,25 @@ function renderMultiDijkstra2203View(step) {
   }
   const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : step.codeLines;
   const summary = vi ? `Bài 2203: minimum = ${view.answer}.` : `Problem 2203: minimum = ${view.answer}.`;
+  const method = pick(view.approachName) || (view.approach === 1 ? "Three Dijkstra runs" : "Shortest path method");
+  const strategy = pick(view.strategy) || (vi
+    ? "Tính dist1[x], dist2[x], toDest[x], rồi chọn x có tổng nhỏ nhất."
+    : "Compute dist1[x], dist2[x], and toDest[x], then minimize their sum over x.");
+  const pass = view.currentPass && view.currentPass.pass
+    ? `<span class="multi2203-pass">${vi ? "Lượt" : "Pass"} ${view.currentPass.pass}/${view.currentPass.maxPasses}</span>`
+    : view.currentPass && view.currentPass.intermediate !== undefined
+      ? `<span class="multi2203-pass">${vi ? "Node trung gian" : "Intermediate"} k=${view.currentPass.intermediate}</span>`
+      : "";
   $("treeView").innerHTML = `<section class="multi2203-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="multi2203-phases">${phaseHtml}</div>
+    <div class="multi2203-method"><small>${vi ? "CÁCH ĐANG DÙNG" : "ACTIVE APPROACH"}</small><strong>${escapeHtml(method)}</strong><span>${escapeHtml(strategy)}</span>${pass}</div>
     <header class="multi2203-title"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></header>
     <div class="multi2203-action">${action}</div>
     <div class="multi2203-workspace">
       <section class="multi2203-graph"><header><strong>DIRECTED GRAPH</strong><span>src1=${view.src1} · src2=${view.src2} · dest=${view.dest}</span></header><div id="multi2203Graph"></div></section>
-      <section class="multi2203-runs">${distancesHtml}<div class="multi2203-heap"><header><strong>ACTIVE HEAP</strong><span>${escapeHtml(pick(view.runLabel) || "—")}</span></header><div>${heapHtml}</div></div></section>
+      <section class="multi2203-runs">${distancesHtml}<div class="multi2203-heap"><header><strong>${worklistLabel}</strong><span>${escapeHtml(pick(view.runLabel) || "—")}</span></header><div>${heapHtml}</div></div></section>
     </div>
-    <section class="multi2203-combine"><header><strong>TRY EVERY MEETING NODE</strong><span>d1[x] + d2[x] + toDest[x]</span></header><div class="multi2203-combine-head"><b>x</b><span>d1</span><i></i><span>d2</span><i></i><span>toDest</span><strong>total</strong></div><div>${combineHtml}</div></section>
+    <section class="multi2203-combine"><header><strong>${vi ? "THỬ ĐIỂM NHẬP CHUNG" : "TRY EVERY MEETING NODE"}</strong><span>${vi ? "đủ cả 3 khoảng cách mới là ứng viên" : "candidate needs all 3 finite distances"}</span></header><div class="multi2203-combine-head"><b>x</b><span>d1</span><i>+</i><span>d2</span><i>+</i><span>toDest</span><strong>${vi ? "tổng" : "total"}</strong></div><div>${combineHtml}</div></section>
     <div class="multi2203-result ${view.phase === "done" ? "visible" : ""}"><small>MINIMUM WEIGHT</small><strong>${view.phase === "done" && view.answer === "∞" ? -1 : escapeHtml(view.answer)}</strong><span>${view.bestMeeting === null ? (vi ? "chưa có meeting point" : "no meeting point yet") : `meet at node ${view.bestMeeting}`}</span></div>
   </section>`;
   renderGraph(step, "multi2203Graph");
@@ -4693,4 +4716,3 @@ function renderCriticalPoints2058View(step) {
     <div class="cp2058-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(lineExplanation || pick(step.note))}</span></div>
   </section>`;
 }
-

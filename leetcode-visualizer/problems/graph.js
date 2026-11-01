@@ -22915,6 +22915,8 @@ function buildSteps1786(input, params = {}) {
 
 /** LeetCode 2203: Dijkstra from two sources and from dest on reversed edges. */
 function buildSteps2203(input, params = {}) {
+  const approach = Number(params.approach) || 1;
+  if (approach > 1) return buildSteps2203Alternative(input, params, approach);
   const edges = parseWeightedEdgesDijkstra(input);
   const n = Number(params.n ?? 6);
   const src1 = Number(params.src1 ?? 0);
@@ -22988,7 +22990,13 @@ function buildSteps2203(input, params = {}) {
         dimUnfocused: Boolean(currentNode || activeEdge || final),
       },
       multiDijkstra2203View: {
-        phase, n, src1, src2, dest, activeRun, runLabel: activeRun ? runLabels[activeRun] : null,
+        phase, approach: 1,
+        approachName: { vi: "Ba lần Dijkstra với heap", en: "Three heap-based Dijkstra runs" },
+        strategy: {
+          vi: "Tính dist1[x], dist2[x], toDest[x], rồi chọn x có tổng nhỏ nhất.",
+          en: "Compute dist1[x], dist2[x], and toDest[x], then minimize their sum over x.",
+        },
+        n, src1, src2, dest, activeRun, runLabel: activeRun ? runLabels[activeRun] : null,
         distances: {
           src1: nodes.map((node) => ({ node, value: fmt(dist1[node]) })),
           src2: nodes.map((node) => ({ node, value: fmt(dist2[node]) })),
@@ -23115,6 +23123,447 @@ function buildSteps2203(input, params = {}) {
   return { original: edges, edges, n, src1, src2, dest, answer: result, steps };
 }
 
+function buildSteps2203Alternative(input, params, approach) {
+  if (![2, 3, 4, 5].includes(approach)) {
+    throw new RangeError("#2203: approach must be between 1 and 5.");
+  }
+  const edges = parseWeightedEdgesDijkstra(input);
+  const n = Number(params.n ?? 6);
+  const src1 = Number(params.src1 ?? 0);
+  const src2 = Number(params.src2 ?? 1);
+  const dest = Number(params.dest ?? 5);
+  const nodes = Array.from({ length: Number.isInteger(n) && n > 0 ? n : 0 }, (_, index) => index);
+  const valid = Number.isInteger(n) && n >= 3 && n <= 9 && edges.length >= 1 && edges.length <= 20
+    && [src1, src2, dest].every((node) => Number.isInteger(node) && node >= 0 && node < n)
+    && new Set([src1, src2, dest]).size === 3
+    && edges.every((edge) => edge.length === 3 && edge.every(Number.isFinite)
+      && Number.isInteger(edge[0]) && Number.isInteger(edge[1])
+      && edge[0] >= 0 && edge[0] < n && edge[1] >= 0 && edge[1] < n
+      && edge[0] !== edge[1] && Number.isInteger(edge[2]) && edge[2] > 0);
+  const reverseEdges = edges.map(([u, v, w]) => [v, u, w]);
+  const dist1 = Array(Math.max(0, n)).fill(Infinity);
+  const dist2 = Array(Math.max(0, n)).fill(Infinity);
+  const toDest = Array(Math.max(0, n)).fill(Infinity);
+  const parent1 = Array(Math.max(0, n)).fill(null);
+  const parent2 = Array(Math.max(0, n)).fill(null);
+  const nextToDest = Array(Math.max(0, n)).fill(null);
+  const steps = [];
+  let answer = Infinity;
+  let bestMeeting = null;
+  let activeRun = null;
+  let currentNode = null;
+  let activeEdge = null;
+  let candidate = null;
+  let oldDistance = null;
+  let improves = null;
+  let currentPass = null;
+  let matrixCheck = null;
+  let queue = [];
+  let settled = [];
+
+  const fmt = (value) => value === Infinity ? "∞" : value;
+  const runLabels = {
+    src1: { vi: `Từ src1=${src1}`, en: `From src1=${src1}` },
+    src2: { vi: `Từ src2=${src2}`, en: `From src2=${src2}` },
+    dest: { vi: `Tới dest=${dest}`, en: `To dest=${dest}` },
+  };
+  const strategies = {
+    2: {
+      vi: "Bellman–Ford: mỗi lượt thử nới lỏng tất cả cạnh; đường đi ngắn nhất đơn có tối đa n−1 cạnh.",
+      en: "Bellman–Ford: relax every edge per pass; a simple shortest path uses at most n−1 edges.",
+    },
+    3: {
+      vi: "Floyd–Warshall: cho phép từng node làm điểm trung gian, rồi đọc ba khoảng cách cần thiết.",
+      en: "Floyd–Warshall: allow each node as an intermediate, then read the three required distances.",
+    },
+    4: {
+      vi: "Dijkstra O(V²): mỗi lượt quét toàn bộ node để chốt khoảng cách nhỏ nhất, không dùng heap.",
+      en: "O(V²) Dijkstra: scan every node to finalize the smallest distance; no heap is used.",
+    },
+    5: {
+      vi: "SPFA: dùng queue để chỉ thử lại các node vừa được cải thiện; thời gian xấu nhất O(VE).",
+      en: "SPFA: queue only nodes whose distances improved; worst-case time is O(VE).",
+    },
+  };
+  const approachNames = {
+    2: { vi: "Bellman–Ford", en: "Bellman–Ford" },
+    3: { vi: "Floyd–Warshall", en: "Floyd–Warshall" },
+    4: { vi: "Dijkstra quét O(V²)", en: "Array-scan Dijkstra O(V²)" },
+    5: { vi: "SPFA (queue relaxation)", en: "SPFA (queue relaxation)" },
+  };
+  const distanceRows = () => ({
+    src1: nodes.map((node) => ({ node, value: fmt(dist1[node]) })),
+    src2: nodes.map((node) => ({ node, value: fmt(dist2[node]) })),
+    dest: nodes.map((node) => ({ node, value: fmt(toDest[node]) })),
+  });
+  const combineRows = () => nodes.map((node) => {
+    const reachable = [dist1[node], dist2[node], toDest[node]].every(Number.isFinite);
+    return {
+      node,
+      d1: fmt(dist1[node]),
+      d2: fmt(dist2[node]),
+      d3: fmt(toDest[node]),
+      total: reachable ? dist1[node] + dist2[node] + toDest[node] : "∞",
+      best: node === bestMeeting,
+    };
+  });
+  const pathEdges = () => {
+    if (bestMeeting === null) return [];
+    const result = [];
+    const addPath = (parent, node) => {
+      let current = node;
+      const seen = new Set();
+      while (parent[current] !== null && !seen.has(current)) {
+        seen.add(current);
+        result.push([parent[current], current]);
+        current = parent[current];
+      }
+    };
+    addPath(parent1, bestMeeting);
+    addPath(parent2, bestMeeting);
+    let node = bestMeeting;
+    const seen = new Set();
+    while (nextToDest[node] !== null && !seen.has(node)) {
+      seen.add(node);
+      result.push([node, nextToDest[node]]);
+      node = nextToDest[node];
+    }
+    return result;
+  };
+
+  function snapshot({ title, note, phase, codeLine, final = false, combineNode = null, runLabel = null } = {}) {
+    const graphEdges = edges.map(([u, v, w]) => ({ u, v, w }));
+    const view = {
+      phase,
+      approach,
+      strategy: strategies[approach],
+      approachName: approachNames[approach],
+      n, src1, src2, dest,
+      activeRun,
+      runLabel: activeRun ? runLabels[activeRun] : runLabel,
+      distances: distanceRows(),
+      heap: queue.map(([distance, node], index) => ({ distance, node, index })),
+      settled: [...settled],
+      currentNode,
+      activeEdge,
+      candidate,
+      oldDistance: oldDistance === Infinity ? "∞" : oldDistance,
+      improves,
+      combineNode,
+      combineRows: combineRows(),
+      bestMeeting,
+      answer: answer === Infinity ? "∞" : answer,
+      pathEdges: final ? pathEdges() : [],
+      currentPass,
+      matrixCheck,
+      queue: queue.map((item) => item[1]),
+    };
+    const step = {
+      title,
+      note,
+      codeLines: [codeLine || 1],
+      codeBlock: approach,
+      graph: {
+        nodes: nodes.map((id) => ({ id, label: String(id) })),
+        edges: graphEdges,
+        hlNodes: [currentNode, combineNode, bestMeeting].filter((value, index, list) => value !== null && list.indexOf(value) === index),
+        hlEdges: final ? pathEdges() : activeEdge ? [[activeEdge.originalU, activeEdge.originalV]] : [],
+        visitedNodes: settled,
+        annotations: { [src1]: "src1", [src2]: "src2", [dest]: "dest" },
+        dimUnfocused: Boolean(currentNode !== null || activeEdge || final),
+      },
+      multiDijkstra2203View: view,
+      vars: [
+        { name: "method", value: approachNames[approach].en },
+        { name: "meeting", value: bestMeeting === null ? "-" : bestMeeting },
+        { name: "minimum", value: answer === Infinity ? "∞" : answer },
+      ],
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!valid) {
+    snapshot({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      note: { vi: "Visualization hỗ trợ 3 ≤ n ≤ 9, tối đa 20 cạnh có hướng u,v,w có trọng số nguyên dương và ba endpoint khác nhau.", en: "Visualization supports 3 <= n <= 9, at most 20 directed u,v,w edges with positive integer weights, and three distinct endpoints." },
+      phase: "invalid", final: true,
+    });
+    return { original: edges, edges, n, src1, src2, dest, answer: null, steps };
+  }
+
+  snapshot({
+    title: { vi: `Cách ${approach}: ${approachNames[approach].vi}`, en: `Approach ${approach}: ${approachNames[approach].en}` },
+    note: strategies[approach],
+    phase: "build", codeLine: 1,
+  });
+
+  const runs = [
+    { key: "src1", start: src1, edges, distances: dist1, parent: parent1 },
+    { key: "src2", start: src2, edges, distances: dist2, parent: parent2 },
+    { key: "dest", start: dest, edges: reverseEdges, distances: toDest, parent: nextToDest },
+  ];
+
+  if (approach === 3) {
+    const matrix = Array.from({ length: n }, (_, i) =>
+      Array.from({ length: n }, (_, j) => i === j ? 0 : Infinity)
+    );
+    const next = Array.from({ length: n }, () => Array(n).fill(null));
+    edges.forEach(([u, v, weight]) => {
+      if (weight < matrix[u][v]) {
+        matrix[u][v] = weight;
+        next[u][v] = v;
+      }
+    });
+    snapshot({
+      title: { vi: "Khởi tạo ma trận khoảng cách", en: "Initialize the distance matrix" },
+      note: { vi: "dist[i][i]=0; cạnh trực tiếp giữ trọng số nhỏ nhất nếu có cạnh song song.", en: "Set dist[i][i]=0; direct edges keep the smallest weight if parallel edges exist." },
+      phase: "matrix-init", codeLine: 3,
+    });
+    for (let k = 0; k < n; k += 1) {
+      for (let i = 0; i < n; i += 1) {
+        if (!Number.isFinite(matrix[i][k])) continue;
+        for (let j = 0; j < n; j += 1) {
+          if (!Number.isFinite(matrix[k][j])) continue;
+          currentNode = i;
+          const old = matrix[i][j];
+          const leftDistance = matrix[i][k];
+          const rightDistance = matrix[k][j];
+          const proposed = leftDistance + rightDistance;
+          const changed = proposed < old;
+          if (changed) {
+            matrix[i][j] = proposed;
+            next[i][j] = next[i][k];
+          }
+          candidate = proposed;
+          oldDistance = old;
+          improves = changed;
+          activeEdge = null;
+          matrixCheck = {
+            from: i,
+            to: j,
+            intermediate: k,
+            leftDistance,
+            rightDistance,
+            oldDistance: fmt(old),
+            candidate: proposed,
+            improves: changed,
+          };
+          currentPass = { intermediate: k, from: i, to: j };
+          snapshot({
+            title: changed
+              ? { vi: `Qua node ${k}: dist[${i}][${j}] = ${proposed}`, en: `Via node ${k}: dist[${i}][${j}] = ${proposed}` }
+              : { vi: `Không cải thiện dist[${i}][${j}]`, en: `No improvement to dist[${i}][${j}]` },
+            note: changed
+              ? { vi: `Đường i→${k}→j có cost ${matrix[i][k]} + ${matrix[k][j]} = ${proposed}, tốt hơn ${old === Infinity ? "∞" : old}.`, en: `Route i→${k}→j costs ${matrix[i][k]} + ${matrix[k][j]} = ${proposed}, better than ${old === Infinity ? "∞" : old}.` }
+              : { vi: "Giữ khoảng cách cũ; đi qua node trung gian này không rút ngắn đường.", en: "Keep the old distance; routing through this intermediate does not shorten the path." },
+            phase: "floyd-relax", codeLine: 8,
+          });
+        }
+      }
+    }
+    for (const node of nodes) {
+      dist1[node] = matrix[src1][node];
+      dist2[node] = matrix[src2][node];
+      toDest[node] = matrix[node][dest];
+      parent1[node] = next[src1][node] === null ? null : findPrevious(matrix, next, src1, node);
+      parent2[node] = next[src2][node] === null ? null : findPrevious(matrix, next, src2, node);
+      nextToDest[node] = next[node][dest];
+    }
+  } else {
+    for (const run of runs) {
+      activeRun = run.key;
+      currentNode = run.start;
+      run.distances[run.start] = 0;
+      settled = [];
+      queue = [];
+      snapshot({
+        title: { vi: `Khởi chạy ${runLabels[run.key].vi}`, en: `Start ${runLabels[run.key].en}` },
+        note: run.key === "dest"
+          ? { vi: "Dùng cạnh đảo chiều: khoảng cách dest→x ở reverse graph chính là x→dest ở graph gốc.", en: "Use reversed edges: dest→x in the reversed graph equals x→dest in the original graph." }
+          : { vi: "Đặt khoảng cách nguồn bằng 0; các node khác bắt đầu là ∞.", en: "Set the source distance to 0; all other nodes start at ∞." },
+        phase: "run-init", codeLine: 4,
+      });
+
+      if (approach === 2) {
+        for (let pass = 1; pass < n; pass += 1) {
+          currentPass = { pass, maxPasses: n - 1 };
+          let changed = false;
+          for (const [u, v, weight] of run.edges) {
+            currentNode = u;
+            activeEdge = { u, v, w: weight, originalU: run.key === "dest" ? v : u, originalV: run.key === "dest" ? u : v, reversed: run.key === "dest" };
+            const old = run.distances[v];
+            const proposed = Number.isFinite(run.distances[u]) ? run.distances[u] + weight : Infinity;
+            improves = proposed < old;
+            candidate = proposed;
+            oldDistance = old;
+            if (improves) {
+              changed = true;
+              run.distances[v] = proposed;
+              run.parent[v] = u;
+            }
+            snapshot({
+              title: improves
+                ? { vi: `Lượt ${pass}: cập nhật d[${v}] = ${proposed}`, en: `Pass ${pass}: update d[${v}] = ${proposed}` }
+                : { vi: `Lượt ${pass}: giữ d[${v}] = ${fmt(old)}`, en: `Pass ${pass}: keep d[${v}] = ${fmt(old)}` },
+              note: !Number.isFinite(run.distances[u])
+                ? { vi: `Node ${u} chưa reachable, cạnh ${u}→${v} chưa thể truyền khoảng cách.`, en: `Node ${u} is unreachable, so edge ${u}→${v} cannot propagate a distance yet.` }
+                : improves
+                  ? { vi: `${fmt(run.distances[u])} + ${weight} = ${proposed}; đây là đường ngắn hơn tới ${v}.`, en: `${fmt(run.distances[u])} + ${weight} = ${proposed}; this is a shorter route to ${v}.` }
+                  : { vi: `${fmt(run.distances[u])} + ${weight} không nhỏ hơn khoảng cách hiện tại ${fmt(old)}.`, en: `${fmt(run.distances[u])} + ${weight} is not smaller than the current distance ${fmt(old)}.` },
+              phase: "bellman-relax", codeLine: 10,
+            });
+          }
+          if (!changed) {
+            snapshot({
+              title: { vi: `Lượt ${pass} không đổi khoảng cách → dừng sớm`, en: `Pass ${pass} made no changes → stop early` },
+              note: { vi: "Các lượt sau sẽ không thể cải thiện thêm.", en: "Later passes cannot improve any distance." },
+              phase: "early-stop", codeLine: 11,
+            });
+            break;
+          }
+        }
+      } else if (approach === 4) {
+        const visited = new Set();
+        for (let iteration = 0; iteration < n; iteration += 1) {
+          let u = -1;
+          for (const node of nodes) {
+            if (!visited.has(node) && (u === -1 || run.distances[node] < run.distances[u])) u = node;
+          }
+          if (u === -1 || !Number.isFinite(run.distances[u])) break;
+          visited.add(u);
+          currentNode = u;
+          settled = [...visited];
+          currentPass = { scan: iteration + 1, total: n };
+          snapshot({
+            title: { vi: `Quét node: chốt ${u} = ${run.distances[u]}`, en: `Array scan: finalize ${u} = ${run.distances[u]}` },
+            note: { vi: `Trong các node chưa chốt, ${u} có dist nhỏ nhất.`, en: `${u} has the smallest tentative distance among unfinalized nodes.` },
+            phase: "scan-select", codeLine: 8,
+          });
+          for (const [from, to, weight] of run.edges) {
+            if (from !== u) continue;
+            activeEdge = { u: from, v: to, w: weight, originalU: run.key === "dest" ? to : from, originalV: run.key === "dest" ? from : to, reversed: run.key === "dest" };
+            currentNode = u;
+            const old = run.distances[to];
+            const proposed = run.distances[u] + weight;
+            improves = proposed < old;
+            candidate = proposed;
+            oldDistance = old;
+            if (improves) {
+              run.distances[to] = proposed;
+              run.parent[to] = u;
+            }
+            snapshot({
+              title: improves
+                ? { vi: `Relax ${u}→${to}: dist[${to}] = ${proposed}`, en: `Relax ${u}→${to}: dist[${to}] = ${proposed}` }
+                : { vi: `Relax ${u}→${to}: giữ ${fmt(old)}`, en: `Relax ${u}→${to}: keep ${fmt(old)}` },
+              note: { vi: `Thử dist[${u}] + ${weight}; chỉ cập nhật nếu nhỏ hơn.`, en: `Try dist[${u}] + ${weight}; update only if it is smaller.` },
+              phase: "matrix-relax", codeLine: 10,
+            });
+          }
+        }
+      } else {
+        const inQueue = new Set([run.start]);
+        queue = [[0, run.start]];
+        while (queue.length) {
+          const [, u] = queue.shift();
+          inQueue.delete(u);
+          currentNode = u;
+          settled = [...new Set([...settled, u])];
+          snapshot({
+            title: { vi: `Lấy node ${u} khỏi queue`, en: `Dequeue node ${u}` },
+            note: { vi: `Duyệt các cạnh đi ra từ ${u}; chỉ node được cải thiện mới vào lại queue.`, en: `Inspect outgoing edges from ${u}; only improved nodes are re-enqueued.` },
+            phase: "spfa-pop", codeLine: 8,
+          });
+          for (const [from, to, weight] of run.edges) {
+            if (from !== u) continue;
+            activeEdge = { u: from, v: to, w: weight, originalU: run.key === "dest" ? to : from, originalV: run.key === "dest" ? from : to, reversed: run.key === "dest" };
+            const old = run.distances[to];
+            const proposed = run.distances[u] + weight;
+            improves = proposed < old;
+            candidate = proposed;
+            oldDistance = old;
+            if (improves) {
+              run.distances[to] = proposed;
+              run.parent[to] = u;
+              if (!inQueue.has(to)) {
+                queue.push([proposed, to]);
+                inQueue.add(to);
+              }
+            }
+            snapshot({
+              title: improves
+                ? { vi: `Cải thiện dist[${to}] = ${proposed}`, en: `Improve dist[${to}] = ${proposed}` }
+                : { vi: `Không cải thiện dist[${to}]`, en: `No improvement to dist[${to}]` },
+              note: improves
+                ? { vi: `Thêm ${to} vào queue nếu chưa có để truyền khoảng cách mới.`, en: `Enqueue ${to} if absent so its improved distance can propagate.` }
+                : { vi: `${proposed} không nhỏ hơn ${fmt(old)}, nên không cần xử lý lại ${to}.`, en: `${proposed} is not smaller than ${fmt(old)}, so ${to} does not need reprocessing.` },
+              phase: "spfa-relax", codeLine: 10,
+            });
+          }
+        }
+      }
+      currentNode = null;
+      activeEdge = null;
+      candidate = null;
+      oldDistance = null;
+      improves = null;
+    }
+  }
+
+  activeRun = null;
+  currentPass = null;
+  matrixCheck = null;
+  queue = [];
+  settled = [];
+  for (const node of nodes) {
+    const values = [dist1[node], dist2[node], toDest[node]];
+    const reachable = values.every(Number.isFinite);
+    const total = reachable ? values[0] + values[1] + values[2] : Infinity;
+    const changed = total < answer;
+    if (changed) {
+      answer = total;
+      bestMeeting = node;
+    }
+    currentNode = node;
+    improves = changed;
+    snapshot({
+      title: reachable
+        ? { vi: `Meet tại ${node}: ${values[0]} + ${values[1]} + ${values[2]} = ${total}`, en: `Meet at ${node}: ${values[0]} + ${values[1]} + ${values[2]} = ${total}` }
+        : { vi: `Node ${node} không nối đủ ba phần`, en: `Node ${node} cannot connect all three parts` },
+      note: changed
+        ? { vi: `Node ${node} trở thành điểm nhập chung tốt nhất hiện tại.`, en: `Node ${node} becomes the best shared meeting point so far.` }
+        : { vi: "Nếu một khoảng cách là ∞ thì bỏ qua; nếu không, giữ minimum hiện tại.", en: "Skip if any distance is ∞; otherwise keep the current minimum." },
+      phase: "combine", codeLine: approach === 3 ? 12 : 14, combineNode: node,
+    });
+  }
+  const result = answer === Infinity ? -1 : answer;
+  currentNode = bestMeeting;
+  snapshot({
+    title: result === -1
+      ? { vi: "Không tồn tại subgraph hợp lệ", en: "No valid subgraph exists" }
+      : { vi: `Minimum weight = ${result}, gặp tại node ${bestMeeting}`, en: `Minimum weight = ${result}, meeting at node ${bestMeeting}` },
+    note: result === -1
+      ? { vi: "Không node nào reachable từ cả hai source và đồng thời đi tới dest.", en: "No node is reachable from both sources and can also reach dest." }
+      : { vi: "Hai đường đi dùng chung suffix tới dest; tổng ba khoảng cách tính suffix đó đúng một lần.", en: "The two paths share a suffix to dest; the sum counts that shared suffix exactly once." },
+    phase: "done", codeLine: approach === 3 ? 13 : 15, combineNode: bestMeeting, final: true,
+  });
+  return { original: edges, edges, n, src1, src2, dest, answer: result, steps };
+}
+
+function findPrevious(distance, next, source, target) {
+  if (source === target || next[source][target] === null) return null;
+  let current = source;
+  let previous = null;
+  const seen = new Set();
+  while (current !== target && !seen.has(current)) {
+    seen.add(current);
+    previous = current;
+    current = next[current][target];
+  }
+  return current === target ? previous : null;
+}
+
 Object.assign(module.exports, {
   1786: {
     id: 1786,
@@ -23164,18 +23613,141 @@ Object.assign(module.exports, {
       { key: "src1", label: { vi: "src1", en: "src1" }, default: 0, min: 0 },
       { key: "src2", label: { vi: "src2", en: "src2" }, default: 1, min: 0 },
       { key: "dest", label: { vi: "dest", en: "dest" }, default: 5, min: 0 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1 · Ba lần Dijkstra với heap", en: "Approach 1 · Three heap-based Dijkstra runs" } },
+          { value: "2", label: { vi: "Cách 2 · Bellman–Ford", en: "Approach 2 · Bellman–Ford" } },
+          { value: "3", label: { vi: "Cách 3 · Floyd–Warshall", en: "Approach 3 · Floyd–Warshall" } },
+          { value: "4", label: { vi: "Cách 4 · Dijkstra quét O(V²)", en: "Approach 4 · Array-scan Dijkstra O(V²)" } },
+          { value: "5", label: { vi: "Cách 5 · SPFA (queue relaxation)", en: "Approach 5 · SPFA (queue relaxation)" } },
+        ],
+      },
     ],
     approach: [
       { vi: "Chạy Dijkstra từ src1 và src2 trên graph gốc.", en: "Run Dijkstra from src1 and src2 on the original graph." },
       { vi: "Đảo mọi cạnh rồi chạy Dijkstra từ dest để có khoảng cách từ mỗi node đi tới dest.", en: "Reverse every edge and run Dijkstra from dest to obtain each node's distance to dest." },
       { vi: "Thử mỗi node x làm điểm nhập chung: dist1[x] + dist2[x] + toDest[x]; lấy tổng nhỏ nhất.", en: "Try every node x as the shared meeting point: dist1[x] + dist2[x] + toDest[x]; take the minimum." },
+      { vi: "Cách 2: Bellman–Ford relax mọi cạnh tối đa n−1 lượt cho mỗi nguồn.", en: "Approach 2: Bellman–Ford relaxes every edge for up to n−1 passes per source." },
+      { vi: "Cách 3: Floyd–Warshall tính mọi cặp khoảng cách trong một lần.", en: "Approach 3: Floyd–Warshall computes all-pairs shortest paths in one run." },
+      { vi: "Cách 4: Dijkstra quét toàn bộ node để tìm dist nhỏ nhất, không dùng heap.", en: "Approach 4: array-scan Dijkstra finds the smallest tentative distance without a heap." },
+      { vi: "Cách 5: SPFA chỉ đưa node vừa được cải thiện vào queue; worst-case O(VE).", en: "Approach 5: SPFA queues only nodes whose distances improved; worst case is O(VE)." },
     ],
     complexity: { time: "O((V + E) log V)", space: "O(V + E)", note: { vi: "Ba lần Dijkstra chỉ nhân hằng số 3; graph và reverse graph dùng O(V+E).", en: "Three Dijkstra runs add only a constant factor of 3; graph and reversed graph use O(V+E)." } },
+    complexity2: { time: "O(VE)", space: "O(V + E)", note: { vi: "Bellman–Ford chạy tối đa V−1 lượt trên E cạnh cho mỗi trong ba nguồn.", en: "Bellman–Ford scans E edges for up to V−1 passes for each of the three starts." } },
+    complexity3: { time: "O(V³)", space: "O(V²)", note: { vi: "Tính mọi cặp khoảng cách một lần; phù hợp khi V nhỏ.", en: "Compute all-pairs distances once; best suited to small V." } },
+    complexity4: { time: "O(V² + E)", space: "O(V + E)", note: { vi: "Mỗi lần chốt node quét V node; thực hiện ba lượt Dijkstra.", en: "Scan V nodes per finalized node; run Dijkstra three times." } },
+    complexity5: { time: "Worst O(VE)", space: "O(V + E)", note: { vi: "SPFA thường nhanh trên một số graph nhưng có thể chậm hơn Bellman–Ford trong trường hợp xấu.", en: "SPFA can be fast on some graphs but may be slower than Bellman–Ford in the worst case." } },
     code: [
-      "import heapq", "", "class Solution:", "    def minimumWeight(self, n, edges, src1, src2, dest):", "        graph = [[] for _ in range(n)]", "        reverse = [[] for _ in range(n)]", "        for u, v, weight in edges:", "            graph[u].append((v, weight))", "            reverse[v].append((u, weight))", "", "        def dijkstra(start, adjacency):", "            dist = [float('inf')] * n", "            dist[start] = 0", "            heap = [(0, start)]", "            while heap:", "                distance, u = heapq.heappop(heap)", "                if distance != dist[u]:", "                    continue", "                for v, weight in adjacency[u]:", "                    candidate = distance + weight", "                    if candidate < dist[v]:", "                        dist[v] = candidate", "                        heapq.heappush(heap, (candidate, v))", "            return dist", "", "        from_src1 = dijkstra(src1, graph)", "        from_src2 = dijkstra(src2, graph)", "        to_dest = dijkstra(dest, reverse)", "        answer = min(a + b + c for a, b, c in zip(from_src1, from_src2, to_dest))", "        return -1 if answer == float('inf') else answer",
+      "import heapq", "", "class Solution:", "    def minimumWeight(self, n, edges, src1, src2, dest):", "        graph = [[] for _ in range(n)]", "        reverse = [[] for _ in range(n)]", "        for u, v, weight in edges:", "            graph[u].append((v, weight))", "            reverse[v].append((u, weight))", "", "        def dijkstra(start, adjacency):", "            dist = [float('inf')] * n", "            dist[start] = 0", "            heap = [(0, start)]", "            while heap:", "                distance, u = heapq.heappop(heap)", "                if distance != dist[u]:", "                    continue", "                for v, weight in adjacency[u]:", "                    candidate = distance + weight", "                    if candidate < dist[v]:", "                        dist[v] = candidate", "                        heapq.heappush(heap, (candidate, v))", "            return dist", "", "        from_src1 = dijkstra(src1, graph)", "        from_src2 = dijkstra(src2, graph)", "        to_dest = dijkstra(dest, reverse)", "        answer = min(a + b + c for a, b, c in zip(from_src1, from_src2, to_dest))",       "        return -1 if answer == float('inf') else answer",
+    ],
+    code2Label: { vi: "Cách 2 · Bellman–Ford", en: "Approach 2 · Bellman–Ford" },
+    code2: [
+      "class Solution:",
+      "    def minimumWeight(self, n, edges, src1, src2, dest):",
+      "        graph, reverse = [[] for _ in range(n)], [[] for _ in range(n)]",
+      "        for u, v, w in edges:",
+      "            graph[u].append((v, w))",
+      "            reverse[v].append((u, w))",
+      "        def bellman(start, adj):",
+      "            dist = [float('inf')] * n",
+      "            dist[start] = 0",
+      "            for _ in range(n - 1):",
+      "                changed = False",
+      "                for u in range(n):",
+      "                    for v, w in adj[u]:",
+      "                        if dist[u] + w < dist[v]:",
+      "                            dist[v] = dist[u] + w",
+      "                            changed = True",
+      "                if not changed: break",
+      "            return dist",
+      "        d1 = bellman(src1, graph)",
+      "        d2 = bellman(src2, graph)",
+      "        dt = bellman(dest, reverse)",
+      "        best = min((a + b + c for a, b, c in zip(d1, d2, dt)",
+      "                    if a < float('inf') and b < float('inf') and c < float('inf')),",
+      "                   default=float('inf'))",
+      "        return -1 if best == float('inf') else best",
+    ],
+    code3Label: { vi: "Cách 3 · Floyd–Warshall", en: "Approach 3 · Floyd–Warshall" },
+    code3: [
+      "class Solution:",
+      "    def minimumWeight(self, n, edges, src1, src2, dest):",
+      "        dist = [[float('inf')] * n for _ in range(n)]",
+      "        for i in range(n): dist[i][i] = 0",
+      "        for u, v, w in edges: dist[u][v] = min(dist[u][v], w)",
+      "        for k in range(n):",
+      "            for i in range(n):",
+      "                for j in range(n):",
+      "                    dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j])",
+      "        best = min((dist[src1][x] + dist[src2][x] + dist[x][dest]",
+      "                    for x in range(n)",
+      "                    if all(dist[s][t] < float('inf') for s, t in",
+      "                           [(src1, x), (src2, x), (x, dest)])),",
+      "                   default=float('inf'))",
+      "        return -1 if best == float('inf') else best",
+    ],
+    code4Label: { vi: "Cách 4 · Dijkstra quét O(V²)", en: "Approach 4 · Array-scan Dijkstra O(V²)" },
+    code4: [
+      "class Solution:",
+      "    def minimumWeight(self, n, edges, src1, src2, dest):",
+      "        graph, reverse = [[] for _ in range(n)], [[] for _ in range(n)]",
+      "        for u, v, w in edges:",
+      "            graph[u].append((v, w)); reverse[v].append((u, w))",
+      "        def dijkstra(start, adj):",
+      "            dist, used = [float('inf')] * n, [False] * n",
+      "            dist[start] = 0",
+      "            for _ in range(n):",
+      "                u = min((i for i in range(n) if not used[i]),",
+      "                        key=lambda i: dist[i], default=-1)",
+      "                if u == -1 or dist[u] == float('inf'): break",
+      "                used[u] = True",
+      "                for v, w in adj[u]:",
+      "                    dist[v] = min(dist[v], dist[u] + w)",
+      "            return dist",
+      "        d1, d2 = dijkstra(src1, graph), dijkstra(src2, graph)",
+      "        dt = dijkstra(dest, reverse)",
+      "        best = min((a + b + c for a, b, c in zip(d1, d2, dt)",
+      "                    if a < float('inf') and b < float('inf') and c < float('inf')),",
+      "                   default=float('inf'))",
+      "        return -1 if best == float('inf') else best",
+    ],
+    code5Label: { vi: "Cách 5 · SPFA (queue relaxation)", en: "Approach 5 · SPFA (queue relaxation)" },
+    code5: [
+      "from collections import deque",
+      "class Solution:",
+      "    def minimumWeight(self, n, edges, src1, src2, dest):",
+      "        graph, reverse = [[] for _ in range(n)], [[] for _ in range(n)]",
+      "        for u, v, w in edges:",
+      "            graph[u].append((v, w)); reverse[v].append((u, w))",
+      "        def spfa(start, adj):",
+      "            dist, in_queue = [float('inf')] * n, [False] * n",
+      "            dist[start] = 0",
+      "            q = deque([start]); in_queue[start] = True",
+      "            while q:",
+      "                u = q.popleft(); in_queue[u] = False",
+      "                for v, w in adj[u]:",
+      "                    if dist[u] + w < dist[v]:",
+      "                        dist[v] = dist[u] + w",
+      "                        if not in_queue[v]:",
+      "                            q.append(v); in_queue[v] = True",
+      "            return dist",
+      "        d1, d2 = spfa(src1, graph), spfa(src2, graph)",
+      "        dt = spfa(dest, reverse)",
+      "        best = min((a + b + c for a, b, c in zip(d1, d2, dt)",
+      "                    if a < float('inf') and b < float('inf') and c < float('inf')),",
+      "                   default=float('inf'))",
+      "        return -1 if best == float('inf') else best",
     ],
     liveArgs(input, params = {}) { return [Number(params.n), parseWeightedEdgesDijkstra(input), Number(params.src1), Number(params.src2), Number(params.dest)]; },
     builder: buildSteps2203,
+    builder2: (input, params = {}) => buildSteps2203Alternative(input, params, 2),
+    builder3: (input, params = {}) => buildSteps2203Alternative(input, params, 3),
+    builder4: (input, params = {}) => buildSteps2203Alternative(input, params, 4),
+    builder5: (input, params = {}) => buildSteps2203Alternative(input, params, 5),
   },
 });
 
