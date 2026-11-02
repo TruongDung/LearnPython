@@ -5,6 +5,18 @@ const { join } = require("node:path");
 const vm = require("node:vm");
 const problem = require("../problems").SUPPORTED[743];
 
+test("743 code snippet uses the requested numbered Dijkstra steps", () => {
+  const code = problem.code.join("\n");
+
+  assert.match(code, /# Step 1: Build graph/);
+  assert.match(code, /dist = \[float\("inf"\)\] \* \(n \+ 1\)/);
+  assert.match(code, /minHeap = \[\(0, k\)\]/);
+  assert.match(code, /time, node = heapq\.heappop\(minHeap\)/);
+  assert.match(code, /newTime = time \+ weight/);
+  assert.match(code, /# Step 5: Result\n        answer = max\(dist\[1:\]\)/);
+  assert.match(code, /return answer if answer != float\("inf"\) else -1/);
+});
+
 function renderStep(step, language = "en") {
   const treeHost = { innerHTML: "" };
   const context = {
