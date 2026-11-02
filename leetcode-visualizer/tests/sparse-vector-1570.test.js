@@ -47,6 +47,7 @@ test("1570 debugs both approaches one source line at a time", () => {
   const runs = [
     problem.builder(problem.defaultInput),
     problem.builder2(problem.defaultInput, { approach: 2 }),
+    problem.builder3(problem.defaultInput, { approach: 3 }),
   ];
 
   for (const run of runs) {
@@ -92,4 +93,40 @@ test("1570 draws matching values, product, and hash lookup probe", () => {
   }
   assert.match(probe, /sv1570-lookup-visual/);
   assert.match(probe, /lookup\[/);
+});
+
+test("1570 adds the requested membership-check approach with matching code highlights", () => {
+  const expectedCode = `class SparseVector:
+    def __init__(self, nums: List[int]):
+        self.nums = {}
+
+        for i, num in enumerate(nums):
+            if num != 0:
+                self.nums[i] = num
+
+    def dotProduct(self, vec: 'SparseVector') -> int:
+        result = 0
+
+        for i, num in self.nums.items():
+            if i in vec.nums:
+                result += num * vec.nums[i]
+
+        return result`;
+  const result = problem.builder3("1,0,2,0|0,3,2,0", { approach: 3 });
+  const probe = result.steps.find((step) => step.sparseVector1570View.phase === "probe");
+  const miss = result.steps.find((step) => step.sparseVector1570View.phase === "miss");
+  const match = result.steps.find((step) => step.sparseVector1570View.phase === "match");
+  const probeHtml = renderStep(probe, "vi");
+
+  assert.equal(problem.code3.join("\n"), expectedCode);
+  assert.equal(result.answer, 4);
+  assert.equal(result.steps.at(-1).codeBlock, 3);
+  assert.ok(result.steps.every((step) => step.codeLines.every((line) => line >= 1 && line <= problem.code3.length)));
+  assert.deepEqual(probe.codeLines, [12, 13]);
+  assert.deepEqual(miss.codeLines, [13]);
+  assert.deepEqual(match.codeLines, [14]);
+  assert.equal(probe.sparseVector1570View.strategy, "hash-membership");
+  assert.match(probeHtml, /Hash map · kiểm tra index/);
+  assert.match(probeHtml, /vec\.nums/);
+  assert.match(probeHtml, /index 0/);
 });

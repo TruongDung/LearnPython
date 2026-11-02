@@ -166,12 +166,16 @@ function renderSparseVector1570View(step) {
       .filter((entry) => entry !== null),
   );
 
-  const strategy = view.strategy === "two-pointer" ? "two-pointer" : "hash-lookup";
+  const strategy = view.strategy === "two-pointer"
+    ? "two-pointer"
+    : view.strategy === "hash-membership" ? "hash-membership" : "hash-lookup";
   const strategyLabel = strategy === "two-pointer"
     ? (vi ? "Hai con trỏ" : "Two pointers")
-    : (vi ? "Tra cứu bảng băm" : "Hash lookup");
+    : strategy === "hash-membership"
+      ? (vi ? "Hash map · kiểm tra index" : "Hash map · membership")
+      : (vi ? "Tra cứu bảng băm" : "Hash lookup");
   const iteratedSide = normalizeSide(view.iteratedSide);
-  const lookupSide = strategy === "hash-lookup" && (iteratedSide === "left" || iteratedSide === "right")
+  const lookupSide = strategy !== "two-pointer" && (iteratedSide === "left" || iteratedSide === "right")
     ? (iteratedSide === "left" ? "right" : "left")
     : null;
 
@@ -224,6 +228,7 @@ function renderSparseVector1570View(step) {
     compress: { en: "Compress", vi: "Nén vector" },
     compression: { en: "Compress", vi: "Nén vector" },
     "select-smaller": { en: "Choose shorter side", vi: "Chọn phía ngắn hơn" },
+    iterate: { en: "Check nums1", vi: "Duyệt nums1" },
     initialize: { en: "Initialize pointers", vi: "Đặt con trỏ" },
     probe: { en: "Probe lookup", vi: "Dò bảng tra cứu" },
     miss: { en: "Lookup miss", vi: "Không tìm thấy" },
@@ -249,6 +254,10 @@ function renderSparseVector1570View(step) {
     ? (vi
       ? ["Đọc vector", "Nén số khác 0", "So sánh hai index", "Kết quả"]
       : ["Read vectors", "Compress nonzeros", "Compare indices", "Result"])
+    : strategy === "hash-membership"
+      ? (vi
+        ? ["Đọc vector", "Tạo hash map", "Kiểm tra index", "Kết quả"]
+        : ["Read vectors", "Build hash maps", "Check membership", "Result"])
     : (vi
       ? ["Đọc vector", "Tạo bảng thưa", "Dò phía ngắn hơn", "Kết quả"]
       : ["Read vectors", "Build sparse lookup", "Probe shorter side", "Result"]);
@@ -280,7 +289,7 @@ function renderSparseVector1570View(step) {
         if (phaseKey === "compression" && buildSide === side && sameValue(buildIndex, index)) {
           classes.push("sv1570-dense-building");
         }
-        if (sameValue(activeOperand.index, index) || (strategy === "hash-lookup" && side === iteratedSide && sameValue(probeIndex, index))) {
+        if (sameValue(activeOperand.index, index) || (strategy !== "two-pointer" && side === iteratedSide && sameValue(probeIndex, index))) {
           classes.push("sv1570-dense-active");
         }
         const aria = `${label}, ${vi ? "index" : "index"} ${index}, ${vi ? "giá trị" : "value"} ${valueText(rawValue)}`;
@@ -395,6 +404,8 @@ function renderSparseVector1570View(step) {
       : (vi ? "Bỏ số 0" : "Skip zero")
     : phaseKey === "select-smaller"
       ? `${sparseLeft.length} ${vi ? "so với" : "vs"} ${sparseRight.length}`
+      : phaseKey === "iterate"
+        ? (vi ? "nums1 → vec.nums" : "nums1 → vec.nums")
       : phaseKey === "probe"
         ? `lookup[${valueText(probeIndex)}]`
         : phaseKey === "miss"
@@ -418,6 +429,12 @@ function renderSparseVector1570View(step) {
         <i class="sv1570-visual-arrow">→</i>
         <span class="sv1570-visual-output${buildStatusKey === "skip-zero" ? " is-empty" : ""}"><small>${buildStatusKey === "skip-zero" ? (vi ? "bỏ qua" : "skip") : (vi ? "lưu" : "keep")}</small><strong>${buildStatusKey === "skip-zero" ? "∅" : `(${escaped(buildIndex)}, ${escaped(buildValue)})`}</strong></span>
       </div>`
+    : phaseKey === "iterate"
+      ? `<div class="sv1570-action-visual sv1570-membership-visual" aria-hidden="true">
+          <span class="sv1570-visual-value sv1570-visual-left"><small>self.nums</small><strong>${sparseLeft.length}</strong></span>
+          <i class="sv1570-visual-arrow">→</i>
+          <span class="sv1570-visual-output sv1570-visual-right"><small>vec.nums</small><strong>∈ ?</strong></span>
+        </div>`
     : `<div class="sv1570-action-visual sv1570-comparison-visual" aria-hidden="true">
         <span class="sv1570-visual-value sv1570-visual-left"><small>index ${escaped(currentLeft.index)}</small><strong>${escaped(currentLeft.value)}</strong></span>
         <i class="sv1570-visual-relation sv1570-relation-${relation.tone}">${escapeHtml(relation.symbol)}</i>

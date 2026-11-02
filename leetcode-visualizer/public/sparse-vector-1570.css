@@ -241,6 +241,11 @@
   background: color-mix(in srgb, var(--sv1570-right) 10%, var(--sv1570-panel));
 }
 
+.sv1570-visual-output.sv1570-visual-right {
+  border-color: color-mix(in srgb, var(--sv1570-right) 55%, var(--sv1570-border));
+  background: color-mix(in srgb, var(--sv1570-right) 10%, var(--sv1570-panel));
+}
+
 .sv1570-visual-value small,
 .sv1570-visual-output small,
 .sv1570-visual-product small {

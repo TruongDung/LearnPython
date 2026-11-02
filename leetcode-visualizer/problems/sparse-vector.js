@@ -27,6 +27,25 @@ const HASH_MAP_CODE = [
   "        return total",
 ];
 
+const HASH_MEMBERSHIP_CODE = [
+  "class SparseVector:",
+  "    def __init__(self, nums: List[int]):",
+  "        self.nums = {}",
+  "",
+  "        for i, num in enumerate(nums):",
+  "            if num != 0:",
+  "                self.nums[i] = num",
+  "",
+  "    def dotProduct(self, vec: 'SparseVector') -> int:",
+  "        result = 0",
+  "",
+  "        for i, num in self.nums.items():",
+  "            if i in vec.nums:",
+  "                result += num * vec.nums[i]",
+  "",
+  "        return result",
+];
+
 const TWO_POINTER_CODE = [
   "class SparseVector:",
   "    def __init__(self, nums):",
@@ -137,7 +156,7 @@ function createSnapshotter({ strategy, codeBlock, left, right, sparseLeft, spars
       mark: mark ? [...mark] : contributionMarks,
       final: Boolean(final),
       codeLines: [...codeLines],
-      ...(codeBlock === 2 ? { codeBlock: 2 } : {}),
+      ...(codeBlock > 1 ? { codeBlock } : {}),
       vars: [
         { name: "strategy", value: strategy },
         { name: "left sparse", value: sparseText(sparseLeft) },
@@ -171,7 +190,7 @@ function createSnapshotter({ strategy, codeBlock, left, right, sparseLeft, spars
   };
 }
 
-function compressVector({ dense, sparse, side, state, snapshot }) {
+function compressVector({ dense, sparse, side, state, snapshot, lineOffset = 0 }) {
   const sideVi = side === "left" ? "trái" : "phải";
   for (let index = 0; index < dense.length; index++) {
     const value = dense[index];
@@ -195,7 +214,7 @@ function compressVector({ dense, sparse, side, state, snapshot }) {
       note: stored
         ? { vi: `Giữ cặp {index: ${index}, value: ${value}} trong biểu diễn thưa.`, en: `Keep {index: ${index}, value: ${value}} in the sparse representation.` }
         : { vi: "Số 0 không thể đóng góp vào tích vô hướng nên không cần lưu.", en: "Zero cannot contribute to the dot product, so it is not stored." },
-      codeLines: stored ? [4, 5, 6] : [4, 5],
+      codeLines: stored ? [4, 5, 6].map((line) => line + lineOffset) : [4, 5].map((line) => line + lineOffset),
       highlight: [index],
       vars: [
         { name: "build side", value: side },
@@ -339,6 +358,119 @@ function buildSteps1570HashMap(input) {
     title: { vi: `Trả về ${state.runningTotal}`, en: `Return ${state.runningTotal}` },
     note: { vi: "Mọi entry của map nhỏ hơn đã được kiểm tra; ledger chứa toàn bộ index đóng góp.", en: "Every entry in the smaller map has been checked; the ledger contains every contributing index." },
     codeLines: [19],
+    final: true,
+  });
+
+  return { original: [[...left], [...right]], answer: state.runningTotal, steps };
+}
+
+function buildSteps1570HashMembership(input) {
+  const [left, right] = parseSparseVectors(input);
+  const sparseLeft = [];
+  const sparseRight = [];
+  const state = initialState();
+  const steps = [];
+  const snapshot = createSnapshotter({
+    strategy: "hash-membership",
+    codeBlock: 3,
+    left,
+    right,
+    sparseLeft,
+    sparseRight,
+    state,
+    steps,
+  });
+
+  compressVector({ dense: left, sparse: sparseLeft, side: "left", state, snapshot, lineOffset: 1 });
+  compressVector({ dense: right, sparse: sparseRight, side: "right", state, snapshot, lineOffset: 1 });
+  markBuildComplete(state, left.length);
+
+  const rightPositions = new Map(sparseRight.map((entry, position) => [entry.index, position]));
+  state.iteratedSide = "left";
+  state.current = emptyCurrent();
+  state.cursors = { left: 0, right: null, iteration: 0 };
+  snapshot({
+    phase: "iterate",
+    title: { vi: "Duyệt các cặp trong nums1", en: "Iterate pairs in nums1" },
+    note: {
+      vi: "Mỗi index của nums1 được kiểm tra trong bảng nums của vector còn lại.",
+      en: "Check each nums1 index in the other vector's nums map.",
+    },
+    codeLines: [12],
+  });
+
+  for (let position = 0; position < sparseLeft.length; position++) {
+    const candidate = sparseLeft[position];
+    const rightPosition = rightPositions.get(candidate.index);
+    const rightValue = rightPosition === undefined ? 0 : sparseRight[rightPosition].value;
+    state.cursors = { left: position, right: rightPosition ?? null, iteration: position };
+    state.current = {
+      index: candidate.index,
+      leftIndex: candidate.index,
+      leftValue: candidate.value,
+      rightIndex: candidate.index,
+      rightValue,
+      relation: "probe",
+      product: null,
+    };
+    snapshot({
+      phase: "probe",
+      title: { vi: `Kiểm tra index ${candidate.index}`, en: `Check index ${candidate.index}` },
+      note: { vi: "Tìm index này trong vec.nums.", en: "Look for this index in vec.nums." },
+      codeLines: [12, 13],
+      highlight: [candidate.index],
+      vars: [{ name: "index", value: candidate.index }],
+    });
+
+    if (rightPosition === undefined) {
+      state.current = { ...state.current, relation: "missing", product: 0 };
+      snapshot({
+        phase: "miss",
+        title: { vi: `Không có index ${candidate.index} trong vec.nums`, en: `Index ${candidate.index} is not in vec.nums` },
+        note: { vi: "Bỏ qua index này; tổng không đổi.", en: "Skip this index; the total stays unchanged." },
+        codeLines: [13],
+        highlight: [candidate.index],
+        vars: [{ name: "contribution", value: 0 }],
+      });
+      continue;
+    }
+
+    const product = candidate.value * rightValue;
+    state.current = { ...state.current, relation: "match", product };
+    snapshot({
+      phase: "match",
+      title: { vi: `${candidate.value} × ${rightValue} tại index ${candidate.index}`, en: `${candidate.value} × ${rightValue} at index ${candidate.index}` },
+      note: { vi: "Index có ở cả hai vector.", en: "The index exists in both vectors." },
+      codeLines: [14],
+      highlight: [candidate.index],
+      vars: [{ name: "product", value: product }],
+    });
+
+    state.runningTotal += product;
+    state.contributions.push({
+      index: candidate.index,
+      leftValue: candidate.value,
+      rightValue,
+      product,
+      totalAfter: state.runningTotal,
+    });
+    snapshot({
+      phase: "accumulate",
+      title: { vi: `Cộng ${product} → result = ${state.runningTotal}`, en: `Add ${product} → result = ${state.runningTotal}` },
+      note: { vi: "Cập nhật tổng tích vô hướng.", en: "Update the dot-product total." },
+      codeLines: [14],
+      highlight: [candidate.index],
+      vars: [{ name: "product", value: product }, { name: "result", value: state.runningTotal }],
+    });
+  }
+
+  state.current = emptyCurrent();
+  state.cursors = { left: sparseLeft.length, right: null, iteration: sparseLeft.length };
+  snapshot({
+    phase: "complete",
+    title: { vi: `Trả về ${state.runningTotal}`, en: `Return ${state.runningTotal}` },
+    note: { vi: "Đã duyệt hết nums1.", en: "All entries in nums1 have been checked." },
+    codeLines: [16],
     final: true,
   });
 
@@ -503,16 +635,18 @@ module.exports = {
         options: [
           { value: "1", label: { vi: "Hash map + duyệt map nhỏ hơn", en: "Hash maps + iterate smaller map" } },
           { value: "2", label: { vi: "Cặp đã sort + hai con trỏ", en: "Sorted pairs + two pointers" } },
+          { value: "3", label: { vi: "Hash map + kiểm tra index", en: "Hash map + membership check" } },
         ],
       },
     ],
     approach: [
-      { vi: "Cả hai cách đều quét vector đặc một lần và chỉ lưu các cặp index–value có value khác 0.", en: "Both approaches scan each dense vector once and store only index–value pairs whose value is nonzero." },
+      { vi: "Cả ba cách đều quét vector đặc một lần và chỉ lưu các cặp index–value có value khác 0.", en: "All three approaches scan each dense vector once and store only index–value pairs whose value is nonzero." },
       { vi: "Cách hash map duyệt map có ít entry hơn và tra mỗi index trong map còn lại với O(1) trung bình.", en: "The hash-map approach iterates the map with fewer entries and probes each index in the other map in expected O(1) time." },
       { vi: "Cách hai con trỏ giữ các cặp theo index tăng dần, tiến con trỏ có index nhỏ hơn và chỉ nhân khi hai index bằng nhau.", en: "The two-pointer approach keeps pairs sorted by index, advances the smaller index, and multiplies only when the indices match." },
+      { vi: "Cách này duyệt từng cặp trong nums1, kiểm tra index có trong vec.nums rồi nhân hai giá trị; thời gian O(nnz1) trung bình.", en: "This approach iterates nums1 pairs, checks membership in vec.nums, and multiplies matches; expected O(nnz1) time." },
     ],
     complexity: {
-      time: "Build O(n) · hash dot O(min(nnz1, nnz2)) expected · two-pointer dot O(nnz1 + nnz2)",
+      time: "Build O(n) · optimized hash O(min(nnz1, nnz2)) expected · membership hash O(nnz1) expected · two-pointer O(nnz1 + nnz2)",
       space: "O(nnz1 + nnz2)",
       note: {
         vi: "Mỗi constructor vẫn phải đọc n phần tử đặc. Sau khi nén, phép dot chỉ phụ thuộc số phần tử khác 0 (nnz).",
@@ -524,8 +658,11 @@ module.exports = {
     code: HASH_MAP_CODE,
     code2Label: { vi: "Cặp đã sort: hai con trỏ", en: "Sorted pairs: two pointers" },
     code2: TWO_POINTER_CODE,
+    code3Label: { vi: "Hash map: kiểm tra index trong vec.nums", en: "Hash map: check membership in vec.nums" },
+    code3: HASH_MEMBERSHIP_CODE,
     builder: buildSteps1570HashMap,
     builder2: buildSteps1570TwoPointers,
+    builder3: buildSteps1570HashMembership,
     parseSparseVectors,
   },
 };
