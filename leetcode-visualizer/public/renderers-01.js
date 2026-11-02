@@ -1970,8 +1970,8 @@ function renderNetworkDelayView(step) {
   const dijkstraPhases = new Set(["init", "pop", "stale", "inspect", "calculate", "compare", "update", "push"]);
   const activeStage = view.phase === "build" ? 0 : dijkstraPhases.has(view.phase) ? 1 : 2;
   const stageLabels = vi
-    ? ["1. Dựng graph", "2. Chạy Dijkstra", "3. Lấy max(dist)"]
-    : ["1. Build graph", "2. Run Dijkstra", "3. Take max(dist)"];
+    ? ["1. Dựng đồ thị", "2. Tìm dist ngắn nhất", "3. Tính thời gian toàn mạng"]
+    : ["1. Build graph", "2. Find shortest distances", "3. Calculate network delay"];
   const stageHtml = stageLabels.map((label, index) => {
     const state = index < activeStage ? "is-done" : index === activeStage ? "is-active" : "";
     return `<span class="${state}">${index < activeStage ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
@@ -1983,7 +1983,7 @@ function renderNetworkDelayView(step) {
     if (item.value !== "∞") stateLabel = vi ? "đã biết" : "known";
     if (item.isSource) {
       classes.push("is-source");
-      stateLabel = "source";
+      stateLabel = vi ? "nguồn" : "source";
     }
     if (item.isFinalized) {
       classes.push("is-finalized");
@@ -2008,7 +2008,7 @@ function renderNetworkDelayView(step) {
     ? view.heap.map((item, index) => `<div class="network-delay-heap-item${index === 0 ? " is-front" : ""}">
         <small>${index === 0 ? (vi ? "POP TIẾP" : "NEXT POP") : `[${index}]`}</small>
         <strong>(${escapeHtml(item.distance)}, ${escapeHtml(item.node)})</strong>
-        <em>distance, node</em>
+        <em>${vi ? "thời gian, node" : "time, node"}</em>
       </div>`).join("")
     : `<span class="network-delay-empty">${vi ? "heap rỗng" : "empty heap"}</span>`;
 
@@ -2057,10 +2057,12 @@ function renderNetworkDelayView(step) {
     actionDetail = vi ? "Trạng thái mới vào heap và sẽ được sắp theo distance." : "The improved state enters the heap and is ordered by distance.";
     outcomeClass = "is-accepted";
   } else if (view.phase === "done") {
-    actionMain = view.answer === -1 ? "return -1" : `return ${view.answer}`;
+    actionMain = view.answer === -1
+      ? (vi ? "∞ trong dist → -1" : "∞ in dist → -1")
+      : `max(${view.distances.map((item) => item.value).join(", ")}) = ${view.answer}`;
     actionDetail = view.answer === -1
-      ? (vi ? "Vẫn còn node có dist = ∞, nên tín hiệu không tới được toàn mạng." : "At least one dist is ∞, so the signal cannot reach the whole network.")
-      : (vi ? `Giá trị lớn nhất trong dist là ${view.answer}: thời điểm node cuối cùng nhận tín hiệu.` : `The maximum dist is ${view.answer}: when the final node receives the signal.`);
+      ? (vi ? "Còn node không thể tới từ nguồn, vì vậy hàm trả về -1." : "At least one node is unreachable from the source, so the function returns -1.")
+      : (vi ? `Thời gian chờ bằng dist lớn nhất; hàm trả về ${view.answer}.` : `The network delay is the largest shortest-path distance; the function returns ${view.answer}.`);
     outcomeClass = view.answer === -1 ? "is-rejected" : "is-accepted";
   } else {
     actionMain = vi ? "Heap rỗng → kiểm tra max(dist)" : "Heap empty → inspect max(dist)";
@@ -2072,12 +2074,17 @@ function renderNetworkDelayView(step) {
     : `Dijkstra from source ${view.source}. The heap contains ${view.heap.length} states.`;
   $("treeView").innerHTML = `<section class="network-delay-viz" aria-label="${escapeHtml(summary)}">
     <div class="network-delay-phases">${stageHtml}</div>
+    <div class="network-delay-guide">
+      <div><small>${vi ? "Ý NGHĨA" : "MEANING"}</small><strong>dist[v]</strong><span>${vi ? "Thời điểm sớm nhất tín hiệu từ k tới node v." : "Earliest time the signal from k reaches node v."}</span></div>
+      <div><small>${vi ? "THỬ ĐƯỜNG MỚI" : "TRY A ROUTE"}</small><strong>dist[u] + w(u,v)</strong><span>${vi ? "Chỉ cập nhật dist[v] nếu kết quả nhỏ hơn giá trị đang lưu." : "Update dist[v] only when this candidate is smaller."}</span></div>
+      <div><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>max(dist)</strong><span>${vi ? "Nếu còn ∞, có node không tới được và kết quả là -1." : "If ∞ remains, some node is unreachable and the answer is -1."}</span></div>
+    </div>
     <div class="network-delay-workspace">
       <div id="networkDelayGraph" class="network-delay-graph"></div>
       <div class="network-delay-state">
         <div class="network-delay-section-head"><strong>dist</strong><span>${vi ? "thời gian ngắn nhất đã biết" : "best known arrival time"}</span></div>
         <div class="network-delay-distances">${distanceHtml}</div>
-        <div class="network-delay-section-head"><strong>min-heap</strong><span>${vi ? "ưu tiên distance nhỏ nhất" : "smallest distance first"}</span></div>
+        <div class="network-delay-section-head"><strong>${vi ? "Hàng đợi ưu tiên" : "Priority queue"}</strong><span>${vi ? "node có thời gian nhỏ nhất được pop trước" : "pop the node with the smallest time first"}</span></div>
         <div class="network-delay-heap">${heapHtml}</div>
       </div>
     </div>
