@@ -1980,22 +1980,22 @@ function renderNetworkDelayView(step) {
   const distanceHtml = view.distances.map((item) => {
     const classes = ["network-delay-dist"];
     let stateLabel = vi ? "chưa tới" : "unreached";
-    if (item.value !== "∞") stateLabel = vi ? "đã biết" : "known";
+    if (item.value !== "∞") stateLabel = vi ? "tạm tính" : "tentative";
     if (item.isSource) {
       classes.push("is-source");
       stateLabel = vi ? "nguồn" : "source";
     }
     if (item.isFinalized) {
       classes.push("is-finalized");
-      stateLabel = vi ? "đã chốt" : "finalized";
+      stateLabel = vi ? "đã xử lý xong" : "settled";
     }
     if (item.isCandidate) {
       classes.push("is-candidate");
-      stateLabel = vi ? "đang so sánh" : "candidate";
+      stateLabel = vi ? "đích đang thử" : "route target";
     }
     if (item.isCurrent) {
       classes.push("is-current");
-      stateLabel = vi ? "vừa pop" : "popped";
+      stateLabel = vi ? "đang xét" : "current";
     }
     return `<div class="${classes.join(" ")}">
       <small>node ${escapeHtml(item.node)}</small>
@@ -2004,12 +2004,12 @@ function renderNetworkDelayView(step) {
     </div>`;
   }).join("");
 
+  const visibleHeap = view.heap.slice(0, 4);
   const heapHtml = view.heap.length
-    ? view.heap.map((item, index) => `<div class="network-delay-heap-item${index === 0 ? " is-front" : ""}">
-        <small>${index === 0 ? (vi ? "POP TIẾP" : "NEXT POP") : `[${index}]`}</small>
-        <strong>(${escapeHtml(item.distance)}, ${escapeHtml(item.node)})</strong>
-        <em>${vi ? "thời gian, node" : "time, node"}</em>
-      </div>`).join("")
+    ? `${visibleHeap.map((item, index) => `<div class="network-delay-heap-item${index === 0 ? " is-front" : ""}">
+        <small>${index === 0 ? (vi ? "XÉT TRƯỚC" : "NEXT") : (vi ? "CHỜ" : "WAITING")}</small>
+        <strong>t=${escapeHtml(item.distance)} · node ${escapeHtml(item.node)}</strong>
+      </div>`).join("")}${view.heap.length > visibleHeap.length ? `<span class="network-delay-heap-more">${vi ? `+ ${view.heap.length - visibleHeap.length} trạng thái` : `+ ${view.heap.length - visibleHeap.length} more`}</span>` : ""}`
     : `<span class="network-delay-empty">${vi ? "heap rỗng" : "empty heap"}</span>`;
 
   const edge = view.activeEdge;
@@ -2029,24 +2029,26 @@ function renderNetworkDelayView(step) {
     actionDetail = vi ? "Nguồn vào heap với khoảng cách 0; các node khác vẫn là ∞." : "Push the source with distance 0; every other node remains ∞.";
   } else if (view.phase === "pop") {
     actionMain = view.currentNode === null
-      ? (vi ? "Lấy phần tử nhỏ nhất của heap" : "Take the minimum heap entry")
-      : `pop → node ${view.currentNode}`;
-    actionDetail = vi ? "Chỉ node có distance nhỏ nhất hiện tại được mở rộng." : "Only the node with the smallest current distance is expanded.";
+      ? (vi ? "Chọn node có thời gian nhỏ nhất" : "Choose the node with the smallest time")
+      : (vi ? `Xét node ${view.currentNode} · thời gian ${currentDistance}` : `Check node ${view.currentNode} · time ${currentDistance}`);
+    actionDetail = vi ? "Lấy node này trước vì không còn đường nào tới nó nhanh hơn." : "Process it first because no other route can reach it sooner.";
   } else if (view.phase === "stale") {
-    actionMain = vi ? `Bỏ qua bản ghi cũ của node ${view.currentNode}` : `Skip stale entry for node ${view.currentNode}`;
-    actionDetail = vi ? "Heap entry lớn hơn dist đang lưu, nên không được duyệt cạnh từ entry này." : "The heap entry exceeds the stored dist, so its outgoing edges are not explored.";
+    actionMain = vi ? `Bỏ lượt cũ của node ${view.currentNode}` : `Skip an old entry for node ${view.currentNode}`;
+    actionDetail = vi ? "Đã có đường nhanh hơn tới node này; không cần xét lại lượt cũ." : "A faster route was already found, so this older entry is ignored.";
     outcomeClass = "is-rejected";
   } else if (edge && view.phase === "inspect") {
-    actionMain = `${edge.u} → ${edge.v} · w=${edge.w}`;
-    actionDetail = vi ? `Thử đi từ node ${edge.u} đang xử lý sang node ${edge.v}.` : `Try moving from current node ${edge.u} to node ${edge.v}.`;
+    actionMain = vi ? `Thử đường ${edge.u} → ${edge.v} · mất ${edge.w}` : `Try route ${edge.u} → ${edge.v} · takes ${edge.w}`;
+    actionDetail = vi ? `Tín hiệu tới node ${edge.u} lúc ${currentDistance}; xem đi tiếp tới ${edge.v} có nhanh hơn không.` : `The signal reaches node ${edge.u} at ${currentDistance}; check whether this gets to ${edge.v} sooner.`;
   } else if (edge && view.phase === "calculate") {
-    actionMain = `${currentDistance} + ${edge.w} = ${view.candidate}`;
-    actionDetail = vi ? `Đây là thời gian mới nếu tín hiệu đi qua cạnh ${edge.u} → ${edge.v}.` : `This is the candidate arrival time through edge ${edge.u} → ${edge.v}.`;
+    actionMain = `dist[${edge.u}] + ${edge.w} = ${view.candidate}`;
+    actionDetail = vi ? `Nếu đi qua ${edge.u} → ${edge.v}, tín hiệu tới node ${edge.v} lúc ${view.candidate}.` : `Taking ${edge.u} → ${edge.v} would get the signal to node ${edge.v} at ${view.candidate}.`;
   } else if (edge && view.phase === "compare") {
-    actionMain = `${view.candidate} < ${view.oldDistance} → ${view.improves ? "True" : "False"}`;
+    actionMain = view.improves
+      ? (vi ? `${view.candidate} nhanh hơn ${view.oldDistance}` : `${view.candidate} is faster than ${view.oldDistance}`)
+      : (vi ? `${view.candidate} không nhanh hơn ${view.oldDistance}` : `${view.candidate} is not faster than ${view.oldDistance}`);
     actionDetail = view.improves
-      ? (vi ? `Đường mới tốt hơn, dòng kế tiếp sẽ cập nhật dist[${edge.v}].` : `The new route is better; the next line updates dist[${edge.v}].`)
-      : (vi ? `Không tốt hơn, giữ nguyên dist[${edge.v}] = ${view.oldDistance}.` : `No improvement; keep dist[${edge.v}] = ${view.oldDistance}.`);
+      ? (vi ? `Cập nhật thời gian tốt nhất tới node ${edge.v}.` : `Update the best known time for node ${edge.v}.`)
+      : (vi ? `Giữ dist[${edge.v}] = ${view.oldDistance}.` : `Keep dist[${edge.v}] = ${view.oldDistance}.`);
     outcomeClass = view.improves ? "is-accepted" : "is-rejected";
   } else if (edge && view.phase === "update") {
     actionMain = `dist[${edge.v}]: ${view.oldDistance} → ${view.candidate}`;
@@ -2074,25 +2076,27 @@ function renderNetworkDelayView(step) {
     : `Dijkstra from source ${view.source}. The heap contains ${view.heap.length} states.`;
   $("treeView").innerHTML = `<section class="network-delay-viz" aria-label="${escapeHtml(summary)}">
     <div class="network-delay-phases">${stageHtml}</div>
-    <div class="network-delay-guide">
-      <div><small>${vi ? "Ý NGHĨA" : "MEANING"}</small><strong>dist[v]</strong><span>${vi ? "Thời điểm sớm nhất tín hiệu từ k tới node v." : "Earliest time the signal from k reaches node v."}</span></div>
-      <div><small>${vi ? "THỬ ĐƯỜNG MỚI" : "TRY A ROUTE"}</small><strong>dist[u] + w(u,v)</strong><span>${vi ? "Chỉ cập nhật dist[v] nếu kết quả nhỏ hơn giá trị đang lưu." : "Update dist[v] only when this candidate is smaller."}</span></div>
-      <div><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>max(dist)</strong><span>${vi ? "Nếu còn ∞, có node không tới được và kết quả là -1." : "If ∞ remains, some node is unreachable and the answer is -1."}</span></div>
+    <div class="network-delay-action ${outcomeClass}">
+      <small>${vi ? "ĐANG XẢY RA" : "WHAT IS HAPPENING"}</small>
+      <strong>${escapeHtml(actionMain)}</strong>
+      <span>${escapeHtml(actionDetail)}</span>
     </div>
     <div class="network-delay-workspace">
-      <div id="networkDelayGraph" class="network-delay-graph"></div>
+      <div class="network-delay-graph">
+        <div class="network-delay-section-head"><strong>${vi ? "Sơ đồ mạng" : "Network"}</strong><span>${vi ? "Mũi tên = chiều đi · số = thời gian" : "Arrow = direction · number = travel time"}</span></div>
+        <div id="networkDelayGraph"></div>
+      </div>
       <div class="network-delay-state">
-        <div class="network-delay-section-head"><strong>dist</strong><span>${vi ? "thời gian ngắn nhất đã biết" : "best known arrival time"}</span></div>
+        <div class="network-delay-section-head"><strong>${vi ? "Thời gian tới từng node" : "Time to each node"}</strong><span>${vi ? "∞ nghĩa là chưa tới được" : "∞ means not reached yet"}</span></div>
         <div class="network-delay-distances">${distanceHtml}</div>
-        <div class="network-delay-section-head"><strong>${vi ? "Hàng đợi ưu tiên" : "Priority queue"}</strong><span>${vi ? "node có thời gian nhỏ nhất được pop trước" : "pop the node with the smallest time first"}</span></div>
+        <div class="network-delay-section-head"><strong>${vi ? "Lượt sẽ xét" : "Up next"}</strong><span>${vi ? "thời gian nhỏ nhất được chọn trước" : "smallest time is chosen first"}</span></div>
         <div class="network-delay-heap">${heapHtml}</div>
       </div>
     </div>
-    <div class="network-delay-action ${outcomeClass}"><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
     <div class="network-delay-legend">
-      <span><i class="current"></i>${vi ? "vừa pop / đang xử lý" : "popped / current"}</span>
-      <span><i class="candidate"></i>${vi ? "node đang relax" : "relax candidate"}</span>
-      <span><i class="finalized"></i>${vi ? "khoảng cách đã chốt" : "finalized distance"}</span>
+      <span><i class="current"></i>${vi ? "đang xét" : "being checked"}</span>
+      <span><i class="candidate"></i>${vi ? "node đang thử tới" : "route target"}</span>
+      <span><i class="finalized"></i>${vi ? "đã tìm xong thời gian" : "time confirmed"}</span>
     </div>
   </section>`;
   renderGraph(step, "networkDelayGraph");
