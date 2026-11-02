@@ -2242,6 +2242,63 @@
   height: auto;
 }
 
+.network-delay-graph .graph-node circle {
+  fill: #eff6ff;
+  stroke: #3b82f6;
+}
+
+.network-delay-graph .graph-node text {
+  fill: #1e3a8a;
+}
+
+.network-delay-graph .graph-node.visited circle {
+  fill: #dcfce7;
+  stroke: #16a34a;
+}
+
+.network-delay-graph .graph-node.visited text {
+  fill: #166534;
+}
+
+.network-delay-graph .graph-node.hl circle {
+  fill: #fef3c7;
+  stroke: #d97706;
+}
+
+.network-delay-graph .graph-node.hl text {
+  fill: #92400e;
+}
+
+.network-delay-graph .graph-edge {
+  stroke: #64748b;
+}
+
+.network-delay-graph .graph-edge.hl {
+  stroke: #d97706;
+}
+
+.network-delay-graph .graph-weight-bg {
+  fill: #ffffff;
+  stroke: #cbd5e1;
+}
+
+.network-delay-graph .graph-weight-bg.hl {
+  fill: #fffbeb;
+  stroke: #d97706;
+}
+
+.network-delay-graph .graph-weight {
+  fill: #334155;
+}
+
+.network-delay-graph marker path {
+  fill: #64748b;
+}
+
+.network-delay-graph marker#graph-arrow-hl path {
+  fill: #d97706;
+}
+
 .network-delay-state {
   display: grid;
   gap: 9px;
