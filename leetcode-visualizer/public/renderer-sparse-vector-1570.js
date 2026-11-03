@@ -168,14 +168,23 @@ function renderSparseVector1570View(step) {
 
   const strategy = view.strategy === "two-pointer"
     ? "two-pointer"
-    : view.strategy === "hash-membership" ? "hash-membership" : "hash-lookup";
+    : ["hash-membership", "hash-lookup", "two-pointer", "brute-force", "binary-search"].includes(view.strategy)
+      ? view.strategy
+      : "hash-lookup";
   const strategyLabel = strategy === "two-pointer"
     ? (vi ? "Hai con trỏ" : "Two pointers")
     : strategy === "hash-membership"
-      ? (vi ? "Hash map · kiểm tra index" : "Hash map · membership")
-      : (vi ? "Tra cứu bảng băm" : "Hash lookup");
+      ? (vi ? "Hash map" : "Hash map")
+      : strategy === "hash-lookup"
+        ? (vi ? "Hash map tối ưu" : "Optimized hash map")
+        : strategy === "brute-force"
+          ? (vi ? "Brute force · mảng" : "Brute force · arrays")
+          : strategy === "binary-search"
+            ? (vi ? "Tìm kiếm nhị phân" : "Binary search")
+            : (vi ? "Tra cứu bảng băm" : "Hash lookup");
   const iteratedSide = normalizeSide(view.iteratedSide);
-  const lookupSide = strategy !== "two-pointer" && (iteratedSide === "left" || iteratedSide === "right")
+  const lookupSide = ["hash-lookup", "hash-membership", "binary-search"].includes(strategy)
+    && (iteratedSide === "left" || iteratedSide === "right")
     ? (iteratedSide === "left" ? "right" : "left")
     : null;
 
@@ -229,6 +238,8 @@ function renderSparseVector1570View(step) {
     compression: { en: "Compress", vi: "Nén vector" },
     "select-smaller": { en: "Choose shorter side", vi: "Chọn phía ngắn hơn" },
     iterate: { en: "Check nums1", vi: "Duyệt nums1" },
+    "brute-force": { en: "Multiply every index", vi: "Nhân mọi index" },
+    "binary-search": { en: "Narrow search range", vi: "Thu hẹp phạm vi tìm" },
     initialize: { en: "Initialize pointers", vi: "Đặt con trỏ" },
     probe: { en: "Probe lookup", vi: "Dò bảng tra cứu" },
     miss: { en: "Lookup miss", vi: "Không tìm thấy" },
@@ -258,9 +269,21 @@ function renderSparseVector1570View(step) {
       ? (vi
         ? ["Đọc vector", "Tạo hash map", "Kiểm tra index", "Kết quả"]
         : ["Read vectors", "Build hash maps", "Check membership", "Result"])
-    : (vi
-      ? ["Đọc vector", "Tạo bảng thưa", "Dò phía ngắn hơn", "Kết quả"]
-      : ["Read vectors", "Build sparse lookup", "Probe shorter side", "Result"]);
+      : strategy === "hash-lookup"
+        ? (vi
+          ? ["Đọc vector", "Tạo bảng thưa", "Dò map nhỏ hơn", "Kết quả"]
+          : ["Read vectors", "Build sparse maps", "Probe smaller map", "Result"])
+        : strategy === "brute-force"
+          ? (vi
+            ? ["Đọc vector", "Giữ mảng đầy đủ", "Nhân mọi index", "Kết quả"]
+            : ["Read vectors", "Keep full arrays", "Multiply every index", "Result"])
+          : strategy === "binary-search"
+            ? (vi
+              ? ["Đọc vector", "Nén theo index", "Tìm nhị phân", "Kết quả"]
+              : ["Read vectors", "Build sorted pairs", "Binary search", "Result"])
+            : (vi
+              ? ["Đọc vector", "Nén số khác 0", "So sánh hai index", "Kết quả"]
+              : ["Read vectors", "Compress nonzeros", "Compare indices", "Result"]);
   const phasesHtml = phaseLabels.map((label, index) => {
     const stateClass = index < phaseIndex
       ? "sv1570-phase-done"
@@ -299,10 +322,12 @@ function renderSparseVector1570View(step) {
   };
 
   const laneHtml = (side, entries, cursor) => {
-    const laneLabel = side === "left" ? (vi ? "Vector thưa trái" : "Left sparse vector") : (vi ? "Vector thưa phải" : "Right sparse vector");
+    const laneLabel = strategy === "brute-force"
+      ? side === "left" ? (vi ? "Mảng trái" : "Left array") : (vi ? "Mảng phải" : "Right array")
+      : side === "left" ? (vi ? "Vector thưa trái" : "Left sparse vector") : (vi ? "Vector thưa phải" : "Right sparse vector");
     const cursorLabel = side === "left" ? "L" : "R";
     const cards = entries.length === 0
-      ? `<span class="sv1570-empty">${vi ? "Không có phần tử khác 0" : "No nonzero entries"}</span>`
+      ? `<span class="sv1570-empty">${strategy === "brute-force" ? (vi ? "Mảng rỗng" : "Empty array") : (vi ? "Không có phần tử khác 0" : "No nonzero entries")}</span>`
       : entries.map((entry, position) => {
         const isPointer = cursor === position;
         const isProbe = probeIndex !== null && probeIndex !== undefined
@@ -325,12 +350,20 @@ function renderSparseVector1570View(step) {
         const aria = `${laneLabel}, ${vi ? "vị trí nén" : "compressed position"} ${position}, index ${valueText(entry.index)}, ${vi ? "giá trị" : "value"} ${valueText(entry.value)}`;
         return `<article class="${classes.join(" ")}" aria-label="${escapeHtml(aria)}"><span class="sv1570-entry-position">#${escapeHtml(String(position))}</span><div class="sv1570-entry-data"><span class="sv1570-entry-index"><small class="sv1570-entry-caption">index</small><strong class="sv1570-entry-number">${escaped(entry.index)}</strong></span><span class="sv1570-entry-divider">:</span><span class="sv1570-entry-value"><small class="sv1570-entry-caption">value</small><strong class="sv1570-entry-number">${escaped(entry.value)}</strong></span></div><div class="sv1570-entry-markers">${markers}</div></article>`;
       }).join("");
-    const roleText = iteratedSide === side || iteratedSide === "both"
+    const roleText = strategy === "brute-force"
+      ? (vi ? "duyệt mọi index" : "scan every index")
+      : iteratedSide === side || iteratedSide === "both"
       ? (iteratedSide === "both"
         ? (vi ? "hai con trỏ cùng duyệt" : "scanned by both pointers")
         : (vi ? "phía được duyệt" : "iterated side"))
       : lookupSide === side ? (vi ? "phía tra cứu" : "lookup side") : "";
-    return `<section class="sv1570-lane sv1570-lane-${side}"><header class="sv1570-lane-header"><div class="sv1570-lane-title"><strong>${escapeHtml(laneLabel)}</strong>${roleText ? `<em class="sv1570-lane-role">${escapeHtml(roleText)}</em>` : ""}</div><span class="sv1570-lane-count">${escapeHtml(String(entries.length))} ${vi ? "phần tử khác 0" : "nonzero"}</span></header><div class="sv1570-lane-scroll"><div class="sv1570-lane-track">${cards}</div></div></section>`;
+    const entryCountLabel = strategy === "brute-force"
+      ? (vi ? "phần tử" : "entries")
+      : (vi ? "phần tử khác 0" : "nonzero");
+    const emptyLabel = strategy === "brute-force"
+      ? (vi ? "Mảng rỗng" : "Empty array")
+      : (vi ? "Không có phần tử khác 0" : "No nonzero entries");
+    return `<section class="sv1570-lane sv1570-lane-${side}"><header class="sv1570-lane-header"><div class="sv1570-lane-title"><strong>${escapeHtml(laneLabel)}</strong>${roleText ? `<em class="sv1570-lane-role">${escapeHtml(roleText)}</em>` : ""}</div><span class="sv1570-lane-count">${escapeHtml(String(entries.length))} ${entryCountLabel}</span></header><div class="sv1570-lane-scroll"><div class="sv1570-lane-track">${cards || `<span class="sv1570-empty">${emptyLabel}</span>`}</div></div></section>`;
   };
 
   const relationKey = valueText(current.relation, "waiting").toLowerCase();
@@ -385,7 +418,12 @@ function renderSparseVector1570View(step) {
   const hasBuildFocus = Boolean(buildSide) || isSafeScalar(buildIndex) || isSafeScalar(buildValue);
   const buildDetail = hasBuildFocus
     ? `${sideName(buildSide)}[${valueText(buildIndex)}] = ${valueText(buildValue)}`
-    : (vi ? "Chờ phần tử khác 0 tiếp theo" : "Waiting for the next nonzero value");
+    : strategy === "brute-force"
+      ? (vi ? "Giữ nguyên n phần tử mỗi vector" : "Keep all n entries per vector")
+      : (vi ? "Chờ phần tử khác 0 tiếp theo" : "Waiting for the next nonzero value");
+  const storageLabel = strategy === "brute-force"
+    ? (vi ? "lưu / độ dài" : "stored / length")
+    : (vi ? "đã quét / nnz" : "scanned / nnz");
 
   const titleText = valueText(pick(safeStep.title), vi ? "Tích vô hướng vector thưa" : "Sparse vector dot product");
   const noteText = valueText(pick(safeStep.note), vi ? "Nén các số khác 0 rồi chỉ nhân các index chung." : "Compress nonzeros, then multiply only shared indices.");
@@ -456,11 +494,11 @@ function renderSparseVector1570View(step) {
     </section>
     <div class="sv1570-main">
       <section class="sv1570-sparse">
-        <header class="sv1570-section-header"><div class="sv1570-section-heading"><strong>${vi ? "DẠNG NÉN (index : value)" : "COMPRESSED (index : value)"}</strong><span>${vi ? "Chỉ giữ phần tử khác 0" : "Store nonzero entries only"}</span></div><span class="sv1570-iteration">${vi ? "duyệt" : "iterate"}: ${escapeHtml(sideName(iteratedSide))}</span></header>
+        <header class="sv1570-section-header"><div class="sv1570-section-heading"><strong>${strategy === "brute-force" ? (vi ? "MẢNG ĐẦY ĐỦ (index : value)" : "FULL ARRAYS (index : value)") : (vi ? "DẠNG NÉN (index : value)" : "COMPRESSED (index : value)")}</strong><span>${strategy === "brute-force" ? (vi ? "Giữ cả số 0" : "Keep zeros too") : (vi ? "Chỉ giữ phần tử khác 0" : "Store nonzero entries only")}</span></div><span class="sv1570-iteration">${vi ? "duyệt" : "iterate"}: ${strategy === "brute-force" ? (vi ? "mọi index" : "every index") : escapeHtml(sideName(iteratedSide))}</span></header>
         <div class="sv1570-lanes">${laneHtml("left", sparseLeft, cursorLeft)}${laneHtml("right", sparseRight, cursorRight)}</div>
       </section>
       <aside class="sv1570-dashboard">
-        <section class="sv1570-build"><header class="sv1570-mini-header"><strong>${vi ? "TRẠNG THÁI NÉN" : "BUILD STATE"}</strong><span>${escapeHtml(buildStatusText)}</span></header><div class="sv1570-build-counts"><span class="sv1570-build-count"><small>L · ${vi ? "đã quét / nnz" : "scanned / nnz"}</small><strong>${escapeHtml(`${processedLeft} / ${sparseLeft.length}`)}</strong></span><span class="sv1570-build-count"><small>R · ${vi ? "đã quét / nnz" : "scanned / nnz"}</small><strong>${escapeHtml(`${processedRight} / ${sparseRight.length}`)}</strong></span></div><code class="sv1570-build-detail">${escapeHtml(buildDetail)}</code></section>
+        <section class="sv1570-build"><header class="sv1570-mini-header"><strong>${strategy === "brute-force" ? (vi ? "MẢNG LƯU TRỮ" : "ARRAY STORAGE") : (vi ? "TRẠNG THÁI NÉN" : "BUILD STATE")}</strong><span>${escapeHtml(buildStatusText)}</span></header><div class="sv1570-build-counts"><span class="sv1570-build-count"><small>L · ${storageLabel}</small><strong>${escapeHtml(`${processedLeft} / ${sparseLeft.length}`)}</strong></span><span class="sv1570-build-count"><small>R · ${storageLabel}</small><strong>${escapeHtml(`${processedRight} / ${sparseRight.length}`)}</strong></span></div><code class="sv1570-build-detail">${escapeHtml(buildDetail)}</code></section>
         <section class="sv1570-current"><header class="sv1570-mini-header"><strong>${vi ? "SO SÁNH HIỆN TẠI" : "CURRENT COMPARISON"}</strong><span>${escapeHtml(vi ? relation.vi : relation.en)}</span></header><div class="sv1570-current-equation"><span class="sv1570-operand sv1570-operand-left"><small>L · index ${escaped(currentLeft.index)}</small><strong>${escaped(currentLeft.value)}</strong></span><span class="sv1570-relation sv1570-relation-${relation.tone}"><b>${escapeHtml(relation.symbol)}</b></span><span class="sv1570-operand sv1570-operand-right"><small>R · index ${escaped(currentRight.index)}</small><strong>${escaped(currentRight.value)}</strong></span></div><code class="sv1570-formula">${escapeHtml(formulaText)}</code></section>
         <section class="sv1570-running"><small>${vi ? "TỔNG ĐANG CHẠY" : "RUNNING TOTAL"}</small><strong>${escaped(runningTotal, "0")}</strong><span>${escapeHtml(String(contributions.length))} ${vi ? "tích đã cộng" : "contribution(s)"}</span></section>
         <section class="sv1570-answer ${done ? "sv1570-answer-ready" : "sv1570-answer-pending"}"><small>${vi ? "ĐÁP ÁN CUỐI" : "FINAL ANSWER"}</small><strong>${escaped(finalAnswer, done ? "0" : "…")}</strong><span>${done ? (vi ? "Hoàn tất tích vô hướng" : "Dot product complete") : (vi ? "Tiếp tục quét các index chung" : "Keep scanning shared indices")}</span></section>
