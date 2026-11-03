@@ -212,6 +212,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.safeKruskal9021View), surface: "treeView", render: (step) => {
       renderSafeKruskal9021View(step);
     } },
+    { id: "distance-limited-paths-1697", predicate: (step) => Boolean(step.distanceLimited1697View), surface: "treeView", render: (step) => {
+      renderDistanceLimited1697View(step);
+    } },
     { predicate: (step) => Boolean(step.safeDijkstra9021View), surface: "treeView", render: (step) => {
       renderSafeDijkstra9021View(step);
     } },
