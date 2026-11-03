@@ -215,6 +215,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { id: "distance-limited-paths-1697", predicate: (step) => Boolean(step.distanceLimited1697View), surface: "treeView", render: (step) => {
       renderDistanceLimited1697View(step);
     } },
+    { id: "minimum-cost-walk-3108", predicate: (step) => Boolean(step.minimumCostWalk3108View), surface: "treeView", render: (step) => {
+      renderMinimumCostWalk3108(step);
+    } },
     { predicate: (step) => Boolean(step.safeDijkstra9021View), surface: "treeView", render: (step) => {
       renderSafeDijkstra9021View(step);
     } },
