@@ -8,6 +8,7 @@ const problem = require("../problems").SUPPORTED[743];
 test("743 code snippet uses the requested numbered Dijkstra steps", () => {
   const code = problem.code.join("\n");
 
+  assert.equal(problem.debugMode, "line-by-line");
   assert.match(code, /# Step 1: Build graph/);
   assert.match(code, /dist = \[float\("inf"\)\] \* \(n \+ 1\)/);
   assert.match(code, /minHeap = \[\(0, k\)\]/);
@@ -15,6 +16,32 @@ test("743 code snippet uses the requested numbered Dijkstra steps", () => {
   assert.match(code, /newTime = time \+ weight/);
   assert.match(code, /# Step 5: Result\n        answer = max\(dist\[1:\]\)/);
   assert.match(code, /return answer if answer != float\("inf"\) else -1/);
+});
+
+test("743 trace highlights the exact Python line for every Dijkstra operation", () => {
+  const result = problem.builder("1-2-4,1-3-1,3-2-2,2-4-1,3-4-5", { n: 4, k: 1 });
+  const lineFor = (step) => problem.code[step.codeLines[0] - 1].trim();
+
+  assert.ok(result.steps.every((step) => step.codeLines.length === 1));
+  assert.ok(result.steps.every((step) => step.codeLines[0] >= 1 && step.codeLines[0] <= problem.code.length));
+  assert.equal(lineFor(result.steps.find((step) => step.title.en === "Create the adjacency list")), "graph = defaultdict(list)");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en.startsWith("Read edge "))), "for u, v, w in times:");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en.startsWith("graph[") && step.title.en.includes(".append"))), "graph[u].append((v, w))");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en === "Initialize every distance to ∞")), 'dist = [float("inf")] * (n + 1)');
+  assert.equal(lineFor(result.steps.find((step) => step.title.en.startsWith("dist[") && step.title.en.endsWith(" = 0"))), "dist[k] = 0");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en === "Push the source into the min-heap")), "minHeap = [(0, k)]");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en === "The heap is not empty")), "while minHeap:");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en.startsWith("heappop"))), "time, node = heapq.heappop(minHeap)");
+  assert.equal(lineFor(result.steps.find((step) => step.networkDelayView.phase === "stale")), "if time > dist[node]:");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en === "Skip the stale entry")), "continue");
+  assert.equal(lineFor(result.steps.find((step) => step.networkDelayView.phase === "inspect")), "for neighbor, weight in graph[node]:");
+  assert.equal(lineFor(result.steps.find((step) => step.networkDelayView.phase === "calculate")), "newTime = time + weight");
+  assert.equal(lineFor(result.steps.find((step) => step.networkDelayView.phase === "compare")), "if newTime < dist[neighbor]:");
+  assert.equal(lineFor(result.steps.find((step) => step.networkDelayView.phase === "update")), "dist[neighbor] = newTime");
+  assert.equal(lineFor(result.steps.find((step) => step.networkDelayView.phase === "push")), "heapq.heappush(minHeap, (newTime, neighbor))");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en === "The heap is empty")), "while minHeap:");
+  assert.equal(lineFor(result.steps.find((step) => step.title.en.startsWith("ans ="))), "answer = max(dist[1:])");
+  assert.equal(lineFor(result.steps.at(-1)), 'return answer if answer != float("inf") else -1');
 });
 
 function renderStep(step, language = "en") {

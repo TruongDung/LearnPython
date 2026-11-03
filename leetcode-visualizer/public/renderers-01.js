@@ -1965,6 +1965,11 @@ function renderCountPaths1976View(step) {
 }
 
 function renderNetworkDelayView(step) {
+  if (step.dijkstraFileView) {
+    renderDijkstraFileView(step);
+    return;
+  }
+
   const view = step.networkDelayView;
   const vi = lang === "vi";
   const dijkstraPhases = new Set(["init", "pop", "stale", "inspect", "calculate", "compare", "update", "push"]);
@@ -2111,6 +2116,90 @@ function renderNetworkDelayView(step) {
     </div>
   </section>`;
   renderGraph(step, "networkDelayGraph");
+}
+
+function renderDijkstraFileView(step) {
+  const view = step.dijkstraFileView || {};
+  const vi = lang === "vi";
+  const phases = vi
+    ? ["Dựng graph", "Min-heap", "Cập nhật dist"]
+    : ["Build graph", "Min-heap", "Update distances"];
+  const activeStage = view.phase === "build" ? 0
+    : ["init", "pop", "check", "stale", "inspect", "compare", "update", "push"].includes(view.phase) ? 1 : 2;
+  const stageHtml = phases.map((label, index) => {
+    const state = index < activeStage ? "is-done" : index === activeStage ? "is-active" : "";
+    return `<span class="${state}"><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  if (view.phase === "invalid") {
+    $("treeView").innerHTML = `<section class="network-delay-viz dijkstra-file-viz">
+      <div class="network-delay-action is-rejected"><small>${vi ? "ĐẦU VÀO KHÔNG HỢP LỆ" : "INVALID INPUT"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+      <p class="dijkstra-file-error">${escapeHtml(pick(view.error))}</p>
+    </section>`;
+    return;
+  }
+
+  const distanceHtml = view.distances.map((item) => {
+    const classes = ["network-delay-dist"];
+    if (item.isSource) classes.push("is-source");
+    if (item.isFinalized) classes.push("is-finalized");
+    if (item.isCandidate) classes.push("is-candidate");
+    if (item.isCurrent) classes.push("is-current");
+    if (item.value === "∞") classes.push("is-unreachable");
+    return `<div class="${classes.join(" ")}"><small>dist[${escapeHtml(item.node)}]</small><strong>${escapeHtml(item.value)}</strong><em>${item.isSource ? (vi ? "nguồn" : "source") : item.isFinalized ? (vi ? "đã xử lý" : "processed") : item.isCandidate ? (vi ? "đích đang thử" : "candidate") : item.value === "∞" ? (vi ? "chưa tới được" : "unreached") : (vi ? "tạm tính" : "tentative")}</em></div>`;
+  }).join("");
+
+  const heapHtml = view.heap.length
+    ? view.heap.slice(0, 12).map((item, index) => `<div class="network-delay-heap-item${index === 0 ? " is-front" : ""}">
+        <small>${index === 0 ? (vi ? "LẤY TIẾP" : "NEXT POP") : `#${index + 1}`}</small>
+        <strong>(${escapeHtml(item.distance)}, ${escapeHtml(item.node)})</strong>
+      </div>`).join("")
+      + (view.heap.length > 12 ? `<span class="network-delay-heap-more">+ ${view.heap.length - 12}</span>` : "")
+    : `<span class="network-delay-empty">${vi ? "heap rỗng" : "empty heap"}</span>`;
+
+  const adjacencyHtml = view.adjacency.map((neighbors, node) => {
+    const active = node === view.currentNode;
+    const entries = neighbors.length
+      ? neighbors.map(([neighbor, weight]) => `<span>${node} → ${escapeHtml(neighbor)} <small>(w=${escapeHtml(weight)})</small></span>`).join("")
+      : `<em>∅</em>`;
+    return `<div class="dijkstra-file-adj-row${active ? " is-active" : ""}"><b>graph[${node}]</b><i>→</i><div>${entries}</div></div>`;
+  }).join("");
+  const outcomeClass = view.phase === "update" || view.phase === "push" ? "is-accepted"
+    : view.phase === "stale" || (view.phase === "compare" && !view.improves) ? "is-rejected" : "";
+  const result = view.phase === "done"
+    ? `<div class="dijkstra-file-result"><small>${vi ? "KẾT QUẢ · dist[i] TỪ start = " : "RESULT · dist[i] FROM start = "}${escapeHtml(view.start)}</small><strong>[${view.answer.map(escapeHtml).join(", ")}]</strong></div>`
+    : "";
+  const activeEdge = view.activeEdge
+    ? `<span>${view.activeEdge.u} → ${view.activeEdge.v} · w=${escapeHtml(view.activeEdge.w)}</span>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="network-delay-viz dijkstra-file-viz" aria-label="${escapeHtml(vi ? "Mô phỏng Dijkstra từ một node nguồn" : "Dijkstra trace from a source node")}">
+    <div class="network-delay-phases">${stageHtml}</div>
+    <div class="network-delay-action ${outcomeClass}">
+      <small>${vi ? "BƯỚC ĐANG XÉT" : "CURRENT STEP"}</small>
+      <strong>${escapeHtml(pick(step.title))}</strong>
+      <span>${escapeHtml(pick(step.note))}</span>
+      ${activeEdge}
+    </div>
+    <div class="network-delay-workspace">
+      <div class="network-delay-graph">
+        <div class="network-delay-section-head"><strong>${vi ? "Đồ thị có hướng" : "Directed graph"}</strong><span>${vi ? "nhãn cạnh = trọng số" : "edge labels = weights"}</span></div>
+        <div id="dijkstraFileGraph"></div>
+      </div>
+      <div class="network-delay-state">
+        <div class="network-delay-section-head"><strong>dist</strong><span>${vi ? "khoảng cách tốt nhất hiện biết" : "best distances known so far"}</span></div>
+        <div class="network-delay-distances">${distanceHtml}</div>
+        <div class="network-delay-section-head"><strong>pq · min-heap</strong><span>${vi ? "gốc heap được lấy tiếp" : "heap root is popped next"}</span></div>
+        <div class="network-delay-heap">${heapHtml}</div>
+      </div>
+    </div>
+    <div class="dijkstra-file-adjacency">
+      <div class="network-delay-section-head"><strong>graph[u]</strong><span>${vi ? "các cạnh đi ra" : "outgoing edges"}</span></div>
+      ${adjacencyHtml}
+    </div>
+    ${result}
+  </section>`;
+  renderGraph(step, "dijkstraFileGraph");
 }
 
 function renderReachable882View(step) {
