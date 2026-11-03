@@ -3825,8 +3825,8 @@ function renderBstPreorder255View(step) {
   }]));
   const treeEdges = positioned.filter((node) => node.parent).map((node) => {
     const from = nodePositions.get(node.parent.value), to = nodePositions.get(node.value);
-    const side = node.parent.left === node ? "L" : "R";
-    return `<g class="vp255-link ${side === "R" ? "right" : "left"}"><line x1="${from.x}" y1="${from.y + 17}" x2="${to.x}" y2="${to.y - 17}"/><text x="${(from.x + to.x) / 2}" y="${(from.y + to.y) / 2}">${side}</text></g>`;
+    const side = node.parent.left?.index === node.index ? "L" : "R";
+    return `<g class="vp255-link ${side === "R" ? "right" : "left"}" data-parent="${node.parent.value}" data-node="${node.value}"><line x1="${from.x}" y1="${from.y + 17}" x2="${to.x}" y2="${to.y - 17}"/><text x="${(from.x + to.x) / 2}" y="${(from.y + to.y) / 2}">${side}</text></g>`;
   }).join("");
   const treeNodes = positioned.map((node) => {
     const isTop = stack.at(-1) === node.value;
