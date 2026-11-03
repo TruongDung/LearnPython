@@ -938,7 +938,7 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.buildingBoxesView), surface: "treeView", render: (step) => {
       renderBuildingBoxesView(step);
     } },
-    { predicate: (step) => Boolean(step.networkDelayView), surface: "treeView", render: (step) => {
+    { predicate: (step) => Boolean(step.networkDelayView || step.dijkstraFileView), surface: "treeView", render: (step) => {
       renderNetworkDelayView(step);
     } },
     { predicate: (step) => Boolean(step.reachable882View), surface: "treeView", render: (step) => {
