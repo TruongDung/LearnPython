@@ -166,12 +166,16 @@ function renderSparseVector1570View(step) {
       .filter((entry) => entry !== null),
   );
 
-  const strategy = view.strategy === "two-pointer" ? "two-pointer" : "hash-lookup";
+  const strategy = view.strategy === "two-pointer"
+    ? "two-pointer"
+    : view.strategy === "hash-membership" ? "hash-membership" : "hash-lookup";
   const strategyLabel = strategy === "two-pointer"
     ? (vi ? "Hai con trỏ" : "Two pointers")
-    : (vi ? "Tra cứu bảng băm" : "Hash lookup");
+    : strategy === "hash-membership"
+      ? (vi ? "Hash map · kiểm tra index" : "Hash map · membership")
+      : (vi ? "Tra cứu bảng băm" : "Hash lookup");
   const iteratedSide = normalizeSide(view.iteratedSide);
-  const lookupSide = strategy === "hash-lookup" && (iteratedSide === "left" || iteratedSide === "right")
+  const lookupSide = strategy !== "two-pointer" && (iteratedSide === "left" || iteratedSide === "right")
     ? (iteratedSide === "left" ? "right" : "left")
     : null;
 
@@ -224,6 +228,7 @@ function renderSparseVector1570View(step) {
     compress: { en: "Compress", vi: "Nén vector" },
     compression: { en: "Compress", vi: "Nén vector" },
     "select-smaller": { en: "Choose shorter side", vi: "Chọn phía ngắn hơn" },
+    iterate: { en: "Check nums1", vi: "Duyệt nums1" },
     initialize: { en: "Initialize pointers", vi: "Đặt con trỏ" },
     probe: { en: "Probe lookup", vi: "Dò bảng tra cứu" },
     miss: { en: "Lookup miss", vi: "Không tìm thấy" },
@@ -249,6 +254,10 @@ function renderSparseVector1570View(step) {
     ? (vi
       ? ["Đọc vector", "Nén số khác 0", "So sánh hai index", "Kết quả"]
       : ["Read vectors", "Compress nonzeros", "Compare indices", "Result"])
+    : strategy === "hash-membership"
+      ? (vi
+        ? ["Đọc vector", "Tạo hash map", "Kiểm tra index", "Kết quả"]
+        : ["Read vectors", "Build hash maps", "Check membership", "Result"])
     : (vi
       ? ["Đọc vector", "Tạo bảng thưa", "Dò phía ngắn hơn", "Kết quả"]
       : ["Read vectors", "Build sparse lookup", "Probe shorter side", "Result"]);
@@ -277,7 +286,10 @@ function renderSparseVector1570View(step) {
         const classes = ["sv1570-dense-cell"];
         if (!hasValue) classes.push("sv1570-dense-missing");
         if (rawValue === 0) classes.push("sv1570-dense-zero");
-        if (sameValue(activeOperand.index, index) || (strategy === "hash-lookup" && side === iteratedSide && sameValue(probeIndex, index))) {
+        if (phaseKey === "compression" && buildSide === side && sameValue(buildIndex, index)) {
+          classes.push("sv1570-dense-building");
+        }
+        if (sameValue(activeOperand.index, index) || (strategy !== "two-pointer" && side === iteratedSide && sameValue(probeIndex, index))) {
           classes.push("sv1570-dense-active");
         }
         const aria = `${label}, ${vi ? "index" : "index"} ${index}, ${vi ? "giá trị" : "value"} ${valueText(rawValue)}`;
@@ -386,6 +398,50 @@ function renderSparseVector1570View(step) {
   const summary = vi
     ? `Bài 1570, ${strategyLabel}, độ dài ${vectorLength}, tổng đang chạy ${valueText(runningTotal)}${done ? `, đáp án ${valueText(finalAnswer)}` : ""}.`
     : `Problem 1570, ${strategyLabel}, length ${vectorLength}, running total ${valueText(runningTotal)}${done ? `, answer ${valueText(finalAnswer)}` : ""}.`;
+  const actionTitle = phaseKey === "compression"
+    ? buildStatusKey === "store"
+      ? (vi ? "Lưu cặp" : "Store pair")
+      : (vi ? "Bỏ số 0" : "Skip zero")
+    : phaseKey === "select-smaller"
+      ? `${sparseLeft.length} ${vi ? "so với" : "vs"} ${sparseRight.length}`
+      : phaseKey === "iterate"
+        ? (vi ? "nums1 → vec.nums" : "nums1 → vec.nums")
+      : phaseKey === "probe"
+        ? `lookup[${valueText(probeIndex)}]`
+        : phaseKey === "miss"
+          ? `lookup[${valueText(probeIndex)}] → ∅`
+          : phaseKey === "compare"
+            ? `${valueText(currentLeft.index)} ${relation.symbol} ${valueText(currentRight.index)}`
+            : phaseKey === "advance-left"
+              ? (vi ? "L → tiếp" : "L → next")
+              : phaseKey === "advance-right"
+                ? (vi ? "R → tiếp" : "R → next")
+                : phaseKey === "match"
+                  ? `${valueText(currentLeft.value)} × ${valueText(currentRight.value)}`
+                  : phaseKey === "accumulate"
+                    ? `${valueText(productValue)} → Σ ${valueText(runningTotal)}`
+                    : done
+                      ? `Σ = ${valueText(finalAnswer)}`
+                      : titleText;
+  const actionVisual = phaseKey === "compression"
+    ? `<div class="sv1570-action-visual sv1570-compression-visual" aria-hidden="true">
+        <span class="sv1570-visual-value${buildStatusKey === "skip-zero" ? " is-zero" : ""}"><small>${vi ? "index" : "index"} ${escaped(buildIndex)}</small><strong>${escaped(buildValue)}</strong></span>
+        <i class="sv1570-visual-arrow">→</i>
+        <span class="sv1570-visual-output${buildStatusKey === "skip-zero" ? " is-empty" : ""}"><small>${buildStatusKey === "skip-zero" ? (vi ? "bỏ qua" : "skip") : (vi ? "lưu" : "keep")}</small><strong>${buildStatusKey === "skip-zero" ? "∅" : `(${escaped(buildIndex)}, ${escaped(buildValue)})`}</strong></span>
+      </div>`
+    : phaseKey === "iterate"
+      ? `<div class="sv1570-action-visual sv1570-membership-visual" aria-hidden="true">
+          <span class="sv1570-visual-value sv1570-visual-left"><small>self.nums</small><strong>${sparseLeft.length}</strong></span>
+          <i class="sv1570-visual-arrow">→</i>
+          <span class="sv1570-visual-output sv1570-visual-right"><small>vec.nums</small><strong>∈ ?</strong></span>
+        </div>`
+    : `<div class="sv1570-action-visual sv1570-comparison-visual" aria-hidden="true">
+        <span class="sv1570-visual-value sv1570-visual-left"><small>index ${escaped(currentLeft.index)}</small><strong>${escaped(currentLeft.value)}</strong></span>
+        <i class="sv1570-visual-relation sv1570-relation-${relation.tone}">${escapeHtml(relation.symbol)}</i>
+        <span class="sv1570-visual-value sv1570-visual-right"><small>index ${escaped(currentRight.index)}</small><strong>${escaped(currentRight.value)}</strong></span>
+        ${hasProduct ? `<i class="sv1570-visual-arrow">→</i><span class="sv1570-visual-product"><small>${vi ? "tích" : "product"}</small><strong>${escaped(productValue)}</strong></span>` : ""}
+      </div>
+      ${phaseKey === "probe" || phaseKey === "miss" ? `<div class="sv1570-lookup-visual" aria-hidden="true"><span>${vi ? "index" : "index"} ${escaped(probeIndex)}</span><i>⌕</i><b>${phaseKey === "miss" ? "∅" : "?"}</b></div>` : ""}`;
 
   el.innerHTML = `<section class="sv1570-viz ${strategy === "two-pointer" ? "sv1570-strategy-two-pointer" : "sv1570-strategy-hash"}" role="img" aria-label="${escapeHtml(summary)}">
     <header class="sv1570-header">
@@ -393,7 +449,7 @@ function renderSparseVector1570View(step) {
       <div class="sv1570-meta"><span class="sv1570-strategy">${escapeHtml(strategyLabel)}</span><span class="sv1570-length">n = ${escapeHtml(String(vectorLength))}</span><span class="sv1570-phase-name">${escapeHtml(phaseDisplay)}</span></div>
     </header>
     <div class="sv1570-phases">${phasesHtml}</div>
-    <section class="sv1570-action"><small class="sv1570-action-label">${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong class="sv1570-action-title">${escapeHtml(titleText)}</strong><span class="sv1570-action-note">${escapeHtml(noteText)}</span></section>
+    <section class="sv1570-action" aria-label="${escapeHtml(`${titleText}. ${noteText}`)}"><small class="sv1570-action-label">${vi ? "ĐANG XỬ LÝ" : "NOW"}</small><strong class="sv1570-action-title">${escapeHtml(actionTitle)}</strong>${actionVisual}</section>
     <section class="sv1570-dense">
       <header class="sv1570-section-header"><div class="sv1570-section-heading"><strong>${vi ? "VECTOR DÀY BAN ĐẦU" : "ORIGINAL DENSE VECTORS"}</strong><span>${vi ? "index ở trên · giá trị ở dưới" : "index above · value below"}</span></div>${vectorsTruncated ? `<em class="sv1570-truncated">${vi ? `Hiển thị ${visibleLength}/${vectorLength}` : `Showing ${visibleLength}/${vectorLength}`}</em>` : ""}</header>
       <div class="sv1570-dense-scroll"><div class="sv1570-dense-rows">${denseRowHtml("left", denseLeft)}${denseRowHtml("right", denseRight)}</div></div>
