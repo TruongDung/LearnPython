@@ -3785,69 +3785,94 @@ function renderBstPreorder255View(step) {
   const preorder = Array.isArray(view.preorder) ? view.preorder : [];
   const stack = Array.isArray(view.stack) ? view.stack : [];
   const accepted = Array.isArray(view.accepted) ? view.accepted : [];
-  const history = Array.isArray(view.lowerHistory) ? view.lowerHistory : [];
-  const currentPops = Array.isArray(view.currentPops) ? view.currentPops : [];
   const current = Number.isInteger(view.current) ? view.current : -1;
   const compared = Number.isFinite(view.compared) ? view.compared : null;
-  const popped = Number.isFinite(view.popped) ? view.popped : null;
   const lower = Number.isFinite(view.lower) ? view.lower : null;
   const currentValue = current >= 0 ? preorder[current] : null;
-  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
-  const labels = vi
-    ? ["Hiểu lower bound", "Kiểm tra current", "Pop ancestor", "Push / Kết quả"]
-    : ["Understand bound", "Check current", "Pop ancestors", "Push / Result"];
-  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${escapeHtml(label)}</span>`).join("");
-
-  const sequence = preorder.map((value, index) => {
-    const classes = ["vp255-item"];
-    const invalid = view.phase === "reject" && index === current;
-    if (accepted.includes(index)) classes.push("accepted");
-    if (stack.includes(value)) classes.push("in-stack");
-    if (index === current) classes.push("current");
-    if (value === compared) classes.push("compared");
-    if (value === popped) classes.push("popped");
-    if (invalid) classes.push("invalid");
-    let status = index > current && current >= 0 ? (vi ? "chưa đọc" : "unread") : (vi ? "đang chờ" : "waiting");
-    if (accepted.includes(index)) status = vi ? "đã nhận" : "accepted";
-    if (stack.includes(value)) status = "ANCESTOR";
-    if (index === current) status = "CURRENT";
-    if (value === popped) status = "POPPED";
-    if (invalid) status = "INVALID";
-    return `<article class="${classes.join(" ")}"><small>index ${index}</small><strong>${value}</strong><span>${escapeHtml(status)}</span></article>`;
+  const tree = [];
+  for (const index of accepted) {
+    const node = { value: preorder[index], index, left: null, right: null, parent: null };
+    if (!tree.length) {
+      tree.push(node);
+      continue;
+    }
+    let cursor = tree[0];
+    while (true) {
+      const side = node.value < cursor.value ? "left" : "right";
+      if (!cursor[side]) {
+        cursor[side] = node;
+        node.parent = cursor;
+        tree.push(node);
+        break;
+      }
+      cursor = cursor[side];
+    }
+  }
+  let inorderIndex = 0;
+  const positioned = [];
+  const layout = (node, depth = 0) => {
+    if (!node) return;
+    layout(node.left, depth + 1);
+    positioned.push({ ...node, x: inorderIndex++, y: depth });
+    layout(node.right, depth + 1);
+  };
+  layout(tree[0]);
+  const width = Math.max(220, positioned.length * 62);
+  const height = Math.max(115, (Math.max(0, ...positioned.map((node) => node.y)) + 1) * 62 + 24);
+  const nodePositions = new Map(positioned.map((node) => [node.value, {
+    x: positioned.length === 1 ? width / 2 : 30 + node.x * (width - 60) / (positioned.length - 1),
+    y: 30 + node.y * 58,
+  }]));
+  const treeEdges = positioned.filter((node) => node.parent).map((node) => {
+    const from = nodePositions.get(node.parent.value), to = nodePositions.get(node.value);
+    const side = node.parent.left === node ? "L" : "R";
+    return `<g class="vp255-link ${side === "R" ? "right" : "left"}"><line x1="${from.x}" y1="${from.y + 17}" x2="${to.x}" y2="${to.y - 17}"/><text x="${(from.x + to.x) / 2}" y="${(from.y + to.y) / 2}">${side}</text></g>`;
   }).join("");
-
-  const stackHtml = stack.length
-    ? stack.map((value, index) => `<span class="${index === stack.length - 1 ? "top" : ""}"><small>${index === 0 ? "ROOT / ANCESTOR" : "ANCESTOR"}</small><b>${value}</b>${index === stack.length - 1 ? "<em>TOP</em>" : ""}</span>`).join("<i>→</i>")
-    : `<p>${vi ? "Ancestor path đang trống" : "The ancestor path is empty"}</p>`;
-  const popsHtml = currentPops.length
-    ? currentPops.map((value, index) => `<span><small>POP #${index + 1}</small><b>${value}</b><em>lower = ${value}</em></span>`).join("<i>→</i>")
-    : `<p>${vi ? "Current chưa leo qua ancestor nào." : "Current has not climbed past an ancestor."}</p>`;
-  const historyHtml = history.length
-    ? history.map((item) => `<span class="${item.current === currentValue ? "current" : ""}"><small>${item.current} &gt; ${item.popped}</small><b>lower = ${item.lower}</b></span>`).join("")
-    : `<p>${vi ? "lower_bound vẫn là −∞." : "lower_bound is still −∞."}</p>`;
-
-  const passesBound = currentValue == null || lower == null || currentValue > lower;
-  const gate = currentValue == null ? "WAIT" : passesBound ? "PASS" : "INVALID";
-  const gateHtml = `<section class="vp255-gate ${gate.toLowerCase()}"><div class="forbidden"><small>${vi ? "VÙNG CẤM" : "FORBIDDEN"}</small><strong>${lower == null ? "none yet" : `value ≤ ${lower}`}</strong><span>${vi ? "Không được quay lại left subtree đã đóng" : "Cannot return to a closed left subtree"}</span></div><b>| lower_bound = ${lower ?? "−∞"} |</b><div class="allowed"><small>${vi ? "VÙNG HỢP LỆ" : "ALLOWED"}</small><strong>${lower == null ? "all values" : `value > ${lower}`}</strong><span>${currentValue == null ? "current = —" : `current = ${currentValue} · ${gate}`}</span></div></section>`;
-
-  const showCompare = currentValue != null && compared != null && (view.phase === "compare" || view.phase === "pop");
-  const climbs = showCompare && currentValue > compared;
-  const compareHtml = showCompare ? `<section class="vp255-compare ${climbs ? "pop" : "stay"}"><div><small>CURRENT</small><strong>${currentValue}</strong></div><b>${climbs ? ">" : "<"}</b><div><small>STACK TOP</small><strong>${compared}</strong></div><p><b>${climbs ? "POP + MOVE RIGHT" : "STOP + MOVE LEFT"}</b><span>${climbs ? (vi ? `Đóng left subtree của ${compared}; lower_bound tăng lên ${popped ?? compared}.` : `Close ${compared}'s left subtree; raise lower_bound to ${popped ?? compared}.`) : (vi ? `${currentValue} vẫn thuộc left subtree của ${compared}.` : `${currentValue} remains in ${compared}'s left subtree.`)}</span></p></section>` : "";
+  const treeNodes = positioned.map((node) => {
+    const isTop = stack.at(-1) === node.value;
+    const isInStack = stack.includes(node.value);
+    const isCompared = compared === node.value;
+    const classes = [isInStack ? "ancestor" : "", isTop ? "top" : "", isCompared ? "compared" : ""].filter(Boolean).join(" ");
+    const point = nodePositions.get(node.value);
+    return `<g class="vp255-tree-node ${classes}" data-node="${node.value}" transform="translate(${point.x} ${point.y})"><circle r="19"/><text y="5">${node.value}</text></g>`;
+  }).join("");
+  const currentInTree = currentValue != null && accepted.includes(current);
+  const candidate = currentValue == null || currentInTree ? "" : `<div class="vp255-candidate ${view.phase === "reject" ? "invalid" : ""}"><span>${vi ? "Kế tiếp" : "Next"}</span><b>${currentValue}</b><span class="vp255-down">↓</span></div>`;
+  const sequence = preorder.map((value, index) => {
+    const state = view.phase === "reject" && index === current ? "invalid" :
+      index === current ? "current" : accepted.includes(index) ? "accepted" : index > current && current >= 0 ? "unread" : "";
+    return `<span class="${state}" data-index="${index}"><small>${index}</small><b>${value}</b>${index === current ? '<i>↓</i>' : ""}</span>`;
+  }).join("");
+  const stackNodes = stack.map((value, index) =>
+    `<span class="${index === stack.length - 1 ? "top" : ""}" data-stack="${value}"><b>${value}</b></span>`).join('<i class="vp255-stack-arrow">→</i>');
   const isFinal = view.phase === "done" || view.phase === "reject";
-  const isValid = view.phase === "done";
-
-  $("treeView").innerHTML = `<section class="vp255-viz" role="img" aria-label="Verify Preorder Sequence in Binary Search Tree visualization">
-    <header><div><small>MONOTONIC ANCESTOR STACK · #255</small><strong>VERIFY BST PREORDER</strong></div><span>${escapeHtml(pick(step.title))}</span></header>
-    <div class="vp255-phases">${phases}</div>
-    <section class="vp255-rule"><b>PREORDER = ROOT → LEFT → RIGHT</b><div><span><small>1</small><strong>${vi ? "Stack giữ ancestor path" : "Stack keeps ancestor path"}</strong></span><i>→</i><span><small>2</small><strong>${vi ? "Pop nghĩa là rẽ phải" : "A pop means move right"}</strong></span><i>→</i><span><small>3</small><strong>${vi ? "Node bị pop thành lower bound" : "Popped node becomes lower bound"}</strong></span></div><p>${vi ? "Sau khi rẽ phải khỏi node x, mọi value về sau bắt buộc phải > x." : "After moving into node x's right subtree, every later value must be greater than x."}</p></section>
-    <section class="vp255-metrics"><div><small>input index</small><strong>${current >= 0 ? current : "—"}</strong></div><div><small>current value</small><strong>${currentValue ?? "—"}</strong></div><div class="${gate.toLowerCase()}"><small>lower_bound</small><strong>${lower ?? "−∞"}</strong></div><div><small>stack depth</small><strong>${stack.length}</strong></div></section>
-    ${gateHtml}${compareHtml}
-    <section class="vp255-sequence"><header><strong>PREORDER SEQUENCE</strong><span>${vi ? "đọc từ trái sang phải" : "read left to right"}</span></header><div style="--vp255-count:${Math.max(preorder.length, 1)}">${sequence}</div></section>
-    <section class="vp255-stack"><header><strong>${vi ? "ANCESTOR PATH ĐANG MỞ" : "OPEN ANCESTOR PATH"}</strong><span>${vi ? "root → node gần nhất" : "root → nearest node"}</span></header><div>${stackHtml}</div><p>${vi ? "Đỉnh stack là ancestor đầu tiên current phải so sánh." : "The stack top is the first ancestor compared with current."}</p></section>
-    <section class="vp255-climb"><header><strong>${vi ? "CURRENT ĐÃ LEO QUA" : "ANCESTORS CLIMBED BY CURRENT"}</strong><span>${currentValue == null ? "—" : `current ${currentValue}`}</span></header><div>${popsHtml}</div></section>
-    <section class="vp255-history"><header><strong>${vi ? "LỊCH SỬ NÂNG LOWER BOUND" : "LOWER-BOUND HISTORY"}</strong><span>${history.length} pop(s)</span></header><div>${historyHtml}</div></section>
-    <section class="vp255-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(view.action || "value must stay above lower_bound")}</strong><span>${escapeHtml(pick(view.explanation))}</span></section>
-    <footer class="vp255-result ${isFinal ? (isValid ? "valid" : "invalid") : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${isFinal ? (isValid ? "TRUE · VALID PREORDER" : "FALSE · INVALID PREORDER") : "…"}</strong><span>${isFinal ? (isValid ? (vi ? "Mọi value đều nằm đúng phía của lower_bound." : "Every value stayed on the valid side of lower_bound.") : (vi ? `preorder[${current}] = ${currentValue} nhỏ hơn lower_bound ${lower}.` : `preorder[${current}] = ${currentValue} is below lower_bound ${lower}.`)) : (vi ? "Tiếp tục kiểm tra current, ancestor stack và hàng rào." : "Continue checking current, the ancestor stack, and the barrier.")}</span></footer>
+  const valid = view.phase === "done";
+  const min = Math.min(...preorder, 0), max = Math.max(...preorder, 1);
+  const scale = (value) => 8 + ((value - min) / Math.max(1, max - min)) * 84;
+  const lowerPosition = lower == null ? 0 : scale(lower);
+  const currentPosition = currentValue == null ? null : scale(currentValue);
+  const currentPasses = currentValue != null && (lower == null || currentValue > lower);
+  const compareText = currentValue == null ? "—" : compared == null ? (lower == null ? `${currentValue} > −∞` : `${currentValue} > ${lower} ?`) : `${currentValue} ${currentValue > compared ? ">" : "<"} ${compared}`;
+  const range = `<section class="vp255-range">
+    <header><b>${vi ? "HÀNG RÀO" : "LOWER BOUND"}</b><strong>${lower == null ? "−∞" : lower}</strong></header>
+    <div class="vp255-track"><span class="blocked" style="width:${lower == null ? 0 : lowerPosition}%"></span><span class="allowed" style="left:${lowerPosition}%;width:${100 - lowerPosition}%"></span>
+      ${lower == null ? "" : `<i class="bound-marker" style="left:${lowerPosition}%"><b>≤ ${lower}</b></i>`}
+      ${currentPosition == null ? "" : `<i class="current-marker ${currentPasses ? "pass" : "fail"}" style="left:${currentPosition}%"><b>${currentValue}</b></i>`}
+    </div><footer><span>× ≤ ${lower ?? "—"}</span><b>${compareText}</b><span>✓ &gt; ${lower ?? "−∞"}</span></footer>
+  </section>`;
+  const verdict = isFinal
+    ? `<footer class="vp255-verdict ${valid ? "valid" : "invalid"}"><span>${preorder.length ? preorder.join(" → ") : "∅"}</span><strong>${valid ? "✓ TRUE" : "× FALSE"}</strong></footer>`
+    : `<footer class="vp255-verdict"><span>${compareText}</span><strong>${view.phase === "pop" ? "↗ POP" : view.phase === "reject" ? "×" : view.phase === "push" ? "↓ PUSH" : "…"}</strong></footer>`;
+  $("treeView").innerHTML = `<section class="vp255-viz vp255-picture" role="img" aria-label="${vi ? "Cây BST minh họa dãy preorder" : "BST picture for the preorder sequence"}">
+    <header class="vp255-picture-heading"><strong>#255 · ${vi ? "Dãy có tạo được BST không?" : "Can this sequence form a BST?"}</strong><span>${isFinal ? (valid ? "✓" : "×") : `i = ${Math.max(0, current)}`}</span></header>
+    <section class="vp255-sequence vp255-picture-sequence" aria-label="preorder">${sequence}</section>
+    <div class="vp255-picture-main">
+      <section class="vp255-tree-panel"><header><b>${vi ? "Cây đang dựng" : "BST so far"}</b><small>${positioned.length} / ${preorder.length}</small></header>
+        <div class="vp255-tree-scroll">${positioned.length ? `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${vi ? "Cây tìm kiếm nhị phân đang dựng" : "BST being constructed"}">${treeEdges}${treeNodes}</svg>` : `<span class="vp255-empty">∅</span>`}${candidate}</div>
+      </section>
+      <section class="vp255-side"><div class="vp255-stack-picture"><header><b>STACK</b><small>${stack.length}</small></header><div>${stackNodes || '<span class="vp255-empty">∅</span>'}</div><footer>${vi ? "đỉnh" : "top"} <b>→</b></footer></div>${range}</section>
+    </div>
+    ${verdict}
   </section>`;
 }
 
