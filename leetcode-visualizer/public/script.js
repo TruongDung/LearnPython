@@ -242,6 +242,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.arrangingCoins441View), surface: "treeView", render: (step) => {
       renderArrangingCoins441View(step);
     } },
+    { predicate: (step) => Boolean(step.subarrayOr3171View), surface: "treeView", render: (step) => {
+      renderSubarrayOr3171View(step);
+    } },
     { predicate: (step) => Boolean(step.koko875View), surface: "treeView", render: (step) => {
       renderKoko875View(step);
     } },
