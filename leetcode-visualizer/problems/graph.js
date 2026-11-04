@@ -1272,6 +1272,252 @@ function buildSteps994(input) {
   return { original, answer, steps };
 }
 
+function buildSteps994Alternative(input, approach) {
+  const parsed = parseIslandGrid(input);
+  const original = parsed.map((row) => [...row]);
+  const grid = parsed.map((row) => [...row]);
+  const steps = [];
+  const invalid = !grid.length || !grid[0].length || grid.some((row) =>
+    row.length !== grid[0].length || row.some((value) => value !== "0" && value !== "1" && value !== "2")
+  );
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [1],
+      vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Grid phải là ma trận chữ nhật chỉ gồm 0, 1, 2.", en: "The grid must be rectangular and contain only 0, 1, and 2." },
+    });
+    return { original, answer: -1, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const times = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
+  const sources = [];
+  const freshCells = [];
+  let initialFresh = 0;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (grid[row][col] === "1") {
+        initialFresh++;
+        freshCells.push([row, col]);
+      } else if (grid[row][col] === "2") {
+        times[row][col] = 0;
+        sources.push([row, col]);
+      }
+    }
+  }
+
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const coordinates = (items) => items.map(([row, col], index) => ({
+    row, col, index, rottenMinute: times[row][col],
+  }));
+  function pushFrame({ title, line, phase = "spread", source = null, neighbor = null, direction = null, check = null, frontier = [], nextFrontier = [], newlyRotten = [], queue = [], minutes = 0, answer }) {
+    const rottenMinutes = times.flat().filter(Number.isFinite);
+    const lastMinute = rottenMinutes.reduce((maxMinute, minute) => Math.max(maxMinute, minute), 0);
+    const timeline = Array.from({ length: lastMinute + 1 }, (_, minute) => ({
+      minute,
+      cells: times.flatMap((timeRow, row) => timeRow.flatMap((time, col) => time === minute ? [[row, col]] : [])),
+    }));
+    const rottedFresh = freshCells.filter(([row, col]) => Number.isFinite(times[row][col])).length;
+    const gridView = grid.map((gridRow, row) => gridRow.map((value, col) => ({
+      row, col,
+      value: value === "1" && Number.isFinite(times[row][col]) ? 2 : Number(value),
+      rottenMinute: Number.isFinite(times[row][col]) ? times[row][col] : -1,
+    })));
+    steps.push({
+      title,
+      arr: [],
+      final: answer !== undefined,
+      codeLines: [line],
+      vars: [
+        { name: "time", value: minutes },
+        { name: "fresh rotted", value: rottedFresh },
+        ...(answer === undefined ? [] : [{ name: "answer", value: answer }]),
+      ],
+      note: { vi: "Theo dõi thời điểm cam thối lan trên lưới.", en: "Track the time each orange becomes rotten on the grid." },
+      rottingOrangesView: {
+        phase: answer === undefined ? phase : "result",
+        event: answer === undefined ? "neighbor-check" : "result",
+        rows, cols, grid: gridView,
+        queue: coordinates(queue),
+        frontier: coordinates(frontier),
+        nextFrontier: coordinates(nextFrontier),
+        source, neighbor, direction, check, newlyRotten,
+        fresh: initialFresh - rottedFresh, initialFresh, minutes,
+        targetMinute: minutes + 1, timeline, answer,
+      },
+    });
+  }
+
+  const queue = [...sources];
+  pushFrame({
+    title: { vi: `Khởi tạo cách ${approach}`, en: `Initialize approach ${approach}` },
+    line: 1, phase: "scan", frontier: sources, queue,
+  });
+
+  if (approach === 2) {
+    let head = 0;
+    while (head < queue.length) {
+      const [row, col] = queue[head++];
+      for (const [rowDelta, colDelta] of directions) {
+        const nextRow = row + rowDelta;
+        const nextCol = col + colDelta;
+        const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+        const isFresh = inBounds && grid[nextRow][nextCol] === "1" && !Number.isFinite(times[nextRow][nextCol]);
+        if (isFresh) {
+          times[nextRow][nextCol] = times[row][col] + 1;
+          queue.push([nextRow, nextCol]);
+        }
+        pushFrame({
+          title: { vi: `BFS xét ô kề (${nextRow},${nextCol})`, en: `BFS checks neighbor (${nextRow},${nextCol})` },
+          line: isFresh ? 18 : 17, source: [row, col], neighbor: [nextRow, nextCol],
+          direction: [rowDelta, colDelta], check: { inBounds, isFresh },
+          frontier: [[row, col]], nextFrontier: queue.slice(head),
+          newlyRotten: isFresh ? [[nextRow, nextCol]] : [],
+          queue: queue.slice(head), minutes: times[row][col],
+        });
+      }
+    }
+  } else if (approach === 3) {
+    const stack = sources.map(([row, col]) => [row, col, 0]);
+    while (stack.length) {
+      const [row, col, time] = stack.pop();
+      if (time !== times[row][col]) continue;
+      for (const [rowDelta, colDelta] of directions) {
+        const nextRow = row + rowDelta;
+        const nextCol = col + colDelta;
+        const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+        const previousTime = inBounds ? times[nextRow][nextCol] : Infinity;
+        const isFresh = inBounds && grid[nextRow][nextCol] === "1" && time + 1 < previousTime;
+        if (isFresh) {
+          times[nextRow][nextCol] = time + 1;
+          stack.push([nextRow, nextCol, time + 1]);
+        }
+        pushFrame({
+          title: { vi: `DFS cập nhật ô (${nextRow},${nextCol})`, en: `DFS updates cell (${nextRow},${nextCol})` },
+          line: isFresh ? 18 : 17, source: [row, col], neighbor: [nextRow, nextCol],
+          direction: [rowDelta, colDelta], check: { inBounds, isFresh },
+          frontier: [[row, col]], nextFrontier: stack.map(([r, c]) => [r, c]),
+          newlyRotten: isFresh && !Number.isFinite(previousTime) ? [[nextRow, nextCol]] : [],
+          queue: stack.map(([r, c]) => [r, c]), minutes: time,
+        });
+      }
+    }
+  } else if (approach === 4) {
+    let minutes = 0;
+    let remaining = initialFresh;
+    let current = [...sources];
+    while (remaining > 0) {
+      const newlyRotten = [];
+      for (const [row, col] of current) {
+        for (const [rowDelta, colDelta] of directions) {
+          const nextRow = row + rowDelta;
+          const nextCol = col + colDelta;
+          if (nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols
+            && grid[nextRow][nextCol] === "1" && !Number.isFinite(times[nextRow][nextCol])) {
+            times[nextRow][nextCol] = minutes + 1;
+            newlyRotten.push([nextRow, nextCol]);
+          }
+        }
+      }
+      if (!newlyRotten.length) break;
+      remaining -= newlyRotten.length;
+      minutes++;
+      pushFrame({
+        title: { vi: `Mô phỏng hết phút ${minutes}`, en: `Finish simulating minute ${minutes}` },
+        line: 22, frontier: current, nextFrontier: newlyRotten,
+        newlyRotten, queue: newlyRotten, minutes,
+      });
+      current = newlyRotten;
+    }
+  } else {
+    const heap = [...sources.map(([row, col]) => [0, row, col])];
+    const pushHeap = (item) => {
+      heap.push(item);
+      let index = heap.length - 1;
+      while (index > 0) {
+        const parent = Math.floor((index - 1) / 2);
+        if (heap[parent][0] <= heap[index][0]) break;
+        [heap[parent], heap[index]] = [heap[index], heap[parent]];
+        index = parent;
+      }
+    };
+    const popHeap = () => {
+      const first = heap[0];
+      const last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        let index = 0;
+        while (true) {
+          const left = index * 2 + 1;
+          const right = left + 1;
+          let smallest = index;
+          if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;
+          if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;
+          if (smallest === index) break;
+          [heap[index], heap[smallest]] = [heap[smallest], heap[index]];
+          index = smallest;
+        }
+      }
+      return first;
+    };
+    while (heap.length) {
+      const [time, row, col] = popHeap();
+      if (time !== times[row][col]) continue;
+      for (const [rowDelta, colDelta] of directions) {
+        const nextRow = row + rowDelta;
+        const nextCol = col + colDelta;
+        const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+        const isFresh = inBounds && grid[nextRow][nextCol] === "1" && time + 1 < times[nextRow][nextCol];
+        if (isFresh) {
+          times[nextRow][nextCol] = time + 1;
+          pushHeap([time + 1, nextRow, nextCol]);
+        }
+        pushFrame({
+          title: { vi: `Dijkstra xét ô (${nextRow},${nextCol})`, en: `Dijkstra checks neighbor (${nextRow},${nextCol})` },
+          line: isFresh ? 21 : 20, source: [row, col], neighbor: [nextRow, nextCol],
+          direction: [rowDelta, colDelta], check: { inBounds, isFresh },
+          frontier: [[row, col]], nextFrontier: heap.map((item) => [item[1], item[2]]),
+          newlyRotten: isFresh ? [[nextRow, nextCol]] : [],
+          queue: heap.map((item) => [item[1], item[2]]), minutes: time,
+        });
+      }
+    }
+  }
+
+  const answer = freshCells.every(([row, col]) => Number.isFinite(times[row][col]))
+    ? Math.max(0, ...freshCells.map(([row, col]) => times[row][col]))
+    : -1;
+  pushFrame({
+    title: answer === -1
+      ? { vi: "Còn cam tươi không thể tiếp cận → -1", en: "Some fresh oranges are unreachable → -1" }
+      : { vi: `Kết quả: ${answer} phút`, en: `Result: ${answer} minute(s)` },
+    line: approach === 2 ? 21 : approach === 3 ? 22 : approach === 4 ? 23 : 24,
+    phase: "result", minutes: answer === -1 ? 0 : answer, answer,
+  });
+  return { original, answer, steps };
+}
+
+function buildSteps994BfsWithTime(input) {
+  return buildSteps994Alternative(input, 2);
+}
+
+function buildSteps994Dfs(input) {
+  return buildSteps994Alternative(input, 3);
+}
+
+function buildSteps994Simulation(input) {
+  return buildSteps994Alternative(input, 4);
+}
+
+function buildSteps994Dijkstra(input) {
+  return buildSteps994Alternative(input, 5);
+}
+
 /**
  * LeetCode 994: exact line-by-line multi-source BFS trace.
  * This detailed builder mirrors every executable line in the displayed Python.
@@ -18753,12 +18999,25 @@ module.exports = {
     defaultInput: "2,1,1|1,1,0|0,1,1",
     inputKind: "string",
     inputLabel: { vi: "Grid 0/1/2 (hàng cách '|')", en: "0/1/2 grid (rows separated by '|')" },
+    extraParams: [
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Multi-source BFS", en: "Approach 1: Multi-source BFS" } },
+          { value: "2", label: { vi: "Cách 2: BFS lưu thời gian từng ô", en: "Approach 2: BFS with per-cell times" } },
+          { value: "3", label: { vi: "Cách 3: DFS cập nhật thời gian", en: "Approach 3: DFS with time updates" } },
+          { value: "4", label: { vi: "Cách 4: Mô phỏng từng phút", en: "Approach 4: Minute-by-minute simulation" } },
+          { value: "5", label: { vi: "Cách 5: Graph + Dijkstra", en: "Approach 5: Graph + Dijkstra" } },
+        ],
+      },
+    ],
     debugMode: "line-by-line",
     approach: [
-      { vi: "Đưa tất cả cam thối ban đầu vào queue cùng lúc: đây là multi-source BFS.", en: "Put all initially rotten oranges into the queue at once: this is multi-source BFS." },
-      { vi: "Đếm số cam tươi ban đầu. Mỗi khi một cam tươi bị thối, fresh -= 1.", en: "Count initial fresh oranges. Whenever one rots, decrement fresh." },
-      { vi: "Mỗi level BFS là 1 phút: frontier hiện tại làm thối các ô tươi kề 4 hướng.", en: "Each BFS level is 1 minute: the current frontier rots 4-directionally adjacent fresh cells." },
-      { vi: "Nếu fresh = 0 thì trả số phút. Nếu queue hết mà vẫn còn fresh thì trả -1.", en: "If fresh reaches 0, return minutes. If the queue empties while fresh remains, return -1." },
+      { vi: "1. Multi-source BFS: tất cả cam thối ban đầu cùng vào queue; mỗi level ứng với 1 phút.", en: "1. Multi-source BFS: enqueue all initially rotten oranges; each level is one minute." },
+      { vi: "2. BFS + thời gian từng ô: lưu phút cam thối sớm nhất vào ma trận times.", en: "2. BFS + per-cell time: store the earliest rot minute in a times matrix." },
+      { vi: "3. DFS + cập nhật thời gian: dùng stack và lan lại khi tìm được thời điểm sớm hơn; ô có thể được xử lý nhiều lần.", en: "3. DFS + time updates: use a stack and propagate improved arrival times; cells may be revisited." },
+      { vi: "4. Mô phỏng: quét toàn grid mỗi phút và chỉ áp dụng cam mới thối sau khi quét xong.", en: "4. Simulation: scan the whole grid each minute and apply new rotten cells after the scan." },
+      { vi: "5. Graph + Dijkstra: xem mỗi ô là đỉnh, cạnh kề có trọng số 1, lấy thời điểm đến lớn nhất.", en: "5. Graph + Dijkstra: treat cells as vertices with unit-weight neighbor edges; take the latest arrival time." },
     ],
     complexity: {
       time: "O(rows·cols)",
@@ -18767,6 +19026,26 @@ module.exports = {
         vi: "Mỗi ô được đưa vào queue tối đa một lần. Queue trong trường hợp xấu nhất chứa O(rows·cols) ô.",
         en: "Each cell enters the queue at most once. In the worst case, the queue stores O(rows·cols) cells.",
       },
+    },
+    complexity2: {
+      time: "O(rows·cols)",
+      space: "O(rows·cols)",
+      note: { vi: "BFS thăm mỗi ô tươi tối đa một lần; ma trận times và queue chiếm O(rows·cols).", en: "BFS visits each fresh cell at most once; times and the queue use O(rows·cols) space." },
+    },
+    complexity3: {
+      time: "O(V·E) worst case",
+      space: "O(rows·cols)",
+      note: { vi: "DFS cập nhật thời điểm có thể xử lý lại ô khi tìm thấy đường ngắn hơn; cách cài đặt này không đảm bảo O(rows·cols) thời gian trong trường hợp xấu nhất.", en: "Time-updating DFS may revisit cells when it finds a shorter route; this implementation does not guarantee O(rows·cols) worst-case time." },
+    },
+    complexity4: {
+      time: "O((rows·cols)²)",
+      space: "O(rows·cols)",
+      note: { vi: "Mỗi phút quét cả grid; có tối đa O(rows·cols) phút lan truyền.", en: "The whole grid is scanned each minute, for up to O(rows·cols) minutes." },
+    },
+    complexity5: {
+      time: "O(rows·cols log(rows·cols))",
+      space: "O(rows·cols)",
+      note: { vi: "Có O(rows·cols) đỉnh/cạnh kề và mỗi lần đưa ô vào heap tốn log(rows·cols).", en: "There are O(rows·cols) cells and neighbor edges; heap operations cost log(rows·cols)." },
     },
     code: [
       "from collections import deque",
@@ -18798,6 +19077,109 @@ module.exports = {
       "            minutes += 1",
       "        return minutes if fresh == 0 else -1",
     ],
+    code2: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def orangesRotting(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        times = [[float('inf')] * cols for _ in range(rows)]",
+      "        queue = deque()",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if grid[row][col] == 2:",
+      "                    times[row][col] = 0",
+      "                    queue.append((row, col))",
+      "        while queue:",
+      "            row, col = queue.popleft()",
+      "            for dr, dc in ((1,0), (-1,0), (0,1), (0,-1)):",
+      "                nr, nc = row + dr, col + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1 and times[nr][nc] == float('inf'):",
+      "                    times[nr][nc] = times[row][col] + 1",
+      "                    queue.append((nr, nc))",
+      "        answer = max((times[r][c] for r in range(rows) for c in range(cols) if grid[r][c] == 1), default=0)",
+      "        return -1 if answer == float('inf') else answer",
+    ],
+    builder2: buildSteps994BfsWithTime,
+    code3: [
+      "class Solution:",
+      "    def orangesRotting(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        times = [[float('inf')] * cols for _ in range(rows)]",
+      "        stack = []",
+      "        # Initialize times for rotten oranges and push them onto stack.",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if grid[row][col] == 2:",
+      "                    times[row][col] = 0",
+      "                    stack.append((row, col, 0))",
+      "        while stack:",
+      "            row, col, time = stack.pop()",
+      "            if time != times[row][col]:",
+      "                continue",
+      "            for dr, dc in ((1,0), (-1,0), (0,1), (0,-1)):",
+      "                nr, nc = row + dr, col + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1 and time + 1 < times[nr][nc]:",
+      "                    times[nr][nc] = time + 1",
+      "                    stack.append((nr, nc, time + 1))",
+      "        answer = max((times[r][c] for r in range(rows) for c in range(cols) if grid[r][c] == 1), default=0)",
+      "        return -1 if answer == float('inf') else answer",
+    ],
+    builder3: buildSteps994Dfs,
+    code4: [
+      "class Solution:",
+      "    def orangesRotting(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        state = [row[:] for row in grid]",
+      "        fresh = sum(cell == 1 for row in state for cell in row)",
+      "        minutes = 0",
+      "        while fresh:",
+      "            newly_rotten = []",
+      "            for row in range(rows):",
+      "                for col in range(cols):",
+      "                    if state[row][col] != 2:",
+      "                        continue",
+      "                    for dr, dc in ((1,0), (-1,0), (0,1), (0,-1)):",
+      "                        nr, nc = row + dr, col + dc",
+      "                        if 0 <= nr < rows and 0 <= nc < cols and state[nr][nc] == 1:",
+      "                            state[nr][nc] = -1",
+      "                            newly_rotten.append((nr, nc))",
+      "            if not newly_rotten:",
+      "                return -1",
+      "            for row, col in newly_rotten:",
+      "                state[row][col] = 2",
+      "            fresh -= len(newly_rotten)",
+      "            minutes += 1",
+      "        return minutes",
+    ],
+    builder4: buildSteps994Simulation,
+    code5: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def orangesRotting(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        times = [[float('inf')] * cols for _ in range(rows)]",
+      "        heap = []",
+      "        # Initialize times for rotten oranges and push them onto heap.",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if grid[row][col] == 2:",
+      "                    times[row][col] = 0",
+      "                    heapq.heappush(heap, (0, row, col))",
+      "        while heap:",
+      "            time, row, col = heapq.heappop(heap)",
+      "            if time != times[row][col]:",
+      "                continue",
+      "            for dr, dc in ((1,0), (-1,0), (0,1), (0,-1)):",
+      "                nr, nc = row + dr, col + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1 and time + 1 < times[nr][nc]:",
+      "                    times[nr][nc] = time + 1",
+      "                    heapq.heappush(heap, (time + 1, nr, nc))",
+      "        answer = max((times[r][c] for r in range(rows) for c in range(cols) if grid[r][c] == 1), default=0)",
+      "        return -1 if answer == float('inf') else answer",
+    ],
+    builder5: buildSteps994Dijkstra,
     builder: buildSteps994LineByLine,
   },
   1730: {

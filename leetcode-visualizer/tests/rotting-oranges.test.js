@@ -37,6 +37,39 @@ test('994 solves the standard, impossible, and already-finished cases', () => {
   }
 });
 
+test('994 exposes four visualized alternatives with matching answers and code lines', () => {
+  const approaches = [
+    { number: 2, builder: problem.builder2 },
+    { number: 3, builder: problem.builder3 },
+    { number: 4, builder: problem.builder4 },
+    { number: 5, builder: problem.builder5 },
+  ];
+  assert.deepEqual(problem.extraParams[0].options.map(option => option.value), ['1', '2', '3', '4', '5']);
+
+  for (const { number, builder } of approaches) {
+    for (const [input, answer] of [
+      ['2,1,1|1,1,0|0,1,1', 4],
+      ['2,1,1|0,1,1|1,0,1', -1],
+      ['0,2', 0],
+      ['2,1|1,2', 1],
+    ]) {
+      const result = builder(input);
+      assert.equal(result.answer, answer, `approach ${number}: ${input}`);
+      assert.ok(result.steps.every(step => step.rottingOrangesView));
+      assert.ok(result.steps.every(step => step.codeLines.every(
+        line => line >= 1 && line <= problem[`code${number}`].length,
+      )));
+      const html = renderView(result.steps.find(step => step.rottingOrangesView.event === 'neighbor-check'));
+      assert.match(html, /rotting-oranges-viz/);
+      assert.match(html, /rotting-grid/);
+      const spreadStep = result.steps.find(step => step.rottingOrangesView.newlyRotten.length);
+      if (spreadStep) {
+        assert.match(renderView(spreadStep), /is-newly-rotten/);
+      }
+    }
+  }
+});
+
 test('994 traces exactly one executable Python line per frame', () => {
   assert.equal(problem.debugMode, 'line-by-line');
   const run = problem.builder(problem.defaultInput);
