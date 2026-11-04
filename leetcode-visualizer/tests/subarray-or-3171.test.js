@@ -29,7 +29,8 @@ test("3171 returns the minimum OR difference, including single-value and tie cas
   for (const [nums, k] of cases) {
     const run = problem.builder(nums, { k });
     assert.equal(run.answer, brute(nums, k));
-    assert.equal(run.steps.length, nums.length);
+    assert.ok(run.steps.every(step => step.codeLines.length === 1));
+    assert.equal(run.steps.filter(step => step.final).length, 1);
     assert.equal(run.steps.at(-1).subarrayOr3171View.best, run.answer);
   }
 });
@@ -37,11 +38,14 @@ test("3171 returns the minimum OR difference, including single-value and tie cas
 test("3171 compressed suffix OR states contain every distinct subarray OR", () => {
   for (let mask = 1; mask < 1 << 8; mask++) {
     const nums = Array.from({ length: 4 }, (_, index) => (mask >> (index * 2)) & 3);
-    for (let k = 0; k <= 7; k++) {
+    // Suffix states depend only on nums; vary k once per exhaustive array.
+    for (const k of [mask % 8]) {
       const run = problem.builder(nums, { k });
       assert.equal(run.answer, brute(nums, k));
+      const rounds = run.steps.filter(step => step.subarrayOr3171View.event === 'suffix-ready');
+      assert.equal(rounds.length, nums.length);
       for (let right = 0; right < nums.length; right++) {
-        const actual = run.steps[right].subarrayOr3171View.candidates.map(({ value }) => value);
+        const actual = rounds[right].subarrayOr3171View.candidates.map(({ value }) => value);
         const expected = new Set();
         let value = 0;
         for (let left = right; left >= 0; left--) {
