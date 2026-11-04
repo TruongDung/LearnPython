@@ -43,6 +43,9 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
   if (!replaced) categories.graph[id] = problem;
 }
 
+// Dedicated 1284 lesson supersedes the shared grid preview.
+Object.assign(categories.graph, require('./minimum-flips-1284'));
+
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 const { PREFIX_MAX_TAG, PREFIX_MAX_ROSTER, PREFIX_MAX_ORDER, PREFIX_MAX_ORDER_LABEL, PREFIX_MAX_GUIDE, prefixMaxSubTabs } = require('./prefix-max-catalog');

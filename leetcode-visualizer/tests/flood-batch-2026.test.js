@@ -24,9 +24,9 @@ const cases=[...defaults,
 ];
 let seed=20261029;const random=n=>(seed=(Math.imul(seed,1664525)+1013904223)>>>0)%n;
 for(let j=0;j<8;j++)for(const id of [1034,1992,2658,711,1559,407,4003,1284]){const r=2+random(2),c=2+random(2),grid=Array.from({length:r},()=>Array.from({length:c},()=>id===1559?'abc'[random(3)]:[1992,711,1284].includes(id)?random(2):random(6)));cases.push({id,input:JSON.stringify(grid),params:id===1034?{row:0,col:0,color:7}:{}});}
-function executePython(cmd,payload,maxBuffer=128*1024*1024){const p=spawnSync('python3',cmd,{input:JSON.stringify(payload),encoding:'utf8',maxBuffer});assert.equal(p.status,0,p.stderr);return JSON.parse(p.stdout);}
+function executePython(cmd,payload,maxBuffer=128*1024*1024){const p=spawnSync(process.env.PYTHON||'python3',cmd,{input:JSON.stringify(payload),encoding:'utf8',maxBuffer});assert.equal(p.status,0,p.stderr);return JSON.parse(p.stdout);}
 test('all 17 lessons are registered, load exact complete snippets, and the Flood Fill roster now has no disabled gaps',()=>{
- for(const id of ids){assert.equal(SUPPORTED[id],lessons[id]);assert.equal(lessons[id].debugMode,'line-by-line');assert.ok(lessons[id].code.length>5);assert.equal(lessons[id].pictureBatch,true);}
+ for(const id of ids){assert.equal(SUPPORTED[id],id===1284?require('../problems/minimum-flips-1284')[1284]:lessons[id]);assert.equal(lessons[id].debugMode,'line-by-line');assert.ok(lessons[id].code.length>5);assert.equal(lessons[id].pictureBatch,true);}
  assert.equal(FLOOD_FILL_SUBTABS[0].roster.length,33);assert.ok(FLOOD_FILL_SUBTABS[0].roster.every(x=>x.available));
  assert.match(lessons[1284].code.join('\n'),/flips\.append\(flip\)/);assert.doesNotMatch(lessons[1284].code.join('\n'),/flip_mask\(/);assert.match(lessons[3310].code.join('\n'),/from collections import deque/);
 });

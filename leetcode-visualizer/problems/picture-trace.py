@@ -1,6 +1,7 @@
 """Record completed source statements. Only bundled lesson code enters here."""
 import ast
 import collections
+import itertools
 import json
 import math
 import sys
@@ -43,8 +44,20 @@ def picture_trace(payload):
         # Python 3.12 inlines comprehensions; their temporary bindings are not
         # locals of the enclosing statement, unlike actual source variables.
         temporary = comprehension_targets.get(pending.get(frame), set()) if suspended else set()
-        values = {k: encode(v) for k, v in frame.f_locals.items()
-                  if k != 'self' and k not in temporary and not callable(v) and not isinstance(v, types.ModuleType)}
+        values = {}
+        summaries = payload.get('summarizeLocals', {})
+        for name, value in frame.f_locals.items():
+            if name == 'self' or name in temporary or callable(value) or isinstance(value, types.ModuleType):
+                continue
+            if name not in summaries:
+                values[name] = encode(value)
+                continue
+            values[f'len({name})'] = len(value)
+            limit = summaries[name]
+            if limit:
+                items = value.items() if isinstance(value, dict) else value
+                expression = f'list({name}.items())' if isinstance(value, dict) else f'list({name})'
+                values[f'{expression}[:{limit}]'] = encode(list(itertools.islice(items, limit)))
         instance = frame.f_locals.get('self')
         if type(instance).__name__ in payload.get('stateClasses', []):
             values['self'] = {name: encode(value) for name, value in vars(instance).items()}
