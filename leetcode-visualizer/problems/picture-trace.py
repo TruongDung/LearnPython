@@ -43,8 +43,12 @@ def picture_trace(payload):
         # Python 3.12 inlines comprehensions; their temporary bindings are not
         # locals of the enclosing statement, unlike actual source variables.
         temporary = comprehension_targets.get(pending.get(frame), set()) if suspended else set()
-        return {k: encode(v) for k, v in frame.f_locals.items()
-                if k != 'self' and k not in temporary and not callable(v) and not isinstance(v, types.ModuleType)}
+        values = {k: encode(v) for k, v in frame.f_locals.items()
+                  if k != 'self' and k not in temporary and not callable(v) and not isinstance(v, types.ModuleType)}
+        instance = frame.f_locals.get('self')
+        if type(instance).__name__ in payload.get('stateClasses', []):
+            values['self'] = {name: encode(value) for name, value in vars(instance).items()}
+        return values
 
     events, pending = [], {}
     def trace(frame, event, arg):

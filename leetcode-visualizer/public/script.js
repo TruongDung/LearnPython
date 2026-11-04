@@ -242,6 +242,15 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.arrangingCoins441View), surface: "treeView", render: (step) => {
       renderArrangingCoins441View(step);
     } },
+    { predicate: (step) => Boolean(step.scheduler621View), surface: "treeView", render: (step) => {
+      renderScheduler621View(step);
+    } },
+    { predicate: (step) => Boolean(step.orderedTriplet2873View), surface: "treeView", render: (step) => {
+      renderOrderedTriplet2873View(step);
+    } },
+    { predicate: (step) => Boolean(step.taskManager3408View), surface: "treeView", render: (step) => {
+      renderTaskManager3408View(step);
+    } },
     { predicate: (step) => Boolean(step.rightInterval436View), surface: "treeView", render: (step) => {
       renderRightInterval436View(step);
     } },
