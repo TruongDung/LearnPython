@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "server.js": {
+      "includeFiles": "{problems/picture-trace-worker.js,problems/picture-trace.py,node_modules/pyodide/**}"
+    }
+  }
+}
