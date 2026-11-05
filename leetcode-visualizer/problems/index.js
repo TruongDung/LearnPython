@@ -45,6 +45,7 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
 
 // Dedicated 1284 lesson supersedes the shared grid preview.
 Object.assign(categories.graph, require('./minimum-flips-1284'));
+Object.assign(categories.dp, require('./equal-subarrays-3505'));
 
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
