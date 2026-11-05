@@ -64,14 +64,23 @@ def picture_trace(payload):
         return values
 
     events, pending = [], {}
+    entry, truncated = None, False
+    event_limit = payload.get('maxEvents')
     def trace(frame, event, arg):
+        nonlocal entry, truncated
         if frame.f_code.co_filename != filename or frame.f_code.co_name.startswith('<'):
             return trace
+        if frame.f_code.co_name == payload['method']:
+            entry = frame
         if event in ('line', 'return'):
             # Ignore repeated line events inside an inlined comprehension.
             if event == 'line' and pending.get(frame) == frame.f_lineno:
                 return trace
             if frame in pending:
+                if event_limit and len(events) >= event_limit and not (event == 'return' and frame is entry):
+                    truncated = True
+                    sys.settrace(None)
+                    return None
                 line = pending.pop(frame)
                 cursor, outer, frames = frame, frame, []
                 while cursor:
@@ -95,4 +104,12 @@ def picture_trace(payload):
     finally:
         sys.settrace(None)
         pending.clear()
-    return json.dumps({'answer': encode(answer), 'events': events}, separators=(',', ':'))
+    if truncated:
+        # Retaining the real entry frame lets the bounded replay finish with its actual return state.
+        state = local(entry)
+        events.append({'line': entry.f_lineno, 'scope': entry.f_code.co_name, 'locals': state,
+                       'outer': state, 'frames': [{'name': entry.f_code.co_name, 'locals': state}],
+                       'returned': encode(answer), 'returning': True, 'branch': None})
+    return json.dumps({'answer': encode(answer), 'events': events,
+                       'trace': {'captured': len(events), 'truncated': truncated, 'limit': event_limit}},
+                      separators=(',', ':'))

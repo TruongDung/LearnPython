@@ -45,6 +45,12 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
 
 // Dedicated 1284 lesson supersedes the shared grid preview.
 Object.assign(categories.graph, require('./minimum-flips-1284'));
+Object.assign(categories.graph, require('./minimum-cost-grid-1368'));
+Object.assign(categories.graph, require('./minimum-obstacle-removal-2290'));
+Object.assign(categories.graph, require('./safe-walk-3286'));
+Object.assign(categories.graph, require('./network-delay-time-743'));
+Object.assign(categories.graph, require('./maximum-probability-1514'));
+Object.assign(categories.graph, require('./minimum-weighted-subgraph-2203'));
 Object.assign(categories.dp, require('./equal-subarrays-3505'));
 Object.assign(categories.graph, require('./time-room-pictures'), require('./shortest-graph-pictures'));
 
