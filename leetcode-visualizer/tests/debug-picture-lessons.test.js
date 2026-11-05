@@ -32,7 +32,7 @@ test('3408 has exactly two requested sources and bundles the real SortedContaine
  assert.match(p.code.join('\n'),/heapify\(self.heap\)/);assert.match(p.code.join('\n'),/self.tasks\[taskId\] == \(userId, priority\)/);
  assert.match(p.code2.join('\n'),/from sortedcontainers import SortedList/);assert.match(p.code2.join('\n'),/self.sorted_tasks = SortedList\(\)/);
  assert.equal(require('node:crypto').createHash('sha256').update(fs.readFileSync(wheel)).digest('hex'),'a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0');
- assert.ok(JSON.parse(fs.readFileSync(require.resolve('../vercel.json'),'utf8')).functions['server.js'].includeFiles.includes('public/vendor/sortedcontainers-2.4.0-py2.py3-none-any.whl'));
+ assert.ok(require('node:path').posix.matchesGlob('public/vendor/sortedcontainers-2.4.0-py2.py3-none-any.whl',JSON.parse(fs.readFileSync(require.resolve('../vercel.json'),'utf8')).functions['server.js'].includeFiles));
 });
 test('3408 captures heapify, stale user/priority tuples, real SortedList mutations and zero IDs',()=>{
  let stale=0,userMismatch=0,removal=0,heapify=0;

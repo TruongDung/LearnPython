@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "server.js": {
-      "includeFiles": "{problems/picture-trace-worker.js,problems/picture-trace.py,problems/arrow-grid-trace.py,problems/safe-walk-trace.py,problems/network-delay-trace.py,problems/maximum-probability-trace.py,problems/minimum-subgraph-trace.py,public/vendor/sortedcontainers-2.4.0-py2.py3-none-any.whl,node_modules/pyodide/**}"
+      "includeFiles": "{problems/picture-trace-worker.js,problems/*-trace.py,public/vendor/*.whl,node_modules/pyodide/**}"
     }
   }
 }

@@ -13,6 +13,14 @@ test('a missing Python runtime is reported through shared memory instead of sile
  const {Worker}=require('node:worker_threads'),shared=new SharedArrayBuffer(4096),control=new Int32Array(shared,0,4);const worker=new Worker(source,{eval:true,execArgv:[],workerData:{payload:{},shared}});worker.unref();
  try{assert.notEqual(Atomics.wait(control,0,0,5000),'timed-out');assert.equal(Atomics.load(control,0),2);assert.match(Buffer.from(shared,16,Atomics.load(control,1)).toString(),/test runtime unavailable/);}finally{worker.terminate();}
 });
-test('Vercel explicitly packages the worker, Python source and local WebAssembly runtime',()=>{
- const config=JSON.parse(fs.readFileSync(require.resolve('../vercel.json'),'utf8')),include=config.functions['server.js'].includeFiles;for(const asset of['problems/picture-trace-worker.js','problems/picture-trace.py','node_modules/pyodide/**'])assert.ok(include.includes(asset));
+test('Vercel packaging stays within its schema limit and covers every trace helper, wheel and WebAssembly asset',()=>{
+ const config=JSON.parse(fs.readFileSync(require.resolve('../vercel.json'),'utf8')),include=config.functions['server.js'].includeFiles;
+ assert.equal(typeof include,'string');assert.ok(include.length<=256,`includeFiles is ${include.length} characters (maximum 256)`);
+ const root=path.dirname(require.resolve('../vercel.json'));
+ const assets=['problems/picture-trace-worker.js',
+  ...fs.readdirSync(path.join(root,'problems')).filter(name=>name.endsWith('-trace.py')).map(name=>'problems/'+name),
+  ...fs.readdirSync(path.join(root,'public/vendor')).filter(name=>name.endsWith('.whl')).map(name=>'public/vendor/'+name),
+  'node_modules/pyodide/package.json','node_modules/pyodide/pyodide.asm.wasm','node_modules/pyodide/python_stdlib.zip'];
+ for(const asset of assets){assert.ok(fs.existsSync(path.join(root,asset)),asset);assert.ok(path.posix.matchesGlob(asset,include),`Missing from function bundle: ${asset}`);}
+ for(const asset of['tests/picture-trace-runtime.test.js','public/index.html','node_modules/express/package.json'])assert.equal(path.posix.matchesGlob(asset,include),false,asset);
 });
