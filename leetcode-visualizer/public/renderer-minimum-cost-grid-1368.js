@@ -62,13 +62,15 @@ function renderArrowGrid1368View(step) {
   }
   if(v.final) transition=`<div class="ag1368-answer" data-answer="${v.answer}"><b>${v.answer}</b><span>${t('mũi tên cần đổi','arrow changes')} · S → T ✓</span></div>`;
   let entries=v.method===1?v.stack:v.queue;
+  const coordinates=v.queueFormat==='coordinates';
   let heading=['STACK · đáy → đỉnh','MIN-HEAP · ưu tiên → pop','DEQUE · đầu ← 0 | 1 → cuối',`BFS · lớp ${v.locals.cost??0}`,`Bellman-Ford · lượt ${(v.locals.turn??0)+1}`][v.method-1];
   if(lang!=='vi') heading=['STACK · bottom → top','MIN-HEAP · priority → pop','DEQUE · front ← 0 | 1 → back',`BFS · layer ${v.locals.cost??0}`,`Bellman-Ford · pass ${(v.locals.turn??0)+1}`][v.method-1];
+  if(coordinates)heading+=' · (r,c)';
   let frontier;
   if(v.method===5) {
     frontier=`<div class="ag1368-sweep">${v.rows.map(r=>v.cols.map(c=>`<span class="${v.current?.[0]===r&&v.current?.[1]===c?'active':''}">${coord([r,c])}</span>`).join('')).join('')}<span>→</span></div>`;
   } else {
-    frontier=`<div class="ag1368-queue">${entries.map(([cost,r,c],i)=>`<div class="${(v.method===1?i===entries.length-1:i===0)?'active':''}" data-queue-cell="${r},${c}"><span>${coord([r,c])}</span><b>${cost}</b></div>`).join('')||'<span class="ag1368-empty">∅</span>'}${v.queueSize>entries.length&&v.method!==1?`<span>+${v.queueSize-entries.length}</span>`:''}</div>`;
+    frontier=`<div class="ag1368-queue">${entries.map((entry,i)=>{const[cost,r,c]=coordinates?[null,...entry]:entry;return`<div class="${(v.method===1?i===entries.length-1:i===0)?'active':''}" data-queue-cell="${r},${c}"><span>${coord([r,c])}</span>${coordinates?'':`<b>${cost}</b>`}</div>`;}).join('')||'<span class="ag1368-empty">∅</span>'}${v.queueSize>entries.length&&v.method!==1?`<span>+${v.queueSize-entries.length}</span>`:''}</div>`;
   }
   const stack=v.method===4?`<div class="ag1368-dfs"><span>DFS · ${t('theo cạnh 0','follow 0-edges')}</span><b>${v.floodStack.length?v.floodStack.map(coord).join(' → '):'∅'}</b></div>`:'';
   const best=v.method===1?`<div class="ag1368-dfs"><span>best</span><b>${esc(v.locals.best??'∞')}</b><span>↶ ${t('quay lui','backtrack')}</span></div>`:'';

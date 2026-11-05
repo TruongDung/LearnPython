@@ -92,10 +92,60 @@ test('1368 weights use the arrow at departure and distance snapshots match execu
         const {nr,nc,nd}=view.locals;
         assert.equal(view.cells.flat().find(cell=>cell.r===nr&&cell.c===nc).distance,nd);
       }
+      if(approach===3&&source.startsWith('new_cost =')) {
+        const {r,c,i,cost}=view.locals;
+        assert.equal(cost,Number(result.original[r][c]!==i+1));
+        assert.equal(view.probe.weight,cost);
+      }
+      if(approach===3&&source.startsWith('if new_cost'))assert.equal(view.locals.new_cost,view.locals['dist[r][c]']+view.locals.cost);
     }
     const first=JSON.stringify(result.steps[0]);
     result.steps.at(-1).arrow1368View.cells[0][0].distance=99;
     assert.equal(JSON.stringify(result.steps[0]),first);
+  }
+});
+
+test('1368 approach 3 keeps coordinate pairs in the deque and follows the requested source line by line',()=>{
+  const code=problem.code3.join('\n');
+  assert.match(code,/from typing import List/);
+  assert.match(code,/queue = deque\(\[\(0, 0\)\]\)/);
+  assert.match(code,/r, c = queue\.popleft\(\)/);
+  assert.doesNotMatch(code,/parent|heap|cost !=|return cost/);
+  const result=problem.builder('1,1,3;3,2,2;1,1,4',{approach:3});
+  const views=result.steps.map(step=>step.arrow1368View);
+  assert.equal(result.answer,0);verifyRoute(result.original,result);
+  assert.equal(views.at(-1).queueSize,0);
+  assert.ok(views.some(view=>view.current?.[0]===2&&view.current?.[1]===2&&!view.final));
+  let pushes=0,pops=0;
+  for(let i=0;i<views.length;i++) {
+    const view=views[i],source=view.source.text.trim(),next=views[i+1];
+    assert.equal(view.queueFormat,'coordinates');
+    assert.ok(view.queue.every(entry=>entry.length===2&&entry.every(Number.isInteger)));
+    if(view.locals.r!==undefined)assert.equal(view.locals['dist[r][c]'],view.cells.flat().find(cell=>cell.r===view.locals.r&&cell.c===view.locals.c).distance);
+    if(source==='r, c = queue.popleft()') {
+      pops++;assert.deepEqual(next.current,view.queue[0]);assert.equal(next.queueSize,view.queueSize-1);
+    }
+    if(source.startsWith('queue.append')) {
+      pushes++;assert.equal(next.queueSize,view.queueSize+1);
+      const pair=[view.locals.nr,view.locals.nc];
+      if(source.startsWith('queue.appendleft'))assert.deepEqual(next.queue[0],pair);
+      else if(next.queueSize<=12)assert.deepEqual(next.queue.at(-1),pair);
+    }
+  }
+  assert.ok(pushes>0&&pops>0);
+  const host={innerHTML:''},context={lang:'vi',$:()=>host,escapeHtml:value=>String(value)};
+  vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-minimum-cost-grid-1368.js'),'utf8'),context);
+  context.renderArrowGrid1368View(result.steps.find(step=>step.arrow1368View.queue.length>0));
+  assert.match(host.innerHTML,/DEQUE[^<]*\(r,c\)/);
+  assert.match(host.innerHTML,/data-queue-cell="0,0"><span>\(0,0\)<\/span><\/div>/);
+  assert.doesNotMatch(host.innerHTML,/data-queue-cell="[^"]+"><span>[^<]+<\/span><b>/);
+});
+
+test('1368 coordinate-only BFS matches the oracle and retains a valid route on every 2×2 arrow grid',()=>{
+  for(let mask=0;mask<256;mask++) {
+    const values=Array.from({length:4},(_,i)=>1+((mask>>(i*2))&3)),grid=[values.slice(0,2),values.slice(2)];
+    const result=problem.builder(grid,{approach:3});
+    assert.equal(result.answer,oracle(grid),`mask=${mask}`);verifyRoute(grid,result);
   }
 });
 

@@ -15,15 +15,18 @@ def arrow_grid_trace(payload):
     lines = code.splitlines()
     filename = '<arrow-grid-1368>'
     scope = {}
-    exec(compile(code, filename, 'exec'), scope)
+    # Execute bundled lesson source so the trace follows its real Python statements.
+    exec(compile(code, filename, 'exec'), scope)  # pylint: disable=exec-used
     grid = payload['args'][0]
     height, width = len(grid), len(grid[0])
     method = payload['approach']
     obstacle_grid = payload.get('profile') == 'obstacle2290'
     method_name = payload['method']
+    coordinate_queue = payload.get('queueCoordinates', False)
     limit = payload.get('maxEvents', 1600)
     events, count, omitted = [], 0, 0
     last_lines = {}
+    visual_parents, pending_updates = {}, {}
     dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
     def scalar(value):
@@ -50,7 +53,8 @@ def arrow_grid_trace(payload):
         neighbor_line = source.startswith((
             'if not (0 <= nr', 'if 0 <= nr', 'if (nr', 'w =', 'nd =',
             'if nd', 'dist[nr', 'parent[(nr', 'if w', 'dq.append',
-            'heappush', 'dfs(nr',
+            'heappush', 'dfs(nr', 'cost = 0 if', 'new_cost =',
+            'if new_cost', 'if cost ==', 'queue.append',
         )) or source == 'changed = True'
         if neighbor_line and 'nr' in local:
             probe = [local['nr'], local['nc']]
@@ -67,7 +71,7 @@ def arrow_grid_trace(payload):
         cells = [[{'r': r, 'c': c, **({'value': grid[r][c]} if obstacle_grid else {'arrow': grid[r][c]}),
                    'distance': scalar(dist[r][c]) if dist else costs.get((r, c), '∞')}
                   for c in cols] for r in rows]
-        frontier = main.get('heap', main.get('dq', main.get('frontier', [])))
+        frontier = main.get('heap', main.get('dq', main.get('queue', main.get('frontier', []))))
         if method == 2:
             queue = heapq.nsmallest(12, frontier)
         else:
@@ -88,7 +92,7 @@ def arrow_grid_trace(payload):
             if method == 1:
                 route = [list(cell) for cell in main['best_path']]
             else:
-                parents = main.get('parent', {})
+                parents = main.get('parent', visual_parents)
                 cell, seen = (height-1, width-1), set()
                 while cell is not None and cell not in seen:
                     seen.add(cell)
@@ -97,8 +101,15 @@ def arrow_grid_trace(payload):
                         break
                     cell = parents.get(cell)
                 route.reverse()
-        names = ('m', 'n', 'r', 'c', 'cost', 'nr', 'nc', 'k', 'w', 'nd', 'best', 'turn', 'changed', 'layer', 'dr', 'dc')
+        names = (
+            'm', 'n', 'rows', 'cols', 'r', 'c', 'cost', 'nr', 'nc',
+            'k', 'i', 'w', 'nd', 'new_cost', 'best', 'turn', 'changed',
+            'layer', 'dr', 'dc',
+        )
         values = {name: scalar(merged[name]) for name in names if name in merged}
+        active_cell = (merged.get('r', -1), merged.get('c', -1))
+        if coordinate_queue and dist and inside(active_cell):
+            values['dist[r][c]'] = scalar(dist[active_cell[0]][active_cell[1]])
         picture = {
             'method': method, 'height': height, 'width': width, 'rows': rows, 'cols': cols,
             'cells': cells, 'cropped': len(rows) < height or len(cols) < width,
@@ -110,12 +121,21 @@ def arrow_grid_trace(payload):
             'floodStack': [[r, c] for r, c, _ in local.get('stack', [])],
             'path': [list(cell) for cell in path], 'route': route,
             'bestPath': [list(cell) for cell in main.get('best_path', [])],
-            'changes': [] if obstacle_grid else [{'cell': a, 'from': grid[a[0]][a[1]], 'to': dirs.index((b[0]-a[0], b[1]-a[1]))+1}
-                        for a, b in zip(route, route[1:]) if grid[a[0]][a[1]] != dirs.index((b[0]-a[0], b[1]-a[1]))+1],
+            'changes': [] if obstacle_grid else [
+                {
+                    'cell': a,
+                    'from': grid[a[0]][a[1]],
+                    'to': dirs.index((b[0]-a[0], b[1]-a[1]))+1,
+                }
+                for a, b in zip(route, route[1:])
+                if grid[a[0]][a[1]] != dirs.index((b[0]-a[0], b[1]-a[1]))+1
+            ],
             'final': final, 'answer': answer,
         }
         if obstacle_grid:
             picture['removed'] = [cell for cell in route[1:] if grid[cell[0]][cell[1]] == 1]
+        if coordinate_queue:
+            picture['queueFormat'] = 'coordinates'
         # Copy immediately: Python locals and the frontier are mutated later.
         events.append(json.loads(json.dumps(picture)))
 
@@ -131,6 +151,18 @@ def arrow_grid_trace(payload):
             last_lines[frame] = frame.f_lineno
         elif event == 'return':
             last_lines.pop(frame, None)
+        if coordinate_queue:
+            # Observe completed relaxations to draw the route without adding
+            # parent storage or any other statements to the displayed solution.
+            pending = pending_updates.pop(frame, None)
+            if pending is not None:
+                start, target, before = pending
+                if frame.f_locals['dist'][target[0]][target[1]] < before:
+                    visual_parents[target] = start
+            if event == 'line' and lines[frame.f_lineno-1].strip() == 'dist[nr][nc] = new_cost':
+                local = frame.f_locals
+                target = (local['nr'], local['nc'])
+                pending_updates[frame] = ((local['r'], local['c']), target, local['dist'][target[0]][target[1]])
         final = event == 'return' and frame.f_code.co_name == method_name
         if event == 'line' or final:
             count += 1
@@ -146,5 +178,14 @@ def arrow_grid_trace(payload):
     finally:
         sys.settrace(None)
         last_lines.clear()
-    return json.dumps({'answer': answer, 'events': events,
-                       'trace': {'events': count, 'captured': len(events), 'omitted': omitted, 'truncated': omitted > 0}}, separators=(',', ':'))
+        pending_updates.clear()
+    return json.dumps({
+        'answer': answer,
+        'events': events,
+        'trace': {
+            'events': count,
+            'captured': len(events),
+            'omitted': omitted,
+            'truncated': omitted > 0,
+        },
+    }, separators=(',', ':'))

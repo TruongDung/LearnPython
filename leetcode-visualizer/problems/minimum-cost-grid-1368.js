@@ -27,7 +27,7 @@ function build(input, approach = 3) {
   if (definition.maxCells && grid.length * grid[0].length > definition.maxCells) {
     throw new RangeError(`1368: ${definition.label.en}: demo tối đa ${definition.maxCells} ô / demo limit ${definition.maxCells} cells. Dùng cách / Use approach 2, 3, 4 for larger grids.`);
   }
-  const result = runTrace({ profile: 'arrow1368', code: definition.code.join('\n'), method: 'minCost', args: [grid], approach, maxEvents: 1600 });
+  const result = runTrace({ profile: 'arrow1368', code: definition.code.join('\n'), method: 'minCost', args: [grid], approach, maxEvents: 1600, queueCoordinates: approach === 3 });
   const steps = result.events.map(view => ({
     arr: [], highlight: [], mark: [], codeBlock: approach, codeLines: [view.source.line], final: view.final,
     title: bi(`${definition.label.vi} · dòng ${view.source.line}`, `${definition.label.en} · line ${view.source.line}`), note: bi(''),
