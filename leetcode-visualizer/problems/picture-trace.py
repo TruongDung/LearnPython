@@ -94,6 +94,15 @@ def picture_trace(payload):
             values['self'] = {name: encode(value) for name, value in vars(instance).items()}
         return values
 
+    tree_nodes = []
+
+    def tree_state():
+        if not payload.get('captureTrees'):
+            return {}
+        return {'trees': [{'id': node.node_id, 'val': node.val,
+                           'left': node.left.node_id if node.left else None,
+                           'right': node.right.node_id if node.right else None} for node in tree_nodes]}
+
     events, pending = [], {}
     entry, truncated = None, False
     event_limit = payload.get('maxEvents')
@@ -101,7 +110,7 @@ def picture_trace(payload):
         nonlocal entry, truncated
         if frame.f_code.co_filename != filename or frame.f_code.co_name.startswith('<'):
             return trace
-        if frame.f_code.co_name == payload['method']:
+        if frame.f_code.co_name == payload['method'] and entry is None:
             entry = frame
         if event in ('line', 'return'):
             # Ignore repeated line events inside an inlined comprehension.
@@ -123,7 +132,8 @@ def picture_trace(payload):
                                'outer': local(outer, outer is not frame), 'frames': list(reversed(frames)),
                                'returned': encode(arg) if event == 'return' else None,
                                'returning': event == 'return',
-                               'branch': (frame.f_lineno in branches[line]) if line in branches else None})
+                               'branch': (frame.f_lineno in branches[line]) if line in branches else None,
+                               **tree_state()})
             if event == 'line':
                 pending[frame] = frame.f_lineno
         return trace
@@ -131,6 +141,12 @@ def picture_trace(payload):
     args = list(payload['args'])
     for index in payload.get('treeArgs', []):
         args[index] = picture_tree(args[index], index)
+        if payload.get('captureTrees') and args[index] is not None:
+            queue = collections.deque([args[index]])
+            while queue:
+                node = queue.popleft()
+                tree_nodes.append(node)
+                queue.extend(child for child in (node.left, node.right) if child is not None)
     try:
         sys.settrace(trace)
         answer = getattr(scope['Solution'](), payload['method'])(*args)
@@ -142,7 +158,7 @@ def picture_trace(payload):
         state = local(entry)
         events.append({'line': entry.f_lineno, 'scope': entry.f_code.co_name, 'locals': state,
                        'outer': state, 'frames': [{'name': entry.f_code.co_name, 'locals': state}],
-                       'returned': encode(answer), 'returning': True, 'branch': None})
+                       'returned': encode(answer), 'returning': True, 'branch': None, **tree_state()})
     return json.dumps({'answer': encode(answer), 'events': events,
                        'trace': {'captured': len(events), 'truncated': truncated, 'limit': event_limit}},
                       separators=(',', ':'))

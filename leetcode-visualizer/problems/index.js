@@ -44,6 +44,7 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
 }
 
 Object.assign(categories.bst, require('./two-sum-bsts-1214'));
+Object.assign(categories.bst, require('./split-bst-776'));
 
 // Dedicated 1284 lesson supersedes the shared grid preview.
 Object.assign(categories.graph, require('./minimum-flips-1284'));
