@@ -29,22 +29,23 @@ test('2873 trials and best triplets keep distinct ordered indices and exact prod
 test('3408 has exactly two requested sources and bundles the real SortedContainers package',()=>{
  const p=problems[3408];assert.deepEqual(p.extraParams[0].options.map(o=>o.value),[1,2]);
  for(let m=3;m<=7;m++){assert.equal(p['code'+m],undefined);assert.equal(p['builder'+m],undefined);}
- assert.match(p.code.join('\n'),/heapify\(self.heap\)/);assert.match(p.code.join('\n'),/self.tasks\[taskId\] == \(userId, priority\)/);
+ assert.match(p.code.join('\n'),/self.taskInfo\[taskId\] = \[priority, userId\]/);assert.match(p.code.join('\n'),/self.taskInfo.get\(taskId, \[-1, -1\]\)\[0\]/);assert.doesNotMatch(p.code.join('\n'),/heapify|negPriority|self.tasks/);
  assert.match(p.code2.join('\n'),/from sortedcontainers import SortedList/);assert.match(p.code2.join('\n'),/self.sorted_tasks = SortedList\(\)/);
  assert.equal(require('node:crypto').createHash('sha256').update(fs.readFileSync(wheel)).digest('hex'),'a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0');
  assert.ok(require('node:path').posix.matchesGlob('public/vendor/sortedcontainers-2.4.0-py2.py3-none-any.whl',JSON.parse(fs.readFileSync(require.resolve('../vercel.json'),'utf8')).functions['server.js'].includeFiles));
 });
-test('3408 captures heapify, stale user/priority tuples, real SortedList mutations and zero IDs',()=>{
- let stale=0,userMismatch=0,removal=0,heapify=0;
+test('3408 captures pair heaps, taskInfo priorities, real SortedList mutations and reused zero IDs',()=>{
+ let stale=0,reused=0,removal=0,pushes=0;
  for(let m=1;m<=2;m++)for(const config of configs){
   const before=JSON.stringify(config),run=build(3408,m,config);assert.deepEqual(run.answer,manager(config));assert.equal(JSON.stringify(config),before);
   for(const step of run.steps){const v=step.taskManager3408View;assert.deepEqual(step.codeLines,[v.line]);assert.equal(step.codeBlock,m);
-   for(const e of v.heap){const task=v.tasks.find(t=>t.taskId===e.taskId);assert.equal(e.userId,e.key[2]);assert.equal(e.stale,!task||e.userId!==task.userId||e.priority!==task.priority);if(e.stale)stale++;if(task&&e.userId!==task.userId&&e.priority===task.priority){assert.equal(e.stale,true);userMismatch++;}}
-   if(m===1&&v.source==='heapify(self.heap)'){assert.equal(v.heapReady,true);for(let i=1;i<v.heap.length;i++){const a=v.heap[Math.floor((i-1)/2)].key,b=v.heap[i].key;assert.ok(a[0]<b[0]||a[0]===b[0]&&(a[1]<b[1]||a[1]===b[1]&&a[2]<=b[2]));}heapify++;}
-   if(m===1&&v.scope==='__init__'&&v.source.startsWith('self.heap.append'))assert.equal(v.heapReady,false);
+   for(const e of v.heap){const task=v.tasks.find(t=>t.taskId===e.taskId);assert.equal(e.key.length,2);assert.equal(e.stale,!task||e.priority!==task.priority);if(e.stale)stale++;if(task?.userId===7&&task.taskId===0&&task.priority===e.priority){assert.equal(e.stale,false);reused++;}}
+   if(m===1){for(let i=1;i<v.heap.length;i++){const a=v.heap[Math.floor((i-1)/2)].key,b=v.heap[i].key;assert.ok(a[0]<b[0]||a[0]===b[0]&&a[1]<=b[1]);}if(v.source.startsWith('heappush('))pushes++;
+    if(v.source==='priority, taskId = heappop(self.heap)'){const id=step.vars.find(w=>w.name==='taskId').value;assert.equal(v.candidate,-id||0);assert.ok(id<=0);}
+   }
    if(m===2){assert.deepEqual(v.heap,[]);assert.deepEqual(v.order,[...v.order].sort((a,b)=>a[0]-b[0]||a[1]-b[1]));if(v.source==='self.sorted_tasks.remove((oldPriority, taskId))'){const task=v.tasks.find(t=>t.taskId===step.vars.find(w=>w.name==='taskId').value);assert.ok(task);assert.ok(!v.order.some(e=>e[1]===task.taskId));removal++;}}
   }assert.deepEqual(run.steps.at(-1).taskManager3408View.answer,run.answer);
- }assert.ok(stale>0);assert.ok(userMismatch>0);assert.ok(removal>0);assert.ok(heapify>0);
+ }assert.ok(stale>0);assert.ok(reused>0);assert.ok(removal>0);assert.ok(pushes>0);
 });
 test('native Python confirms every line, scope, watch and TaskManager attribute for all 12 approaches',()=>{
  const payload=[];for(const[id,count,method,args]of[[621,7,'leastInterval',[[...'AAABBB'],2]],[2873,3,'maximumTripletValue',[[12,6,1,2,7]]],[3408,2,'run',[configs[0]]]])for(let m=1;m<=count;m++)payload.push({id,m,code:problems[id][`code${m===1?'':m}`].join('\n'),method,args,stateClasses:id===3408?['TaskManager']:[],sequenceClasses:id===3408?['SortedList']:[]});
@@ -53,7 +54,7 @@ p=json.load(sys.stdin)
 trace=runpy.run_path(p['path'])['picture_trace']
 print(json.dumps([json.loads(trace(item))['events'] for item in p['items']]))`;
  const proc=spawnSync(process.env.PYTHON||'python',['-c',source],{input:JSON.stringify({path:require.resolve('../problems/picture-trace.py'),items:payload}),encoding:'utf8',env:pythonEnv,maxBuffer:32*1024*1024});assert.equal(proc.status,0,proc.stderr);
- JSON.parse(proc.stdout).forEach((events,i)=>{const item=payload[i],run=build(item.id,item.m,item.args[0],{n:2});assert.equal(events.length,run.steps.length);let state={};events.forEach((event,j)=>{const s=run.steps[j],v=s[{621:'scheduler621View',2873:'orderedTriplet2873View',3408:'taskManager3408View'}[item.id]];assert.equal(v.line,event.line);if(item.id===3408){assert.equal(v.scope,event.scope);if(event.locals.self)state=event.locals.self;assert.deepEqual(v.tasks,(state.tasks?.__pairs__??[]).map(([taskId,[userId,priority]])=>({taskId,userId,priority})));assert.deepEqual(v.heap.map(e=>e.key),state.heap??[]);assert.deepEqual(v.order,state.sorted_tasks??[]);}const context={...event.outer,...event.locals};s.vars.forEach(w=>assert.deepEqual(w.value,context[w.name]??'—'));});});
+ JSON.parse(proc.stdout).forEach((events,i)=>{const item=payload[i],run=build(item.id,item.m,item.args[0],{n:2});assert.equal(events.length,run.steps.length);let state={};events.forEach((event,j)=>{const s=run.steps[j],v=s[{621:'scheduler621View',2873:'orderedTriplet2873View',3408:'taskManager3408View'}[item.id]];assert.equal(v.line,event.line);if(item.id===3408){assert.equal(v.scope,event.scope);if(event.locals.self)state=event.locals.self;assert.deepEqual(v.tasks,item.m===1?(state.taskInfo?.__pairs__??[]).map(([taskId,[priority,userId]])=>({taskId,userId,priority})):(state.tasks?.__pairs__??[]).map(([taskId,[userId,priority]])=>({taskId,userId,priority})));assert.deepEqual(v.heap.map(e=>e.key),state.heap??[]);assert.deepEqual(v.order,state.sorted_tasks??[]);}const context={...event.outer,...event.locals};s.vars.forEach(w=>assert.deepEqual(w.value,context[w.name]??'—'));});});
 });
 test('renderers draw the exact schedule, arrays, tasks and heap, support both languages, and preserve replay',()=>{
  const host={innerHTML:'',clientWidth:600},context={lang:'vi',$:()=>host,escapeHtml:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),document:{documentElement:{dataset:{theme:'light'}}}};vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-debug-picture-lessons.js'),'utf8'),context);

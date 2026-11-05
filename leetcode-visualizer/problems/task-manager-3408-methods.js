@@ -23,47 +23,34 @@ class Solution:
         return answer`;
 const make=(vi,en,time,space,source)=>({label:{vi,en},time,space,code:(source+driver).split('\n')});
 module.exports=[
-make('Heap + bỏ bản cũ','Heap + lazy deletion','init: O(M); add/edit: O(log H); rmv: O(1); execTop: O(K log H), amortized O(log H)','O(H + M)',`from heapq import heappush, heappop, heapify
+make('Heap + bỏ bản cũ','Heap + lazy deletion','init: O(M log M); add/edit: O(log H); rmv: O(1); execTop: O(K log H), amortized O(log H)','O(H + M)',`from heapq import heappush, heappop
 from typing import List
 
 class TaskManager:
-
     def __init__(self, tasks: List[List[int]]):
-        self.tasks = {}
+        self.taskInfo = {}
         self.heap = []
-
         for userId, taskId, priority in tasks:
-            self.tasks[taskId] = (userId, priority)
-            self.heap.append((-priority, -taskId, userId))
-
-        heapify(self.heap)
+            self.taskInfo[taskId] = [priority, userId]
+            heappush(self.heap, [-priority, -taskId])
 
     def add(self, userId: int, taskId: int, priority: int) -> None:
-        self.tasks[taskId] = (userId, priority)
-        heappush(self.heap, (-priority, -taskId, userId))
+        self.taskInfo[taskId] = [priority, userId]
+        heappush(self.heap, [-priority, -taskId])
 
     def edit(self, taskId: int, newPriority: int) -> None:
-        userId, _ = self.tasks[taskId]
-        self.tasks[taskId] = (userId, newPriority)
-        heappush(self.heap, (-newPriority, -taskId, userId))
+        self.taskInfo[taskId][0] = newPriority
+        heappush(self.heap, [-newPriority, -taskId])
 
     def rmv(self, taskId: int) -> None:
-        del self.tasks[taskId]
+        self.taskInfo.pop(taskId)
 
     def execTop(self) -> int:
         while self.heap:
-            negPriority, negTaskId, userId = heappop(self.heap)
-
-            priority = -negPriority
-            taskId = -negTaskId
-
-            if (
-                taskId in self.tasks
-                and self.tasks[taskId] == (userId, priority)
-            ):
-                del self.tasks[taskId]
-                return userId
-
+            priority, taskId = heappop(self.heap)
+            priority, taskId = -priority, -taskId
+            if priority == self.taskInfo.get(taskId, [-1, -1])[0]:
+                return self.taskInfo.pop(taskId)[1]
         return -1`),
 make('SortedList','SortedList','init: O(M log M); add/edit/rmv/execTop: approximately O(log M)','O(M)',`from sortedcontainers import SortedList
 from typing import List
