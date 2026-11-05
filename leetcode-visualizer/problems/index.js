@@ -50,6 +50,7 @@ Object.assign(categories.graph, require('./minimum-obstacle-removal-2290'));
 Object.assign(categories.graph, require('./safe-walk-3286'));
 Object.assign(categories.graph, require('./network-delay-time-743'));
 Object.assign(categories.graph, require('./maximum-probability-1514'));
+Object.assign(categories.graph, require('./minimum-weighted-subgraph-2203'));
 Object.assign(categories.dp, require('./equal-subarrays-3505'));
 
 const SUPPORTED = {};
