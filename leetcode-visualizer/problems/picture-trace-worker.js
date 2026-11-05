@@ -1,6 +1,6 @@
 'use strict';
 const {parentPort,workerData}=require('node:worker_threads'),{readFileSync}=require('node:fs'),{deflateSync}=require('node:zlib'),path=require('node:path');
-let ready,arrowReady=false;
+let ready,arrowReady=false,safeReady=false;
 function getRuntime(){
  if(!ready)ready=Promise.resolve().then(()=>require('pyodide').loadPyodide({indexURL:path.dirname(require.resolve('pyodide/package.json'))+path.sep})).then(runtime=>{runtime.runPython(readFileSync(require.resolve('./picture-trace.py'),'utf8'));return runtime;});
  return ready;
@@ -12,9 +12,11 @@ async function execute({payload,shared}){
   const runtime=await getRuntime();
   const gridProfile=payload.profile==='arrow1368'||payload.profile==='obstacle2290';
   if(gridProfile&&!arrowReady){runtime.runPython(readFileSync(require.resolve('./arrow-grid-trace.py'),'utf8'));arrowReady=true;}
+  if(payload.profile==='safe3286'&&!safeReady){runtime.runPython(readFileSync(require.resolve('./safe-walk-trace.py'),'utf8'));safeReady=true;}
   runtime.globals.set('__picture_payload',JSON.stringify(payload));
   let result;
-  try{result=runtime.runPython(gridProfile?'arrow_grid_trace(json.loads(__picture_payload))':'picture_trace(json.loads(__picture_payload))');}finally{runtime.globals.delete('__picture_payload');}
+  const entrypoint=payload.profile==='safe3286'?'safe_walk_trace':gridProfile?'arrow_grid_trace':'picture_trace';
+  try{result=runtime.runPython(`${entrypoint}(json.loads(__picture_payload))`);}finally{runtime.globals.delete('__picture_payload');}
   const packed=deflateSync(Buffer.from(result));
   if(packed.length>bytes.length)throw new Error('The recorded trace exceeds the transfer buffer.');
   bytes.set(packed);Atomics.store(control,1,packed.length);Atomics.store(control,0,1);

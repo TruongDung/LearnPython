@@ -47,6 +47,7 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
 Object.assign(categories.graph, require('./minimum-flips-1284'));
 Object.assign(categories.graph, require('./minimum-cost-grid-1368'));
 Object.assign(categories.graph, require('./minimum-obstacle-removal-2290'));
+Object.assign(categories.graph, require('./safe-walk-3286'));
 Object.assign(categories.dp, require('./equal-subarrays-3505'));
 
 const SUPPORTED = {};
