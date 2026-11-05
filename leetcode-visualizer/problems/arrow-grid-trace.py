@@ -1,4 +1,4 @@
-"""Bounded, immutable BEFORE-line pictures of the bundled 1368 solutions.
+"""Bounded, immutable BEFORE-line pictures of bundled 0-1 grid solutions.
 
 The code shown in the debugger is the code executed by Python. Recording stops
 at the picture budget; computation continues and always records the final path.
@@ -19,8 +19,11 @@ def arrow_grid_trace(payload):
     grid = payload['args'][0]
     height, width = len(grid), len(grid[0])
     method = payload['approach']
+    obstacle_grid = payload.get('profile') == 'obstacle2290'
+    method_name = payload['method']
     limit = payload.get('maxEvents', 1600)
     events, count, omitted = [], 0, 0
+    last_lines = {}
     dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
     def scalar(value):
@@ -61,7 +64,7 @@ def arrow_grid_trace(payload):
         dfs_frames = [f.f_locals for f in reversed(chain) if f.f_code.co_name == 'dfs']
         path = main.get('path', [])
         costs = {(f['r'], f['c']): f['cost'] for f in dfs_frames if (f['r'], f['c']) in path}
-        cells = [[{'r': r, 'c': c, 'arrow': grid[r][c],
+        cells = [[{'r': r, 'c': c, **({'value': grid[r][c]} if obstacle_grid else {'arrow': grid[r][c]}),
                    'distance': scalar(dist[r][c]) if dist else costs.get((r, c), '∞')}
                   for c in cols] for r in rows]
         frontier = main.get('heap', main.get('dq', main.get('frontier', [])))
@@ -78,7 +81,8 @@ def arrow_grid_trace(payload):
                 delta = (probe[0]-current[0], probe[1]-current[1])
                 if delta in dirs:
                     direction = dirs.index(delta)+1
-                    edge.update(direction=direction, weight=int(grid[current[0]][current[1]] != direction), original=grid[current[0]][current[1]])
+                    weight = grid[probe[0]][probe[1]] if obstacle_grid else int(grid[current[0]][current[1]] != direction)
+                    edge.update(direction=direction, weight=weight, original=grid[current[0]][current[1]])
         route = []
         if final:
             if method == 1:
@@ -106,18 +110,28 @@ def arrow_grid_trace(payload):
             'floodStack': [[r, c] for r, c, _ in local.get('stack', [])],
             'path': [list(cell) for cell in path], 'route': route,
             'bestPath': [list(cell) for cell in main.get('best_path', [])],
-            'changes': [{'cell': a, 'from': grid[a[0]][a[1]], 'to': dirs.index((b[0]-a[0], b[1]-a[1]))+1}
+            'changes': [] if obstacle_grid else [{'cell': a, 'from': grid[a[0]][a[1]], 'to': dirs.index((b[0]-a[0], b[1]-a[1]))+1}
                         for a, b in zip(route, route[1:]) if grid[a[0]][a[1]] != dirs.index((b[0]-a[0], b[1]-a[1]))+1],
             'final': final, 'answer': answer,
         }
+        if obstacle_grid:
+            picture['removed'] = [cell for cell in route[1:] if grid[cell[0]][cell[1]] == 1]
         # Copy immediately: Python locals and the frontier are mutated later.
         events.append(json.loads(json.dumps(picture)))
 
     def trace(frame, event, arg):
         nonlocal count, omitted
-        if frame.f_code.co_filename != filename or frame.f_code.co_name not in ('minCost', 'dfs', 'flood'):
+        if frame.f_code.co_filename != filename or frame.f_code.co_name not in (method_name, 'dfs', 'flood'):
             return None
-        final = event == 'return' and frame.f_code.co_name == 'minCost'
+        # Python 3.12 inlines comprehensions. Their repeated line events are
+        # iterations inside one assignment, rather than separate statements.
+        if event == 'line' and last_lines.get(frame) == frame.f_lineno:
+            return trace
+        if event == 'line':
+            last_lines[frame] = frame.f_lineno
+        elif event == 'return':
+            last_lines.pop(frame, None)
+        final = event == 'return' and frame.f_code.co_name == method_name
         if event == 'line' or final:
             count += 1
             if len(events) < limit or final:
@@ -128,8 +142,9 @@ def arrow_grid_trace(payload):
 
     try:
         sys.settrace(trace)
-        answer = scope['Solution']().minCost(grid)
+        answer = getattr(scope['Solution'](), method_name)(grid)
     finally:
         sys.settrace(None)
+        last_lines.clear()
     return json.dumps({'answer': answer, 'events': events,
                        'trace': {'events': count, 'captured': len(events), 'omitted': omitted, 'truncated': omitted > 0}}, separators=(',', ':'))

@@ -10,10 +10,11 @@ async function execute({payload,shared}){
  try{
   // Keep boot failures inside the shared-memory error channel as well.
   const runtime=await getRuntime();
-  if(payload.profile==='arrow1368'&&!arrowReady){runtime.runPython(readFileSync(require.resolve('./arrow-grid-trace.py'),'utf8'));arrowReady=true;}
+  const gridProfile=payload.profile==='arrow1368'||payload.profile==='obstacle2290';
+  if(gridProfile&&!arrowReady){runtime.runPython(readFileSync(require.resolve('./arrow-grid-trace.py'),'utf8'));arrowReady=true;}
   runtime.globals.set('__picture_payload',JSON.stringify(payload));
   let result;
-  try{result=runtime.runPython(payload.profile==='arrow1368'?'arrow_grid_trace(json.loads(__picture_payload))':'picture_trace(json.loads(__picture_payload))');}finally{runtime.globals.delete('__picture_payload');}
+  try{result=runtime.runPython(gridProfile?'arrow_grid_trace(json.loads(__picture_payload))':'picture_trace(json.loads(__picture_payload))');}finally{runtime.globals.delete('__picture_payload');}
   const packed=deflateSync(Buffer.from(result));
   if(packed.length>bytes.length)throw new Error('The recorded trace exceeds the transfer buffer.');
   bytes.set(packed);Atomics.store(control,1,packed.length);Atomics.store(control,0,1);
