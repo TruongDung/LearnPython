@@ -5,7 +5,7 @@ const { join } = require("node:path");
 const vm = require("node:vm");
 const { SUPPORTED } = require("../problems");
 
-const problem = SUPPORTED[9030];
+const problem = require('../problems/dijkstra-file-visualization')[9030];
 
 test("Dijkstra file visualization is registered with the original demo and source", () => {
   const result = problem.builder(problem.defaultInput, { n: 5, start: 0 });
