@@ -41,3 +41,6 @@
 #vizPanel:has(.ot2873-viz) .code-line .txt { flex:1; overflow-wrap:anywhere; }
 @container(min-width:500px) { .ot2873-methods { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(pointer:coarse) { .ot2873-viz button { min-height:44px; } }
+
+.ot2873-viz [data-greedy-operation] { font-size:14px; }
+.ot2873-viz [data-greedy-operation]>span { min-width:0; max-width:100%; overflow-wrap:anywhere; }
