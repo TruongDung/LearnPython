@@ -1158,6 +1158,15 @@ async function runLiveCode() {
     const oracle = liveCall.oracle || null;
     const pyodide = await ensurePyodide();
 
+    if (/\b(?:from\s+sortedcontainers\b|import\s+sortedcontainers\b)/.test(userCode) && !pyodide.__viz_sortedcontainers_loaded) {
+      const wheel = "sortedcontainers-2.4.0-py2.py3-none-any.whl";
+      const response = await fetch(new URL(`vendor/${wheel}`, document.baseURI));
+      if (!response.ok) throw new Error("Could not load SortedContainers.");
+      pyodide.FS.writeFile(`/tmp/${wheel}`, new Uint8Array(await response.arrayBuffer()));
+      pyodide.runPython("import sys\nsys.path.insert(0, '/tmp/sortedcontainers-2.4.0-py2.py3-none-any.whl')");
+      pyodide.__viz_sortedcontainers_loaded = true;
+    }
+
     if (!pyodide.__viz_tracer_loaded) {
       pyodide.runPython(TRACER_PY);
       pyodide.__viz_tracer_loaded = true;

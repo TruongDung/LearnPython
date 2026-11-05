@@ -1,6 +1,6 @@
 'use strict';
 const {parentPort,workerData}=require('node:worker_threads'),{readFileSync}=require('node:fs'),{deflateSync}=require('node:zlib'),path=require('node:path');
-let ready,arrowReady=false,safeReady=false,networkReady=false,probabilityReady=false,subgraphReady=false;
+let ready,arrowReady=false,safeReady=false,networkReady=false,probabilityReady=false,subgraphReady=false,sortedReady=false;
 function getRuntime(){
  if(!ready)ready=Promise.resolve().then(()=>require('pyodide').loadPyodide({indexURL:path.dirname(require.resolve('pyodide/package.json'))+path.sep})).then(runtime=>{runtime.runPython(readFileSync(require.resolve('./picture-trace.py'),'utf8'));return runtime;});
  return ready;
@@ -10,6 +10,12 @@ async function execute({payload,shared}){
  try{
   // Keep boot failures inside the shared-memory error channel as well.
   const runtime=await getRuntime();
+  if(payload.packages?.includes('sortedcontainers')&&!sortedReady){
+   const wheel='sortedcontainers-2.4.0-py2.py3-none-any.whl';
+   runtime.FS.writeFile('/tmp/'+wheel,readFileSync(path.join(__dirname,'../public/vendor',wheel)));
+   runtime.runPython("import sys\nsys.path.insert(0, '/tmp/sortedcontainers-2.4.0-py2.py3-none-any.whl')");
+   sortedReady=true;
+  }
   const gridProfile=payload.profile==='arrow1368'||payload.profile==='obstacle2290';
   if(gridProfile&&!arrowReady){runtime.runPython(readFileSync(require.resolve('./arrow-grid-trace.py'),'utf8'));arrowReady=true;}
   if(payload.profile==='safe3286'&&!safeReady){runtime.runPython(readFileSync(require.resolve('./safe-walk-trace.py'),'utf8'));safeReady=true;}

@@ -31,7 +31,7 @@ def picture_trace(payload):
             if all(isinstance(k, str) for k in value):
                 return {k: encode(v) for k, v in value.items()}
             return {'__pairs__': [[encode(k), encode(v)] for k, v in value.items()]}
-        if isinstance(value, (list, tuple, collections.deque)):
+        if isinstance(value, (list, tuple, collections.deque)) or type(value).__name__ in payload.get('sequenceClasses', []):
             return [encode(v) for v in value]
         if isinstance(value, (set, frozenset)):
             try:
