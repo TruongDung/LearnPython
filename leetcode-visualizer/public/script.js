@@ -194,6 +194,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.safeDfs9021View), surface: "treeView", render: (step) => {
       renderSafeDfs9021View(step);
     } },
+    { predicate: (step) => Boolean(step.arrow1368View), surface: "treeView", render: (step) => {
+      renderArrowGrid1368View(step);
+    } },
     { predicate: (step) => Boolean(step.effort1631View), surface: "treeView", render: (step) => {
       renderEffort1631View(step);
     } },

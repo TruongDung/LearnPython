@@ -6,6 +6,7 @@ const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 const JAVASCRIPT_ASSETS = Object.freeze([
   'app-core.js',
   'renderer-minimum-effort-path-1631.js',
+  'renderer-minimum-cost-grid-1368.js',
   'renderer-maximum-minimum-path-1102.js',
   'app-renderers-base.js',
   'renderer-two-sum-bst-653.js',
@@ -188,6 +189,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'style-07.css',
   'style-08.css',
   'style-09.css',
+  'minimum-cost-grid-1368.css',
   'lis-ii-2407.css',
   'sparse-vector-1570.css',
   'regex-match-10.css',
