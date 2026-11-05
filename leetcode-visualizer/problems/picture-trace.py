@@ -7,10 +7,39 @@ import math
 import sys
 import types
 
+
+class PictureTreeNode:
+    """LeetCode's tree context with stable IDs for source-level pictures."""
+
+    def __init__(self, value, node_id):
+        self.val = value
+        self.left = None
+        self.right = None
+        self.node_id = node_id
+
+
+def picture_tree(values, prefix):
+    if not values or values[0] is None:
+        return None
+    root = PictureTreeNode(values[0], f'{prefix}:0')
+    queue, index = collections.deque([root]), 1
+    while queue:
+        node = queue.popleft()
+        for side in ('left', 'right'):
+            if index >= len(values):
+                break
+            if values[index] is not None:
+                child = PictureTreeNode(values[index], f'{prefix}:{index}')
+                setattr(node, side, child)
+                queue.append(child)
+            index += 1
+    return root
+
+
 def picture_trace(payload):
     code = payload['code']
     filename = '<picture-lesson>'
-    scope = {}
+    scope = {'TreeNode': PictureTreeNode} if payload.get('treeArgs') else {}
     # Execute bundled lesson code so its real statements can be traced.
     exec(compile(code, filename, 'exec'), scope)  # pylint: disable=exec-used
     branches = {}
@@ -23,6 +52,8 @@ def picture_trace(payload):
             branches[node.lineno] = {line for stmt in node.body for line in range(stmt.lineno, stmt.end_lineno + 1)}
 
     def encode(value):
+        if isinstance(value, PictureTreeNode):
+            return {'id': value.node_id, 'val': value.val}
         if value is None or isinstance(value, (str, bool, int)):
             return value
         if isinstance(value, float):
@@ -97,7 +128,9 @@ def picture_trace(payload):
                 pending[frame] = frame.f_lineno
         return trace
 
-    args = payload['args']
+    args = list(payload['args'])
+    for index in payload.get('treeArgs', []):
+        args[index] = picture_tree(args[index], index)
     try:
         sys.settrace(trace)
         answer = getattr(scope['Solution'](), payload['method'])(*args)

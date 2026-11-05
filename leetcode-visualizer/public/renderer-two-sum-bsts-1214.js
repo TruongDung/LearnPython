@@ -1,0 +1,41 @@
+function renderBstPair1214View(step){
+ const v=step.bstPair1214View,host=$('treeView'),t=(vi,en)=>lang==='vi'?vi:en,esc=value=>escapeHtml(String(value));
+ const names=[t('Inorder + 2 con trỏ','Inorder + 2 pointers'),'DFS + HashSet'];
+ const presets=[{label:t('Ví dụ','Example'),root1:[2,1,4],root2:[1,0,3],target:5},{label:'j ←',root1:[2,1,4],root2:[1,0,3],target:2},{label:t('Không có cặp','No pair'),root1:[0,-10,10],root2:[5,1,7,0,2],target:18},{label:'5 + 5',root1:[5],root2:[5],target:10},{label:t('Khác cây','Separate trees'),root1:[2,1,3],root2:[10],target:4}];
+ const all=v.trees.flat(),byId=new Map(all.map(n=>[n.id,n])),winner=new Set(v.pair??[]);
+ const phases=v.method===1?['A → a ↑','B → b ↑','i → ← j']:['A → seen','B → target − B'];
+ const phaseIndex=v.phase==='build-a'?0:v.phase==='build-b'?1:v.method===1?2:1;
+ const controls=`<header class="bp1214-heading"><b>#1214 · A + B</b><small>${t('Dòng','Line')} ${v.line} · ${esc(v.scope)}</small></header><div class="bp1214-buttons">${names.map((name,i)=>`<button type="button" data-bp-method="${i+1}" aria-pressed="${v.method===i+1}">${i+1} ${name}</button>`).join('')}</div><div class="bp1214-buttons">${presets.map((p,i)=>`<button type="button" data-bp-preset="${i}">${p.label}</button>`).join('')}<button type="button" data-bp-next>${t('So sánh','Compare')} →</button></div><div class="bp1214-phases">${phases.map((label,i)=>`<span class="${phaseIndex===i?'active':''}">${label}</span>`).join('<i>→</i>')}</div>`;
+ let math='';
+ if(v.method===1){
+  const a=v.arrays[0].values[v.pointers[0]],b=v.arrays[1].values[v.pointers[1]],sum=v.comparison?.sum;
+  math=`<section class="bp1214-math" aria-label="${t('Tổng hai nút đang xét','Sum of the two candidates')}"><span class="a"><small>A · a[i]</small><b>${a===undefined?'?':esc(a)}</b></span><i>+</i><span class="b"><small>B · b[j]</small><b>${b===undefined?'?':esc(b)}</b></span><i>=</i><strong>${sum===undefined?'?':esc(sum)}</strong><i>${sum===undefined?'?':sum===v.target?'=':sum<v.target?'&lt;':'&gt;'}</i><span><small>target</small><b>${v.target}</b></span></section>`;
+ }else{
+  const node=v.active?byId.get(v.active):null,b=node?.id.startsWith('1:')?node.value:undefined;
+  math=`<section class="bp1214-math"><span><small>target</small><b>${v.target}</b></span><i>−</i><span class="b"><small>B</small><b>${b===undefined?'?':esc(b)}</b></span><i>=</i><span class="a"><small>need → seen</small><b>${v.need===null?'?':esc(v.need)}</b></span><strong class="${v.checked===true?'good':v.checked===false?'bad':''}">${v.checked===null?'?':v.checked?'✓':'×'}</strong></section>`;
+ }
+ const tree=(nodes,index)=>{
+  const nodeWidth=Math.max(44,...nodes.map(n=>String(n.value).length*8+16)),width=Math.max(240,nodes.length*(nodeWidth+14)+24),height=Math.max(135,(Math.max(...nodes.map(n=>n.depth))+1)*76+10),positions=new Map();
+  nodes.forEach(n=>positions.set(n.id,{x:(n.rank+.5)*(width-20)/nodes.length+10,y:n.depth*76+33}));
+  const wide=width>400||height>340,stack=new Set(v.stack[index]),visited=new Set(v.visited[index]);
+  const paths=nodes.map(n=>{const parent=positions.get(n.parent),p=positions.get(n.id);return parent?`<path d="M${parent.x} ${parent.y+20}L${p.x} ${p.y-20}"/>`:'';}).join('');
+  const circles=nodes.map(n=>{const p=positions.get(n.id),selected=v.pointerIds[index]===n.id||v.active===n.id,role=winner.has(n.id)?'winner':selected?'current':stack.has(n.id)?'queued':visited.has(n.id)?'visited':'';return`<g class="${role}" data-bp-node="${n.id}" data-bp-value="${n.value}"${selected?' data-bp-current="true"':''} transform="translate(${p.x} ${p.y})"><title>${index?'B':'A'} · ${n.value}</title><rect x="${-nodeWidth/2}" y="-21" width="${nodeWidth}" height="42" rx="14"/><text text-anchor="middle" y="5">${esc(n.value)}</text>${selected||winner.has(n.id)?`<text class="badge" text-anchor="middle" y="37">${winner.has(n.id)?'✓':v.method===1?(index?'j':'i'):'↓'}</text>`:''}</g>`;}).join('');
+  const stackRow=v.stack[index].length?`<div class="bp1214-stack"><small>stack${v.method===2?index+1:''} →</small>${v.stack[index].map(id=>`<span>${esc(byId.get(id).value)}</span>`).join('')}<small>← pop</small></div>`:'';
+  const array=v.method===1?v.arrays[index]:null;
+  const arrayRow=array?`<div class="bp1214-order"><header><b>${array.name} ↑</b><small>${index?'j':'i'} = ${v.pointers[index]??'…'}</small></header><div class="bp1214-array">${array.values.map((value,i)=>{const current=v.pointers[index]===i,discarded=v.pointers[index]!==null&&(index?i>v.pointers[index]:i<v.pointers[index]);return`<span class="${winner.has(array.ids[i])?'winner':current?'current':discarded?'discarded':''}" data-bp-array="${index}:${i}"><small>[${i}]</small><b>${esc(value)}</b><small>${current?(index?'j':'i'):'↑'}</small></span>`;}).join('')||'<em>∅</em>'}</div></div>`:'';
+  return`<section class="bp1214-tree ${index?'b':'a'}"><header><b>${index?'B · root2':'A · root1'}</b><small>${nodes.length} ${t('nút','nodes')}</small></header><div class="bp1214-tree-scroll" tabindex="0" role="region" aria-label="${index?'BST B':'BST A'}"><svg viewBox="0 0 ${width} ${height}"${wide?` style="width:${width}px;height:${height}px"`:''} role="img" aria-label="${index?'BST B':'BST A'}">${paths}${circles}</svg></div>${stackRow}${arrayRow}</section>`;
+ };
+ const seen=v.method===2?`<section class="bp1214-panel"><header><b class="a">seen ← A</b><small>${v.seen.length}</small></header><div class="bp1214-seen">${v.seen.map(value=>`<button type="button" class="${value===v.need&&v.checked===true?'winner':''}" data-bp-seen="${value}">${esc(value)}</button>`).join('')||'∅'}</div></section>`:'';
+ const move=v.move?`<div class="bp1214-move ${v.move}">${v.move==='a'?'i →':'← j'} <small>${v.move==='a'?t('Tăng tổng','Larger sum'):t('Giảm tổng','Smaller sum')}</small></div>`:'';
+ const history=v.history.length?`<div class="bp1214-history">${v.history.slice(-6).map(h=>`<button type="button" data-bp-step="${h.step}">${v.method===1?`${esc(h.left)} + ${esc(h.right)} = ${esc(h.sum)}`:`${esc(h.value)} → ${esc(h.need)} ${h.found?'✓':'×'}`}</button>`).join('')}</div>`:'';
+ const result=v.final?`<div class="bp1214-result ${v.answer?'good':'bad'}" data-bp-answer="${v.answer}"><b>${v.answer?'✓ true':'× false'}</b><span>${v.answer?`A: ${esc(byId.get(v.pair[0]).value)} + B: ${esc(byId.get(v.pair[1]).value)} = ${v.target}`:t('Không có cặp A + B','No pair A + B')}</span></div>`:'';
+ host.innerHTML=`<section class="bp1214-viz" data-method="${v.method}">${controls}${math}${move}<div class="bp1214-trees">${v.trees.map(tree).join('')}</div>${seen}${history}${result}<code class="bp1214-source">${esc(v.source)}</code></section>`;
+ host.querySelectorAll?.('button').forEach(button=>button.addEventListener('keydown',event=>{if(event.key===' '||event.key==='Enter')event.stopPropagation();}));
+ host.querySelectorAll?.('[data-bp-method]').forEach(button=>button.addEventListener('click',()=>{document.querySelector('[data-param="approach"]').value=button.dataset.bpMethod;runViz();}));
+ host.querySelectorAll?.('[data-bp-preset]').forEach(button=>button.addEventListener('click',()=>{const p=presets[Number(button.dataset.bpPreset)];$('arrInput').value=JSON.stringify({root1:p.root1,root2:p.root2});document.querySelector('[data-param="target"]').value=p.target;runViz();}));
+ const jump=index=>{if(index>=0){stepIndex=index;renderStep();}};
+ host.querySelector?.('[data-bp-next]')?.addEventListener('click',()=>jump(steps.findIndex((s,i)=>i>stepIndex&&(s.bstPair1214View?.source===(v.method===1?'total = a[i] + b[j]':'if need in seen:')))));
+ host.querySelectorAll?.('[data-bp-step]').forEach(button=>button.addEventListener('click',()=>jump(Number(button.dataset.bpStep))));
+ host.querySelectorAll?.('[data-bp-seen]').forEach(button=>button.addEventListener('click',()=>jump(steps.findIndex(s=>s.bstPair1214View?.source==='seen.add(node1.val)'&&s.vars.find(w=>w.name==='node1')?.value?.val===Number(button.dataset.bpSeen)))));
+ host.querySelectorAll?.('.bp1214-tree-scroll').forEach(box=>{const current=box.querySelector('[data-bp-current]');if(!current)return;const r=current.getBoundingClientRect(),b=box.getBoundingClientRect();if(r.left<b.left||r.right>b.right)box.scrollLeft+=r.left-b.left-(b.width-r.width)/2;if(r.top<b.top||r.bottom>b.bottom)box.scrollTop+=r.top-b.top-(b.height-r.height)/2;});
+}

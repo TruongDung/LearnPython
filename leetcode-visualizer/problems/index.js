@@ -43,6 +43,8 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
   if (!replaced) categories.graph[id] = problem;
 }
 
+Object.assign(categories.bst, require('./two-sum-bsts-1214'));
+
 // Dedicated 1284 lesson supersedes the shared grid preview.
 Object.assign(categories.graph, require('./minimum-flips-1284'));
 Object.assign(categories.graph, require('./minimum-cost-grid-1368'));
