@@ -89,7 +89,7 @@ function closest(input,params={},method=1){
   if(source==='current[merged] = left')event=operation.duplicate?'deduplicate':'insert';
   if(method===2&&source==='for right in range(left, len(arr)):'&&r.branch){operation={a:x.value,b:arr[x.right],result:null,left:x.left,right:x.right,duplicate:false};range=[x.left,x.right];probe=null;event='operands';}
   if(source==='value &= arr[right]'){operation.result=x.value;event='and';}
-  if(source==='for value, left in current.items():'&&r.branch){range=[x.left,x.right];probe=null;event='candidate';}
+  if(source==='for value, left in current.items():'&&r.branch){range=[x.left,x.right];probe=null;operation=null;event='candidate';}
   if(source==='difference = abs(value - target)'){probe={left:x.left,right:x.right,value:x.value,difference:x.difference,step:index};range=[x.left,x.right];history.push({...probe});event='distance';}
   if(source==='best = min(best, difference)'){if(winner===null||x.difference<knownBest)winner={left:x.left,right:x.right,value:x.value,difference:x.difference};knownBest=x.best;event='best';}
   if(source==='previous = current'){operation=null;probe=null;event='commit';}

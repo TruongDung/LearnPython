@@ -69,6 +69,8 @@ def picture_trace(payload):
                 return [encode(v) for v in sorted(value)]
             except TypeError:
                 return [encode(v) for v in sorted(value, key=repr)]
+        if type(value).__name__ in payload.get('objectClasses', []):
+            return {'type': type(value).__name__, **{name: encode(v) for name, v in vars(value).items()}}
         return repr(value)
 
     def local(frame, suspended=False):

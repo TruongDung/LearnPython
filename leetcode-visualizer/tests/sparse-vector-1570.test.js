@@ -7,7 +7,8 @@ const { test } = require("node:test");
 const vm = require("node:vm");
 
 const { readFrontendJavaScript } = require("./helpers/frontend-source");
-const problem = require("../problems").SUPPORTED[1570];
+// Retain coverage of the legacy semantic renderer; native replay is tested separately.
+const problem = require("../problems/sparse-vector")[1570];
 
 function renderStep(step, language = "en") {
   const treeHost = { innerHTML: "" };

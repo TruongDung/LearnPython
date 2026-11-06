@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.numericPicture), surface: "treeView", render: (step) => {
+      renderNumericPicture(step);
+    } },
     { predicate: (step) => Boolean(step.province547View), surface: "treeView", render: (step) => {
       renderProvince547View(step);
     } },
