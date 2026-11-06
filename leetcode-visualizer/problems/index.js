@@ -50,6 +50,7 @@ Object.assign(categories['union-find'], require('./provinces-547'));
 Object.assign(categories.array, {396: require('./numerical-lessons')[396]});
 Object.assign(categories.bitmask, {1521: require('./numerical-lessons')[1521]});
 Object.assign(categories.design, require('./sparse-vector-pictures-1570'));
+Object.assign(categories.interview, require('./nearby-merchants-9009'));
 
 // Dedicated 1284 lesson supersedes the shared grid preview.
 Object.assign(categories.graph, require('./minimum-flips-1284'));
