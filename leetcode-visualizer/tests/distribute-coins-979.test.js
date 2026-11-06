@@ -5,7 +5,8 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const problem = require('../problems').SUPPORTED[979];
+// Legacy semantic compatibility. Native Python events are tested in tree-dfs-pictures.test.js.
+const problem = require('../problems/tree')[979];
 
 function parseCompactTree(input) {
   const values = String(input).replace(/^\[|\]$/g, '').split(',').map(token => {
@@ -126,7 +127,7 @@ test('979 displayed Python solution passes representative cases', () => {
     'assert Solution().distributeCoins(TreeNode(1)) == 0',
     'assert Solution().distributeCoins(TreeNode(1, TreeNode(0, None, TreeNode(3)), TreeNode(0))) == 4',
   ].join('\n');
-  const result = spawnSync('python3', ['-c', `${prelude}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
+  const result = spawnSync(process.env.PYTHON || 'python3', ['-c', `${prelude}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
 });
 

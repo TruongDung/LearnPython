@@ -46,11 +46,13 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
 Object.assign(categories.bst, require('./two-sum-bsts-1214'));
 Object.assign(categories.bst, require('./split-bst-776'));
 Object.assign(categories.greedy, require('./burst-balloons-452'));
+Object.assign(categories.greedy, require('./task-scheduler-ii-2365'));
 Object.assign(categories['union-find'], require('./provinces-547'));
 Object.assign(categories.array, {396: require('./numerical-lessons')[396]});
 Object.assign(categories.bitmask, {1521: require('./numerical-lessons')[1521]});
 Object.assign(categories.design, require('./sparse-vector-pictures-1570'));
 Object.assign(categories.interview, require('./nearby-merchants-9009'));
+Object.assign(categories['binary-tree'], require('./tree-dfs-pictures'));
 
 // Dedicated 1284 lesson supersedes the shared grid preview.
 Object.assign(categories.graph, require('./minimum-flips-1284'));
@@ -69,6 +71,7 @@ const { PREFIX_MAX_TAG, PREFIX_MAX_ROSTER, PREFIX_MAX_ORDER, PREFIX_MAX_ORDER_LA
 const DP_TAG = { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" };
 const FENWICK_TREE_TAG = { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" };
 const FREQUENCY_COUNT_TAG = { key: "frequency-count", vi: "Đếm tần suất", en: "Frequency Count" };
+const TWO_POINTER_TAG = { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" };
 const SEGMENT_TREE_TAG = { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" };
 const FLOOD_FILL_TAG = { key: "flood-fill", vi: "Flood Fill", en: "Flood Fill" };
 const FLOOD_FILL_ROSTER_RAW = [
@@ -474,6 +477,9 @@ for (const problem of Object.values(SUPPORTED)) {
   if (problem.category && ["frequency", "frequency-count"].includes(problem.category.key)) {
     problem.category = FREQUENCY_COUNT_TAG;
   }
+  if (problem.category && ["two-pointer", "two-pointers"].includes(problem.category.key)) {
+    problem.category = TWO_POINTER_TAG;
+  }
   if (problem.category && problem.category.key === "segment-tree") {
     problem.category = SEGMENT_TREE_TAG;
   }
@@ -485,6 +491,7 @@ for (const problem of Object.values(SUPPORTED)) {
       if (tag && ["fenwick", "fenwick-tree", "binary-indexed-tree"].includes(tag.key)) return FENWICK_TREE_TAG;
       if (tag && ["knapsack", "0-1-knapsack"].includes(tag.key)) return KNAPSACK_TAG;
       if (tag && ["frequency", "frequency-count"].includes(tag.key)) return FREQUENCY_COUNT_TAG;
+      if (tag && ["two-pointer", "two-pointers"].includes(tag.key)) return TWO_POINTER_TAG;
       if (tag && tag.key === "segment-tree") return SEGMENT_TREE_TAG;
       if (tag && tag.key === "topological-sort") return TOPOLOGICAL_SORT_TAG;
       return tag;

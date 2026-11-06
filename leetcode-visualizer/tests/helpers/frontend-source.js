@@ -4,6 +4,8 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-task-scheduler-ii-2365.js',
+  'renderer-tree-dfs-pictures.js',
   'app-core.js',
   'renderer-minimum-effort-path-1631.js',
   'renderer-minimum-cost-grid-1368.js',
@@ -190,6 +192,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'task-scheduler-ii-2365.css',
+  'tree-dfs-pictures.css',
   'style.css',
   'shell-ui.css',
   'style-01.css',
