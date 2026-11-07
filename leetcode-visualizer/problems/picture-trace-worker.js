@@ -1,6 +1,6 @@
 'use strict';
 const {parentPort,workerData}=require('node:worker_threads'),{readFileSync}=require('node:fs'),{deflateSync}=require('node:zlib'),path=require('node:path');
-let ready,arrowReady=false,safeReady=false,networkReady=false,probabilityReady=false,subgraphReady=false,sortedReady=false;
+let ready,arrowReady=false,safeReady=false,networkReady=false,probabilityReady=false,subgraphReady=false,sortedReady=false,linkedReady=false;
 function getRuntime(){
  if(!ready)ready=Promise.resolve().then(()=>require('pyodide').loadPyodide({indexURL:path.dirname(require.resolve('pyodide/package.json'))+path.sep})).then(runtime=>{runtime.runPython(readFileSync(require.resolve('./picture-trace.py'),'utf8'));return runtime;});
  return ready;
@@ -22,9 +22,10 @@ async function execute({payload,shared}){
   if(payload.profile==='network743'&&!networkReady){runtime.runPython(readFileSync(require.resolve('./network-delay-trace.py'),'utf8'));networkReady=true;}
   if(payload.profile==='probability1514'&&!probabilityReady){runtime.runPython(readFileSync(require.resolve('./maximum-probability-trace.py'),'utf8'));probabilityReady=true;}
   if(payload.profile==='subgraph2203'&&!subgraphReady){runtime.runPython(readFileSync(require.resolve('./minimum-subgraph-trace.py'),'utf8'));subgraphReady=true;}
+  if(payload.profile==='linked25'&&!linkedReady){runtime.runPython(readFileSync(require.resolve('./linked-list-trace.py'),'utf8'));linkedReady=true;}
   runtime.globals.set('__picture_payload',JSON.stringify(payload));
   let result;
-  const entrypoint=payload.profile==='subgraph2203'?'minimum_subgraph_trace':payload.profile==='probability1514'?'maximum_probability_trace':payload.profile==='network743'?'network_delay_trace':payload.profile==='safe3286'?'safe_walk_trace':gridProfile?'arrow_grid_trace':'picture_trace';
+  const entrypoint=payload.profile==='linked25'?'linked_list_trace':payload.profile==='subgraph2203'?'minimum_subgraph_trace':payload.profile==='probability1514'?'maximum_probability_trace':payload.profile==='network743'?'network_delay_trace':payload.profile==='safe3286'?'safe_walk_trace':gridProfile?'arrow_grid_trace':'picture_trace';
   try{result=runtime.runPython(`${entrypoint}(json.loads(__picture_payload))`);}finally{runtime.globals.delete('__picture_payload');}
   const packed=deflateSync(Buffer.from(result));
   if(packed.length>bytes.length)throw new Error('The recorded trace exceeds the transfer buffer.');

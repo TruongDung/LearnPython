@@ -76,6 +76,12 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.levelOrder107View), surface: "treeView", render: (step) => { renderLevelOrder107Pictures(step); } },
+    { predicate: (step) => Boolean(step.levelOrder102View), surface: "treeView", render: (step) => { renderLevelOrder102Pictures(step); } },
+    { predicate: (step) => Boolean(step.maxDepth104View), surface: "treeView", render: (step) => { renderMaxDepth104Pictures(step); } },
+    { predicate: (step) => Boolean(step.postorder145View), surface: "treeView", render: (step) => { renderPostorder145Pictures(step); } },
+    { predicate: (step) => Boolean(step.inorder94View), surface: "treeView", render: (step) => { renderInorder94Pictures(step); } },
+    { predicate: (step) => Boolean(step.preorder144View), surface: "treeView", render: (step) => { renderPreorder144Pictures(step); } },
     { predicate: (step) => Boolean(step.numericPicture), surface: "treeView", render: (step) => {
       renderNumericPicture(step);
     } },
@@ -166,6 +172,18 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.swap24View), surface: "treeView", render: (step) => {
       renderSwap24Pictures(step);
+    } },
+    { predicate: (step) => Boolean(step.reverseGroup25View), surface: "treeView", render: (step) => {
+      renderReverseGroup25Pictures(step);
+    } },
+    { predicate: (step) => Boolean(step.scramble87View), surface: "treeView", render: (step) => {
+      renderScramble87Pictures(step);
+    } },
+    { predicate: (step) => Boolean(step.stock123View), surface: "treeView", render: (step) => {
+      renderStock123Pictures(step);
+    } },
+    { predicate: (step) => Boolean(step.validNumber65View), surface: "treeView", render: (step) => {
+      renderValidNumber65Pictures(step);
     } },
     { predicate: (step) => Boolean(step.sqrt69View), surface: "treeView", render: (step) => {
       renderSqrt69Pictures(step);
@@ -960,7 +978,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderFindXValue3524View(step);
     } },
     { predicate: (step) => Boolean(step.minWindow76View), surface: "treeView", render: (step) => {
-      renderMinWindow76View(step);
+      renderMinimumWindow76Pictures(step);
     } },
     { predicate: (step) => Boolean(step.findXValue3525View), surface: "treeView", render: (step) => {
       renderFindXValue3525View(step);

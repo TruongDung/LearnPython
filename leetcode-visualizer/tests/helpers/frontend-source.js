@@ -5,6 +5,15 @@ const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
   'app-core.js',
+  'renderer-level-order-bottom-107.js',
+  'renderer-level-order-102.js',
+  'renderer-maximum-depth-104.js',
+  'renderer-preorder-traversal-144.js',
+  'renderer-reverse-k-group-25.js',
+  'renderer-valid-number-65.js',
+  'renderer-minimum-window-76.js',
+  'renderer-scramble-string-87.js',
+  'renderer-stock-iii-123.js',
   'renderer-minimum-effort-path-1631.js',
   'renderer-minimum-cost-grid-1368.js',
   'renderer-minimum-obstacle-removal-2290.js',
@@ -189,6 +198,11 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'stock-iii-123.css',
+  'scramble-string-87.css',
+  'minimum-window-76.css',
+  'reverse-k-group-25.css',
+  'valid-number-65.css',
   'style.css',
   'shell-ui.css',
   'style-01.css',
@@ -212,6 +226,10 @@ const STYLESHEET_ASSETS = Object.freeze([
   'wildcard-match-44.css',
   'maximal-rectangle-85.css',
   'max-path-sum-124.css',
+  'level-order-bottom-107.css',
+  'level-order-102.css',
+  'maximum-depth-104.css',
+  'preorder-traversal-144.css',
   'palindrome-cuts-132.css',
   'sliding-maximum-239.css',
   'max-consecutive-ones-1004.css',

@@ -1,163 +1,127 @@
+"use strict";
+
 function tj68Escape(value) {
-  return escapeHtml(String(value ?? ""));
+  return String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+function tj68Copy() {
+  const vi = typeof lang !== "undefined" && lang === "vi";
+  return { locale: vi ? "vi" : "en", region: vi ? "Căn đều từng dòng" : "Justify each line",
+    after: vi ? "Sau dòng" : "After line", pack: vi ? "Gom" : "Pack", divide: vi ? "Chia" : "Divide",
+    build: vi ? "Ghép" : "Build", save: vi ? "Lưu" : "Save", done: vi ? "Xong" : "Done",
+    draft: vi ? "Nháp · mỗi khe 1 dấu cách" : "Draft · one space per gap", parts: "parts", line: "line",
+    fit: vi ? "Vừa" : "Fits", noFit: vi ? "Sang dòng sau" : "Next line", letters: vi ? "Chữ" : "Letters",
+    gap: vi ? "Khe" : "Gap", nextWord: vi ? "Từ tiếp →" : "Next word →", nextGap: vi ? "Khe tiếp →" : "Next gap →",
+    result: vi ? "Kết quả ↠" : "Result ↠", output: vi ? "Dòng đã lưu" : "Saved lines",
+    space: vi ? "Khoảng trắng" : "Spaces", extra: vi ? "+1 bên trái" : "+1 on the left",
+    padding: vi ? "Bù bên phải" : "Right padding", single: vi ? "1 từ → căn trái" : "One word → left align",
+    last: vi ? "Dòng cuối → căn trái" : "Last line → left align", target: vi ? "Cần" : "Needs",
+  };
 }
 
-function tj68VisibleSpaces(value) {
-  return String(value ?? "").replace(/ /g, "·");
+function tj68Queue(v) {
+  return `<div class="j68-words">${v.words.map((word, index) => {
+    const done = index < v.completedWords, selected = v.range && index >= v.range.start && index < v.range.end;
+    const candidate = v.fit?.index === index;
+    return `<span class="j68-word ${done ? "is-done" : selected ? "is-selected" : ""} ${candidate ? v.fit.fits ? "is-fits" : "is-rejected" : ""}" data-word-index="${index}"><small>${index}</small><b>${tj68Escape(word)}</b>${candidate ? `<i>${v.fit.fits ? "✓" : "↳"}</i>` : ""}</span>`;
+  }).join("")}</div>`;
 }
 
-function tj68BuildCells(view, lineWords, gapWidths, maxWidth) {
-  const cells = [];
-  const activeGap = Number.isInteger(view.activeGap) ? view.activeGap : -1;
-  const extraSpaces = Number.isInteger(view.extraSpaces) ? view.extraSpaces : 0;
-  const hasStructuredLine = lineWords.length > 0;
+function tj68Board(v, t, showSpaces) {
+  const ruler = Array.from({ length: v.maxWidth }, (_, i) => `<span>${i + 1}</span>`).join("");
+  const cells = Array.from({ length: v.maxWidth }, (_, i) => {
+    const cell = v.cells[i], written = cell && v.written && i >= v.written.from && i < v.written.to;
+    const char = cell?.char ?? "", kind = cell?.kind ?? "empty";
+    return `<span class="j68-cell is-${kind} ${written ? "is-written" : ""}" data-col="${i + 1}" data-char="${tj68Escape(char)}" data-cell-kind="${kind}" aria-label="${i + 1}: ${char === " " ? t.space : char || "—"}">${char === " " ? showSpaces ? "·" : "&nbsp;" : tj68Escape(char)}</span>`;
+  }).join("");
+  return `<section class="j68-board"><header><b>${t[v.boardMode]}</b><span>${v.cells.length} / ${v.maxWidth}</span></header><div class="j68-cell-scroll" tabindex="0" role="region" aria-label="maxWidth ${v.maxWidth}"><div class="j68-ruler">${ruler}</div><div class="j68-cells">${cells}</div></div><div class="j68-legend"><span class="is-letter">▰ ${t.letters}</span><span class="is-gap">· ${t.space}</span><span class="is-extra">· ${t.extra}</span><span class="is-padding">· ${t.padding}</span></div></section>`;
+}
 
-  if (hasStructuredLine) {
-    lineWords.forEach((word, wordIndex) => {
-      [...word].forEach((character) => cells.push({ character, kind: "letter", gap: -1 }));
-      if (wordIndex >= lineWords.length - 1) return;
+function tj68Fit(v, t) {
+  if (!v.fit) return "";
+  const f = v.fit;
+  return `<div class="j68-fit ${f.fits ? "is-fits" : "is-rejected"}" data-fit="${f.fits}"><span class="j68-fit-word">+ ${tj68Escape(f.word)}</span><div class="j68-equation"><b>${f.letters}</b><i>+</i><b>${f.wordLength}</b><i>+</i><b>${f.gaps}</b><i>=</i><strong>${f.needed}</strong><i>${f.fits ? "≤" : ">"}</i><b>${v.maxWidth}</b></div><small>${f.fits ? `✓ ${t.fit}` : `↳ ${t.noFit}`}</small></div>`;
+}
 
-      const width = Number.isInteger(gapWidths[wordIndex]) ? gapWidths[wordIndex] : 1;
-      for (let offset = 0; offset < width; offset += 1) {
-        cells.push({
-          character: " ",
-          kind: wordIndex < extraSpaces && !view.isLastLine && !view.isSingleWord ? "extra-space" : "gap-space",
-          gap: wordIndex,
-          active: wordIndex === activeGap,
-        });
-      }
-    });
-
-    const trailingSpaces = Number.isInteger(view.trailingSpaces) ? view.trailingSpaces : 0;
-    for (let offset = 0; offset < trailingSpaces; offset += 1) {
-      cells.push({ character: " ", kind: "trailing-space", gap: -1 });
-    }
-  } else if (view.renderedLine) {
-    [...String(view.renderedLine)].forEach((character) => {
-      cells.push({ character, kind: character === " " ? "gap-space" : "letter", gap: -1 });
-    });
+function tj68Distribution(v, t) {
+  if (v.mode === "left") {
+    const padding = v.lineReady ? v.cells.filter(cell => cell.kind === "padding").length : null;
+    return `<div class="j68-left" data-align="left"><b>${v.reason === "last" ? t.last : t.single}</b><span>${padding === null ? "…" : `${padding} × · →`} ${t.padding}</span></div>`;
   }
+  if (!v.plan) return "";
+  const p = v.plan;
+  return `<section class="j68-distribution"><div class="j68-division"><b>${p.total}</b><i>÷</i><b>${p.gaps}</b><i>→</i><span>spaces <b>${p.base}</b></span><span>extra <b>${p.extra}</b></span></div><div class="j68-gap-cards">${p.widths.map((width, gap) => {
+    const active = v.activeGap === gap, applied = v.allocated[gap] !== null;
+    const dots = Array.from({ length: width }, (_, offset) => `<i class="${offset >= p.base ? "is-extra" : ""}">·</i>`).join("");
+    return `<div class="j68-gap ${active ? "is-active" : ""} ${applied ? "is-applied" : ""}" data-gap-index="${gap}" data-gap-planned="${width}" data-gap-applied="${v.allocated[gap]}"><small>${t.gap} ${gap + 1}${applied ? " ✓" : ""}</small><div class="j68-gap-dots">${dots}</div><b>${active && v.currentWidth !== null ? `width = ${v.currentWidth}` : `${p.base}${gap < p.extra ? " + 1" : ""}`}</b><span>${tj68Escape(v.lineWords[gap])} ↔ ${tj68Escape(v.lineWords[gap + 1])}</span></div>`;
+  }).join("")}</div></section>`;
+}
 
-  while (cells.length < maxWidth) {
-    cells.push({ character: " ", kind: "empty", gap: -1 });
-  }
-  return cells.slice(0, maxWidth);
+function tj68Output(v, t, showSpaces) {
+  if (!v.output?.length) return "";
+  return `<section class="j68-output ${v.answer !== null ? "is-final" : ""}"><header><b>${t.output}</b><span>${v.output.length}${v.answer !== null ? " ✓" : ""}</span></header>${v.output.map((line, index) => `<div class="j68-output-row" data-output-index="${index}" data-output-value="${tj68Escape(line)}"><small>${index + 1}</small><code>${tj68Escape(showSpaces ? line.replace(/ /g, "·") : line)}</code><b>${line.length}/${v.maxWidth}</b></div>`).join("")}</section>`;
+}
+
+function tj68Jump(kind) {
+  if (typeof steps === "undefined" || typeof renderStep !== "function") return;
+  if (typeof stopPlay === "function") stopPlay();
+  const index = steps.findIndex((s, i) => {
+    const v = s.textJustification68View;
+    return i > stepIndex && v && (kind === "result" ? v.answer !== null : kind === "word" ? v.source.line === 12 || v.source.line === 8 : v.source.line === 22);
+  });
+  stepIndex = index < 0 ? steps.length - 1 : index; renderStep();
+}
+
+function tj68Bind(host) {
+  const bind = (selector, action) => host.querySelectorAll(selector).forEach(node => {
+    node.addEventListener("click", () => action(node));
+    node.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); action(node); }
+    });
+  });
+  bind("[data-j68-jump]", node => tj68Jump(node.dataset.j68Jump));
+  bind("[data-j68-spaces]", () => {
+    host.dataset.tj68Spaces = host.dataset.tj68Spaces === "hidden" ? "visible" : "hidden";
+    if (typeof renderStep === "function") renderStep();
+  });
+  bind("[data-j68-case]", node => {
+    if (typeof runViz !== "function") return;
+    const cases = [
+      [["This", "is", "an", "example", "of", "text", "justification."], 16],
+      [["ab", "c", "d", "efghi"], 7],
+      [["What", "must", "be", "acknowledgment", "shall", "be"], 16],
+      [["a", "bb", "c"], 8], [["a", "b", "c"], 1],
+    ];
+    const [words, width] = cases[Number(node.dataset.j68Case)];
+    document.getElementById("arrInput").value = JSON.stringify(words);
+    const field = document.querySelector('[data-param="maxWidth"]'); if (field) field.value = width;
+    runViz();
+  });
 }
 
 function renderTextJustification68View(step) {
-  const view = step.textJustification68View || {};
-  const vi = lang === "vi";
-  const words = Array.isArray(view.words) ? view.words.map(String) : [];
-  const output = Array.isArray(view.output) ? view.output.map(String) : [];
-  const lineWords = Array.isArray(view.lineWords) ? view.lineWords.map(String) : [];
-  const gapWidths = Array.isArray(view.gapWidths)
-    ? view.gapWidths.map((width) => Number(width)).filter(Number.isFinite)
-    : [];
-  const maxWidth = Math.max(1, Number(view.maxWidth) || 1);
-  const start = Number.isInteger(view.start) ? view.start : 0;
-  const end = Number.isInteger(view.end) ? view.end : start;
-  const candidateIndex = Number.isInteger(view.candidateIndex) ? view.candidateIndex : -1;
-  const phase = String(view.phase || "init");
-  const fit = view.fit && typeof view.fit === "object" ? view.fit : null;
-  const completedGaps = Number.isInteger(view.completedGaps) ? view.completedGaps : 0;
-
-  const phaseIndex = ["init", "line-start", "scan", "accept", "reject"].includes(phase) ? 0
-    : phase === "packed" ? 1
-      : ["left-justify", "distribute", "gap", "assembled"].includes(phase) ? 2 : 3;
-  const phaseLabels = vi
-    ? ["Xếp từ", "Phân loại dòng", "Phân phối khoảng trắng", "Lưu dòng"]
-    : ["Pack words", "Classify line", "Distribute spaces", "Emit line"];
-  const phases = phaseLabels.map((label, index) => {
-    const state = index === phaseIndex ? "active" : index < phaseIndex ? "done" : "";
-    return `<span class="${state}"><b>${index < phaseIndex ? "✓" : index + 1}</b>${tj68Escape(label)}</span>`;
-  }).join("");
-
-  const sourceWords = words.map((word, index) => {
-    const classes = ["tj68-word"];
-    let label = vi ? "chờ" : "pending";
-    if (index < start || (view.final && index < words.length)) {
-      classes.push("processed");
-      label = vi ? "xong" : "done";
-    } else if (index === candidateIndex) {
-      classes.push(fit && fit.fits ? "candidate-fits" : "candidate-rejects");
-      label = fit && fit.fits ? (vi ? "vừa" : "fits") : (vi ? "không vừa" : "no fit");
-    } else if (index >= start && index < end) {
-      classes.push("packed");
-      label = vi ? "trong dòng" : "packed";
+  const host = document.getElementById("treeView"), v = step.textJustification68View, t = tj68Copy();
+  if (!host || !v) return;
+  const showSpaces = host.dataset?.tj68Spaces !== "hidden", oldScroll = host.querySelector(".j68-cell-scroll")?.scrollLeft ?? 0;
+  const phases = ["pack", "divide", "build", "save"].map((key, index) => `<span class="${v.stage === key || v.stage === "done" && key === "save" ? "is-active" : ""}"><i>${["▤", "÷", "⇢", "✓"][index]}</i>${t[key]}</span>`).join('<i class="j68-phase-arrow">→</i>');
+  const presetNames = t.locale === "vi" ? ["Mẫu · 16", "Dư 1", "1 từ", "Dòng cuối", "Rộng 1"]
+    : ["Example · 16", "1 extra", "1 word", "Last line", "Width 1"];
+  host.innerHTML = `<article class="j68-viz" style="--j68-columns:${v.maxWidth}" role="region" aria-label="${t.region}" data-source-line="${v.source.line}">
+    <header class="j68-header"><div><small>LEETCODE 68 · GREEDY</small><h2>${tj68Escape(v.phase[t.locale])}</h2></div><b class="j68-width">↔ ${v.maxWidth}</b></header>
+    <nav class="j68-presets" aria-label="Examples">${presetNames.map((label, index) => `<button type="button" data-j68-case="${index}">${label}</button>`).join("")}<button type="button" data-j68-spaces aria-pressed="${showSpaces}" aria-label="${t.space}">· ${t.space}</button></nav>
+    ${tj68Queue(v)}<div class="j68-phases">${phases}</div>
+    <div class="j68-source"><span>${t.after} <b>L${v.source.line}</b></span><code>${tj68Escape(v.source.text)}</code>${v.branch === null ? "" : `<strong class="${v.branch ? "is-true" : "is-false"}" data-branch="${v.branch}">${v.branch ? "True ✓" : "False ×"}</strong>`}</div>
+    ${tj68Fit(v, t)}${tj68Board(v, t, showSpaces)}${tj68Distribution(v, t)}${tj68Output(v, t, showSpaces)}
+    <footer class="j68-footer"><div><button type="button" data-j68-jump="word">${t.nextWord}</button><button type="button" data-j68-jump="gap">${t.nextGap}</button><button type="button" data-j68-jump="result">${t.result}</button></div><small>${v.answer !== null ? `${t.done} ✓` : "Greedy · divmod"}</small></footer>
+  </article>`;
+  const scroller = host.querySelector(".j68-cell-scroll");
+  if (scroller) {
+    scroller.scrollLeft = oldScroll;
+    const written = host.querySelectorAll(".j68-cell.is-written"), target = written[written.length - 1];
+    if (target) {
+      const box = scroller.getBoundingClientRect(), cell = target.getBoundingClientRect(), pad = 8;
+      if (cell.left < box.left + pad) scroller.scrollLeft -= box.left + pad - cell.left;
+      if (cell.right > box.right - pad) scroller.scrollLeft += cell.right - box.right + pad;
     }
-    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${tj68Escape(word)}</strong><em>${tj68Escape(label)}</em></span>`;
-  }).join("");
-
-  const cells = tj68BuildCells(view, lineWords, gapWidths, maxWidth);
-  const ruler = cells.map((_cell, index) => `<span>${index + 1}</span>`).join("");
-  const lineCells = cells.map((cell, index) => {
-    const classes = ["tj68-cell", cell.kind];
-    if (cell.active) classes.push("active-gap");
-    const label = cell.character === " "
-      ? (vi ? `cột ${index + 1}: khoảng trắng` : `column ${index + 1}: space`)
-      : (vi ? `cột ${index + 1}: ${cell.character}` : `column ${index + 1}: ${cell.character}`);
-    return `<span class="${classes.join(" ")}" aria-label="${tj68Escape(label)}">${cell.character === " " ? "·" : tj68Escape(cell.character)}</span>`;
-  }).join("");
-
-  const fitCard = fit
-    ? `<section class="tj68-fit ${fit.fits ? "fits" : "rejects"}">
-        <header><strong>${fit.fits ? (vi ? "VỪA DÒNG" : "FITS") : (vi ? "KHÔNG VỪA" : "DOES NOT FIT")}</strong><span>${fit.fits ? "≤" : ">"} maxWidth</span></header>
-        <div><b>${Number(fit.lettersBefore) || 0}</b><i>+</i><b>${Number(fit.candidateLength) || 0}</b><i>+</i><b>${Number(fit.prospectiveGaps) || 0}</b><i>=</i><strong>${Number(fit.usedWithMinimumSpaces) || 0}</strong><i>${fit.fits ? "≤" : ">"}</i><b>${maxWidth}</b></div>
-        <p>${vi ? "chữ đã chọn + từ mới + số khe tối thiểu" : "packed letters + candidate + minimum gaps"}</p>
-      </section>`
-    : `<section class="tj68-fit idle"><header><strong>${vi ? "ĐIỀU KIỆN VỪA DÒNG" : "LINE-FIT CHECK"}</strong><span>letters + next + gaps ≤ ${maxWidth}</span></header><p>${vi ? "Chọn nhiều từ nhất có thể mà không cắt từ." : "Take the maximum words possible without splitting one."}</p></section>`;
-
-  const metric = (label, value, accent = "") => `<div class="${accent}"><small>${tj68Escape(label)}</small><strong>${value === null || value === undefined ? "—" : tj68Escape(value)}</strong></div>`;
-  const metrics = [
-    metric("maxWidth", maxWidth, "width"),
-    metric(vi ? "ký tự chữ" : "letters", Number(view.letters) || 0),
-    metric(vi ? "tổng spaces" : "total spaces", view.totalSpaces),
-    metric(vi ? "số khe" : "gaps", Number(view.gapCount) || 0),
-  ].join("");
-
-  let gapCards;
-  if (gapWidths.length) {
-    gapCards = gapWidths.map((width, index) => {
-      const getsExtra = index < (Number(view.extraSpaces) || 0) && !view.isLastLine && !view.isSingleWord;
-      const classes = ["tj68-gap"];
-      if (getsExtra) classes.push("extra");
-      if (index < completedGaps) classes.push("allocated");
-      if (index === view.activeGap) classes.push("active");
-      return `<span class="${classes.join(" ")}"><small>${tj68Escape(lineWords[index] || "")} ↔ ${tj68Escape(lineWords[index + 1] || "")}</small><strong>${width}</strong><em>${getsExtra ? (vi ? "base + 1" : "base + 1") : (vi ? "base" : "base")}</em></span>`;
-    }).join("");
-  } else {
-    gapCards = `<p class="tj68-no-gaps">${vi ? "Chưa có khe cần phân phối." : "No gaps to distribute yet."}</p>`;
   }
-
-  const formula = view.baseSpaces === null || view.baseSpaces === undefined
-    ? (vi ? "Chờ khóa dòng để tính khoảng trắng." : "Lock the line before calculating spaces.")
-    : view.isLastLine || view.isSingleWord
-      ? `${Number(view.gapCount) || 0} × 1 + ${Number(view.trailingSpaces) || 0} ${vi ? "ở cuối" : "trailing"}`
-      : `${view.totalSpaces} = ${view.gapCount} × ${view.baseSpaces} + ${view.extraSpaces}`;
-
-  const outputLines = output.length
-    ? output.map((line, index) => `<div class="tj68-output-line"><small>${vi ? "dòng" : "line"} ${index + 1}</small><code>${tj68Escape(tj68VisibleSpaces(line))}</code><em>${line.length}/${maxWidth}</em></div>`).join("")
-    : `<p>${vi ? "Các dòng hoàn chỉnh sẽ xuất hiện ở đây." : "Completed lines will appear here."}</p>`;
-
-  const currentRange = end > start ? `[${start}, ${end})` : "—";
-  const summary = vi
-    ? `Bài 68, giai đoạn ${phase}, phạm vi dòng ${currentRange}, đã lưu ${output.length} dòng.`
-    : `Problem 68, phase ${phase}, current range ${currentRange}, ${output.length} lines emitted.`;
-  const resultText = view.final
-    ? (vi ? `${output.length} dòng · mỗi dòng ${maxWidth} ký tự` : `${output.length} lines · ${maxWidth} characters each`)
-    : (vi ? "Đang căn đều…" : "Justifying…");
-
-  $("treeView").innerHTML = `<section class="tj68-viz phase-${tj68Escape(phase)}" style="--tj68-width:${maxWidth}" role="img" aria-label="${tj68Escape(summary)}">
-    <header class="tj68-header"><div><small>STRING · GREEDY · #68</small><h2>${vi ? "CĂN ĐỀU VĂN BẢN" : "TEXT JUSTIFICATION"}</h2></div><span><b>${vi ? "DÒNG" : "LINE"} ${(step.codeLines || [])[0] ?? "—"}</b>${tj68Escape(pick(step.title))}</span></header>
-    <div class="tj68-phases">${phases}</div>
-    <section class="tj68-source tj68-card"><header><strong>${vi ? "HÀNG ĐỢI TỪ" : "WORD QUEUE"}</strong><span>${vi ? "xanh = đã chọn · đỏ = không vừa" : "blue = packed · red = rejected"}</span></header><div>${sourceWords}</div></section>
-    <div class="tj68-workspace">
-      <section class="tj68-line tj68-card"><header><strong>${vi ? "DÒNG ĐỘ RỘNG CỐ ĐỊNH" : "FIXED-WIDTH LINE"}</strong><span>${currentRange} · ${lineWords.length} ${vi ? "từ" : "word(s)"}</span></header><div class="tj68-line-scroll"><div class="tj68-ruler">${ruler}</div><div class="tj68-cells">${lineCells}</div></div><div class="tj68-legend"><span><i class="letter"></i>${vi ? "ký tự" : "letter"}</span><span><i class="gap"></i>${vi ? "khe cơ sở" : "base gap"}</span><span><i class="extra"></i>${vi ? "space dư bên trái" : "left extra"}</span><span><i class="trailing"></i>${vi ? "bù bên phải" : "right padding"}</span></div></section>
-      <aside class="tj68-side"><div class="tj68-metrics">${metrics}</div>${fitCard}</aside>
-    </div>
-    <section class="tj68-distribution tj68-card"><header><strong>${vi ? "PHÂN PHỐI KHOẢNG TRẮNG" : "SPACE DISTRIBUTION"}</strong><span>${tj68Escape(formula)}</span></header><div>${gapCards}</div>${view.partialLine ? `<code>${tj68Escape(tj68VisibleSpaces(view.partialLine))}</code>` : ""}</section>
-    <section class="tj68-output tj68-card"><header><strong>${vi ? "CÁC DÒNG ĐÃ LƯU" : "EMITTED LINES"}</strong><span>${output.length}</span></header><div>${outputLines}</div></section>
-    <section class="tj68-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${tj68Escape(pick(step.title))}</strong><p>${tj68Escape(pick(step.note))}</p></section>
-    <footer class="tj68-result ${view.final ? "done" : ""}"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>${tj68Escape(resultText)}</strong></footer>
-  </section>`;
+  tj68Bind(host);
 }
