@@ -20,12 +20,18 @@ test('all ten BFS level-order problems are registered with dedicated visualizati
     const params = Object.fromEntries((problem.extraParams || []).map(param => [param.key, param.default]));
     const run = problem.builder(problem.defaultInput, params);
     assert.ok(run.steps.length >= 4, String(id));
-    assert.ok(run.steps.every(step => step.bfsLevelView?.problemId === id), String(id));
+    assert.ok(run.steps.every(step => id === 107 ? Boolean(step.levelOrder107View) : step.bfsLevelView?.problemId === id), String(id));
     assert.equal(run.steps.at(-1).final, true);
     for (const step of run.steps) {
-      assert.ok(Array.isArray(step.tree.nodes));
-      assert.ok(Array.isArray(step.bfsLevelView.rows));
-      assert.ok(Array.isArray(step.bfsLevelView.queue));
+      if (id === 107) {
+        assert.ok(Array.isArray(step.levelOrder107View.nodes));
+        assert.ok(Array.isArray(step.levelOrder107View.resultIds));
+        assert.ok(step.levelOrder107View.queue === null || Array.isArray(step.levelOrder107View.queue));
+      } else {
+        assert.ok(Array.isArray(step.tree.nodes));
+        assert.ok(Array.isArray(step.bfsLevelView.rows));
+        assert.ok(Array.isArray(step.bfsLevelView.queue));
+      }
       assert.ok(step.codeLines.every(line => line >= 1 && line <= problem.code.length), `${id}: ${step.codeLines}`);
     }
   }
@@ -290,7 +296,7 @@ test('Edit & run code gets TreeNode arguments, including Node.next for 117', () 
   assert.equal(ranked[1], 2);
 });
 
-test('shared level renderer handles every step in English and Vietnamese', () => {
+test('shared level renderer handles the remaining nine lessons in English and Vietnamese', () => {
   const script = readFrontendJavaScript();
   const start = script.indexOf('function renderBfsLevelView(step)');
   const end = script.indexOf('\nfunction renderTreeEssentialsView(step)', start);
@@ -314,7 +320,7 @@ test('shared level renderer handles every step in English and Vietnamese', () =>
 
   for (const language of ['en', 'vi']) {
     context.lang = language;
-    for (const id of ids) {
+    for (const id of ids.filter(value => value !== 107)) {
       const problem = SUPPORTED[id];
       const params = Object.fromEntries((problem.extraParams || []).map(param => [param.key, param.default]));
       for (const step of problem.builder(problem.defaultInput, params).steps) {

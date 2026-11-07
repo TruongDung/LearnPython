@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.zigzag103View), surface: "treeView", render: (step) => { renderZigzag103Pictures(step); } },
     { predicate: (step) => Boolean(step.scheduler2365View), surface: "treeView", render: (step) => {
       renderScheduler2365View(step);
     } },

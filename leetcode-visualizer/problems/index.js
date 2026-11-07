@@ -59,6 +59,7 @@ Object.assign(categories['binary-tree'], require('./postorder-traversal-145'));
 Object.assign(categories['binary-tree'], require('./maximum-depth-104'));
 Object.assign(categories['binary-tree'], require('./level-order-traversal-102'));
 Object.assign(categories['binary-tree'], require('./level-order-bottom-107'));
+Object.assign(categories['binary-tree'], require('./zigzag-level-order-103'));
 Object.assign(categories['union-find'], require('./provinces-547'));
 Object.assign(categories.array, {396: require('./numerical-lessons')[396]});
 Object.assign(categories.bitmask, {1521: require('./numerical-lessons')[1521]});
