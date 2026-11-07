@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
+const legacy549 = require('../problems/tree')[549];
 const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
 
 test('545, 549 and 742 are registered with dedicated metadata', () => {
@@ -29,7 +30,7 @@ test('549 computes increasing/decreasing paths through a node', () => {
   assert.equal(p.builder('1,2,3,3,4,2,4').answer, 3);
   assert.equal(p.builder('2,1,3').answer, 3);
   assert.equal(p.builder('1').answer, 1);
-  assert.ok(p.builder(p.defaultInput).steps.some(step => step.consecutive549View.operation === 'update-best'));
+  assert.ok(p.builder(p.defaultInput).steps.some(step => step.treeDfsPicture.event === 'combine'));
 });
 
 test('742 finds the closest leaf using parent-aware BFS', () => {
@@ -52,7 +53,8 @@ test('545/549/742 renderers cover all states in both languages', () => {
   vm.createContext(context); vm.runInContext(source.slice(start, end), context);
   const cases = [
     [545, 'boundary545View', 'renderBoundary545View', SUPPORTED[545].builder('1,2,3,4,5,6,7')],
-    [549, 'consecutive549View', 'renderConsecutive549View', SUPPORTED[549].builder('1,2,3,3,4,2,4')],
+    // The old renderer stays compatible with its original semantic builder.
+    [549, 'consecutive549View', 'renderConsecutive549View', legacy549.builder('1,2,3,3,4,2,4')],
     [742, 'closestLeaf742View', 'renderClosestLeaf742View', SUPPORTED[742].builder('1,2,3,null,4,5,6', { k: 2 })],
   ];
   for (const language of ['en', 'vi']) {

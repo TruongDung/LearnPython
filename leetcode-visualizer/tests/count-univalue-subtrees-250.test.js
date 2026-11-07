@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const { SUPPORTED } = require('../problems');
+// Preserve legacy semantic compatibility; native registration is tested separately.
+const SUPPORTED = require('../problems/tree');
 
 test('250 is registered as a postorder DFS and tree-DP lesson', () => {
   const problem = SUPPORTED[250];

@@ -3,10 +3,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
+// Legacy builder/renderer compatibility; native registration is tested separately.
+const problem = require('../problems/tree')[1372];
 const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
 const { prepareGenericLiveArgs } = require('../live-args');
 
-const problem = SUPPORTED[1372];
 
 function parseCompactTree(values) {
   if (!values.length || values[0] === null) return null;

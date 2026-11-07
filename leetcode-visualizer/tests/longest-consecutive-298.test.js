@@ -5,7 +5,9 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const problem = require('../problems').SUPPORTED[298];
+// Keep compatibility coverage for the original semantic builder; the registered
+// native Python lesson is covered in tree-dfs-pictures.test.js.
+const problem = require('../problems/tree')[298];
 
 function parseStrictTree(input) {
   const values = String(input).split(',').map(value => {
@@ -110,7 +112,7 @@ test('298 displayed Python solution passes representative cases', () => {
     'assert Solution().longestConsecutive(TreeNode(-2, TreeNode(-1, TreeNode(0)))) == 3',
     'assert Solution().longestConsecutive(None) == 0',
   ].join('\n');
-  const result = spawnSync('python3', ['-c', `${prelude}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
+  const result = spawnSync(process.env.PYTHON || 'python3', ['-c', `${prelude}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
 });
 

@@ -4,6 +4,8 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-task-scheduler-ii-2365.js',
+  'renderer-tree-dfs-pictures.js',
   'app-core.js',
   'renderer-level-order-bottom-107.js',
   'renderer-level-order-102.js',
@@ -109,6 +111,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-special-characters-3121.js',
   'renderer-disappeared-numbers-448.js',
   'renderer-log-system-635.js',
+  'renderer-nearby-merchants-9009.js',
   'renderer-numerical-pictures.js',
   'renderer-provinces-547.js',
   'renderer-burst-balloons-452.js',
@@ -198,6 +201,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'task-scheduler-ii-2365.css',
+  'tree-dfs-pictures.css',
   'stock-iii-123.css',
   'scramble-string-87.css',
   'minimum-window-76.css',
@@ -268,6 +273,7 @@ const STYLESHEET_ASSETS = Object.freeze([
   'special-characters-3121.css',
   'disappeared-numbers-448.css',
   'log-system-635.css',
+  'nearby-merchants-9009.css',
   'numerical-pictures.css',
   'provinces-547.css',
   'burst-balloons-452.css',

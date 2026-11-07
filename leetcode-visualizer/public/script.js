@@ -76,6 +76,12 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.scheduler2365View), surface: "treeView", render: (step) => {
+      renderScheduler2365View(step);
+    } },
+    { predicate: (step) => Boolean(step.merchant9009View), surface: "treeView", render: (step) => {
+      renderNearby9009View(step);
+    } },
     { predicate: (step) => Boolean(step.levelOrder107View), surface: "treeView", render: (step) => { renderLevelOrder107Pictures(step); } },
     { predicate: (step) => Boolean(step.levelOrder102View), surface: "treeView", render: (step) => { renderLevelOrder102Pictures(step); } },
     { predicate: (step) => Boolean(step.maxDepth104View), surface: "treeView", render: (step) => { renderMaxDepth104Pictures(step); } },
@@ -93,6 +99,9 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.splitBst776View), surface: "treeView", render: (step) => {
       renderSplitBst776View(step);
+    } },
+    { predicate: (step) => Boolean(step.treeDfsPicture), surface: "treeView", render: (step) => {
+      renderTreeDfsPicture(step);
     } },
     { predicate: (step) => Boolean(step.bstPair1214View), surface: "treeView", render: (step) => {
       renderBstPair1214View(step);

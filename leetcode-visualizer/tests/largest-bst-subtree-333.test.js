@@ -5,8 +5,10 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
+// Legacy semantic builder compatibility. Native registration and debug events
+// are covered in tree-dfs-pictures.test.js.
+const problem = require('../problems/tree')[333];
 const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
-const problem = SUPPORTED[333];
 
 function parseTree(input) {
   const values = String(input).replace(/^\[|\]$/g, '').split(',').map(token => {
@@ -126,7 +128,7 @@ test('333 displayed Python solution passes representative cases', () => {
     'assert Solution().largestBSTSubtree(TreeNode(10, TreeNode(5, TreeNode(1), TreeNode(8)), TreeNode(15, None, TreeNode(7)))) == 3',
     'assert Solution().largestBSTSubtree(TreeNode(2, TreeNode(2), TreeNode(3))) == 1',
   ].join('\n');
-  const result = spawnSync('python3', ['-c', `${prelude}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
+  const result = spawnSync(process.env.PYTHON || 'python3', ['-c', `${prelude}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
 });
 
@@ -168,6 +170,6 @@ test('333 includes scoped responsive styles and refreshed assets', () => {
   assert.match(css, /\.lb333-node\.best-subtree/);
   assert.match(css, /\.lb333-formula \.ordering/);
   assert.match(css, /@container \(max-width: 520px\)[\s\S]*\.lb333-result/);
-  assert.match(html, /style\.css\?v=20260917-1373-v1&b=20260917-333-v1/);
-  assert.match(html, /script\.js\?v=20260917-1373-v1&b=20260917-333-v1/);
+  assert.match(html, /style\.css\?[^"\n]*b=20260917-333-v1/);
+  assert.match(html, /script\.js\?[^"\n]*b=20260917-333-v1/);
 });

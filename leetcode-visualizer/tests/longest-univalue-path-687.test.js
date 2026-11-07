@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
+// Keep the original semantic builder/renderer contract under compatibility tests.
+// The registered native lesson is covered in tree-dfs-pictures.test.js.
+const problem = require('../problems/tree')[687];
 const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
 const { prepareGenericLiveArgs } = require('../live-args');
 
-const problem = SUPPORTED[687];
 
 function parseCompactTree(values) {
   if (!values.length || values[0] === null) return null;
