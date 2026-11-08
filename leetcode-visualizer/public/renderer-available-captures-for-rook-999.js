@@ -1,97 +1,29 @@
 "use strict";
-
-const ROOK999_COPY = Object.freeze({
-  vi: Object.freeze({
-    kicker: "999 · QUÉT BỐN HƯỚNG", board: "Bàn cờ 8×8", boardHint: "Tia sáng đi qua ô trống và dừng ở quân đầu tiên.",
-    captures: "Số tốt bắt được", directions: "Kết quả bốn hướng", currentRay: "Tia đang xét", noRay: "Đang tìm quân xe trước khi quét tia.", complete: "Đã quét xong cả bốn hướng.",
-    pending: "chưa xét", active: "đang quét", captured: "bắt tốt", blocked: "bị tượng chặn", edge: "chạm biên",
-    rook: "xe trắng", bishop: "tượng chắn", pawn: "tốt đen", scanned: "đã nhìn qua", current: "ô hiện tại", capturedPawn: "bắt được",
-    firstPiece: "Quân đầu tiên quyết định", empty: "trống", result: "Kết quả", line: "DÒNG", phase: "PHA",
-  }),
-  en: Object.freeze({
-    kicker: "999 · FOUR-DIRECTION SCAN", board: "8×8 board", boardHint: "A ray passes through empty squares and stops at the first piece.",
-    captures: "Capturable pawns", directions: "Four-direction result", currentRay: "Current ray", noRay: "Locate the rook before casting a ray.", complete: "All four directions have been scanned.",
-    pending: "pending", active: "scanning", captured: "pawn captured", blocked: "bishop blocks", edge: "board edge",
-    rook: "white rook", bishop: "blocking bishop", pawn: "black pawn", scanned: "seen by rook", current: "current square", capturedPawn: "captured",
-    firstPiece: "The first piece decides", empty: "empty", result: "Result", line: "LINE", phase: "PHASE",
-  }),
-});
-
-function rook999Escape(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+const R999_CASES=[
+ ['........|...p....|...R...p|........|........|...p....|........|........','3 tốt','3 pawns'],
+ ['...p....|...B....|........|p..R..Bp|........|...B....|...p....|........','Tượng chắn tốt phía sau','Bishops block pawns'],
+ ['........|.p.p.p..|...p....|.p.R.p..|...p....|.p.p.p..|........|........','Mỗi hướng chỉ 1 tốt','One pawn per direction'],
+ ['R.......|........|........|........|........|........|........|.......p','Xe ở góc · 0 tốt','Corner rook · 0 pawns']];
+const R999_DIRS=[['down','↓'],['up','↑'],['right','→'],['left','←']];
+function rook999Escape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function rook999Piece(piece){return piece==='R'?'♖':piece==='B'?'♗':piece==='p'?'♟':'·';}
+function rook999Board(v,vi){const step=46,pad=29,w=426,point=(r,c)=>({x:pad+c*step+step/2,y:pad+r*step+step/2}),seen=new Map(v.scanned.map(c=>[`${c.row},${c.col}`,c])),caught=new Set(v.captured.map(p=>p.join(','))),current=v.current?.join(',');
+ const cells=v.board.flatMap((row,r)=>row.map((piece,c)=>{const p=point(r,c),key=`${r},${c}`,visited=seen.get(key),active=current===key;return `<g class="rook999-cell ${(r+c)%2?'is-dark':''} ${visited?'is-scanned':''} ${caught.has(key)?'is-captured':''} ${active?'is-current':''} ${active&&piece==='B'&&v.checks.bishop?'is-blocker':''}" data-r999-cell="${key}" data-piece="${piece}" data-seen="${Boolean(visited)}" data-captured="${caught.has(key)}" role="button" tabindex="0" aria-label="board[${r}][${c}] = ${piece}"><rect x="${p.x-21}" y="${p.y-21}" width="42" height="42" rx="5"/><text class="piece-${piece==='R'?'rook':piece==='B'?'bishop':piece==='p'?'pawn':'empty'}" x="${p.x}" y="${p.y+(piece==='.'?4:11)}">${rook999Piece(piece)}</text>${caught.has(key)?`<circle class="r999-capture-badge" cx="${p.x+13}" cy="${p.y-13}" r="7"/><text class="r999-check" x="${p.x+13}" y="${p.y-10}">✓</text>`:''}</g>`;})).join('');
+ const axes=Array.from({length:8},(_,i)=>`<text class="r999-axis" x="${point(0,i).x}" y="15">${i}</text><text class="r999-axis" x="14" y="${point(i,0).y+4}">${i}</text>`).join('');
+ const rays=v.rook?R999_DIRS.map(([key])=>{const cells=v.scanned.filter(c=>c.direction===key);if(!cells.length)return '';const a=point(...v.rook),last=cells.at(-1),b=point(last.row,last.col);return `<path class="r999-ray-line ${v.direction?.key===key?'is-active':''} ${v.directionStates[key]==='captured'?'is-captured':''}" d="M${a.x},${a.y}L${b.x},${b.y}"/>`;}).join(''):'';
+ return `<section class="r999-panel"><header><b>${vi?'Bàn cờ 8×8':'8×8 board'}</b><small>♗ → stop · ♟ → +1, stop</small></header><div class="r999-board-scroll" tabindex="0"><svg class="rook999-board" width="${w}" height="${w}" viewBox="0 0 ${w} ${w}" role="group" aria-label="${vi?'Xe quét bốn hướng':'Four rook rays'}">${axes}${cells}${rays}</svg></div><div class="r999-legend"><span>♖ R</span><span>♗ B</span><span>♟ p</span><span class="is-seen">━ ${vi?'đã đọc':'read'}</span><span class="is-caught">✓ ${vi?'bắt được':'capturable'}</span></div></section>`;
 }
-
-function rook999Text(value) {
-  return value && typeof value === "object" ? value[lang] : value;
+function rook999Directions(v,vi){const status={pending:'·',active:'…',captured:'✓ +1',blocked:'♗ ×',edge:'↦ |'};return `<section class="rook999-directions r999-panel"><header><b>${vi?'Bốn hướng':'Four directions'}</b><small>${vi?'Chọn mũi tên để xem lượt quét':'Select an arrow to inspect that scan'}</small></header><div>${R999_DIRS.map(([key,arrow])=>`<button type="button" data-r999-direction="${key}" class="is-${v.directionStates[key]} ${v.direction?.key===key?'is-selected':''}" aria-label="${key}"><strong>${arrow}</strong><b>${status[v.directionStates[key]]}</b></button>`).join('')}</div></section>`;}
+function rook999Ray(v,vi){const cells=v.direction?v.scanned.filter(c=>c.direction===v.direction.key):[];return `<section class="rook999-ray r999-panel"><header><b>${vi?'Tia đang đọc':'Current ray'}</b><small>${v.direction?.symbol??'♖'}</small></header><div class="r999-ray-scroll" tabindex="0">${v.rook?`<span><b>♖</b><small>${v.rook.join(',')}</small></span>`:'—'}${cells.map(c=>`<i>${v.direction.symbol}</i><span class="${c.piece==='B'?'is-bishop':c.piece==='p'?'is-pawn':''}"><b>${rook999Piece(c.piece)}</b><small>${c.row},${c.col}</small></span>`).join('')}${v.direction&&v.directionStates[v.direction.key]==='edge'?'<i>→ |</i>':''}</div></section>`;}
+function rook999Jump(kind){if(typeof steps==='undefined'||typeof renderStep!=='function')return;if(typeof stopPlay==='function')stopPlay();const i=steps.findIndex((s,i)=>i>stepIndex&&s.rook999View&&(kind==='step'?true:kind==='read'?s.rook999View.event==='read-piece':kind==='capture'?s.rook999View.event==='capture':s.final));stepIndex=i<0?steps.length-1:i;renderStep();}
+function rook999Bind(host){const bind=(selector,fn)=>(host.querySelectorAll?.(selector)??[]).forEach(el=>{el.addEventListener('click',()=>fn(el));el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();fn(el);}});});const go=i=>{if(i<0)return;if(typeof stopPlay==='function')stopPlay();stepIndex=i;renderStep();};
+ bind('[data-r999-jump]',el=>rook999Jump(el.dataset.r999Jump));bind('[data-r999-direction]',el=>go(steps.findIndex(s=>s.rook999View?.event==='direction-start'&&s.rook999View.direction?.key===el.dataset.r999Direction)));
+ bind('[data-r999-cell]',el=>{let i=steps.findIndex(s=>s.rook999View?.event==='read-piece'&&s.rook999View.current?.join(',')===el.dataset.r999Cell);if(i<0)i=steps.findIndex(s=>s.rook999View?.event==='rook-check'&&s.rook999View.current?.join(',')===el.dataset.r999Cell);go(i);});
+ bind('[data-r999-case]',el=>{document.getElementById('arrInput').value=R999_CASES[Number(el.dataset.r999Case)][0];if(typeof runViz==='function')runViz();});
 }
-
-function rook999Piece(piece) {
-  if (piece === "R") return "♖";
-  if (piece === "B") return "♗";
-  if (piece === "p") return "♟";
-  return "";
-}
-
-function rook999Board(view, copy) {
-  const scanned = new Map(view.scanned.map((cell) => [`${cell.row},${cell.col}`, cell]));
-  const captured = new Set(view.captured.map(([row, col]) => `${row},${col}`));
-  const current = view.current ? `${view.current[0]},${view.current[1]}` : null;
-  const rook = view.rook ? `${view.rook[0]},${view.rook[1]}` : null;
-  const cells = [];
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const key = `${row},${col}`;
-      const piece = view.board[row][col];
-      const seen = scanned.get(key);
-      const classes = ["rook999-cell", (row + col) % 2 ? "is-dark" : "is-light"];
-      if (seen) classes.push("is-scanned", `ray-${seen.direction}`);
-      if (key === current) classes.push("is-current");
-      if (key === rook) classes.push("is-rook");
-      if (captured.has(key)) classes.push("is-captured");
-      if (piece === "B" && key === current) classes.push("is-blocker");
-      cells.push(`<div class="${classes.join(" ")}" data-row="${row}" data-col="${col}" data-piece="${piece}" aria-label="row ${row}, column ${col}, ${piece === "." ? copy.empty : piece}">
-        <small>${row},${col}</small><span class="piece piece-${piece === "p" ? "pawn" : piece === "R" ? "rook" : piece === "B" ? "bishop" : "empty"}">${rook999Piece(piece)}</span>
-      </div>`);
-    }
-  }
-  return `<section class="rook999-board-panel"><header><div><strong>${copy.board}</strong><small>${copy.boardHint}</small></div><span>${view.scanned.length}/14</span></header><div class="rook999-board" role="grid" aria-label="${copy.board}">${cells.join("")}</div><div class="rook999-legend"><span class="rook">♖ ${copy.rook}</span><span class="bishop">♗ ${copy.bishop}</span><span class="pawn">♟ ${copy.pawn}</span><span class="seen">${copy.scanned}</span><span class="active">${copy.current}</span><span class="caught">${copy.capturedPawn}</span></div></section>`;
-}
-
-function rook999DirectionCards(view, copy) {
-  const directions = [
-    { key: "up", symbol: "↑", vi: "Lên", en: "Up" },
-    { key: "right", symbol: "→", vi: "Phải", en: "Right" },
-    { key: "down", symbol: "↓", vi: "Xuống", en: "Down" },
-    { key: "left", symbol: "←", vi: "Trái", en: "Left" },
-  ];
-  const cards = directions.map((direction) => {
-    const status = view.directionStates[direction.key] || "pending";
-    return `<li class="is-${status}${view.direction && view.direction.key === direction.key ? " is-selected" : ""}"><b>${direction.symbol}</b><span>${direction[lang]}</span><small>${copy[status]}</small></li>`;
-  }).join("");
-  return `<section class="rook999-directions"><header><strong>${copy.directions}</strong><span>${copy.firstPiece}</span></header><ol>${cards}</ol></section>`;
-}
-
-function rook999Ray(view, copy) {
-  if (!view.direction) return `<section class="rook999-ray"><header><strong>${copy.currentRay}</strong></header><p>${view.final ? copy.complete : copy.noRay}</p></section>`;
-  const cells = view.scanned.filter((cell) => cell.direction === view.direction.key);
-  const tokens = [`<span class="is-rook"><b>♖</b><small>R</small></span>`];
-  for (const cell of cells) {
-    const finalPiece = cell.piece === "B" || cell.piece === "p";
-    tokens.push(`<i>${view.direction.symbol}</i><span class="${finalPiece ? cell.piece === "B" ? "is-bishop" : "is-pawn" : "is-empty"}${view.current && view.current[0] === cell.row && view.current[1] === cell.col ? " is-current" : ""}"><b>${rook999Piece(cell.piece) || "·"}</b><small>${cell.row},${cell.col}</small></span>`);
-  }
-  if (view.directionStates[view.direction.key] === "edge") tokens.push(`<i>${view.direction.symbol}</i><span class="is-edge"><b>∅</b><small>edge</small></span>`);
-  return `<section class="rook999-ray"><header><strong>${copy.currentRay}</strong><span>${view.direction.symbol} ${rook999Escape(view.direction[lang])}</span></header><div>${tokens.join("")}</div></section>`;
-}
-
-function renderAvailableCapturesForRook999View(step) {
-  const view = step.rook999View;
-  const copy = ROOK999_COPY[lang === "en" ? "en" : "vi"];
-  const condition = view.condition ? `<span class="rook999-condition ${view.condition.result ? "is-true" : "is-false"}"><code>${rook999Escape(view.condition.expression)}</code><b>${view.condition.result ? "TRUE" : "FALSE"}</b></span>` : "";
-  const root = $("treeView");
-  root.innerHTML = `<section class="rook999-viz" role="img" aria-label="Available Captures for Rook visualization">
-    <header class="rook999-heading"><div><small>${copy.kicker}</small><h3>${rook999Escape(rook999Text(step.title))}</h3></div><span>${copy.line} ${view.line} · ${copy.phase} ${rook999Escape(view.phase.toUpperCase())}</span></header>
-    <section class="rook999-action"><div><code>${rook999Escape(view.source.trim())}</code>${condition}</div><p>${rook999Escape(rook999Text(step.note))}</p></section>
-    <div class="rook999-summary"><section><small>${copy.captures}</small><strong>${view.captures}</strong><span>/ 4</span></section>${rook999DirectionCards(view, copy)}</div>
-    <div class="rook999-main">${rook999Board(view, copy)}<div>${rook999Ray(view, copy)}<section class="rook999-result ${view.final ? "is-final" : ""}"><small>${copy.result}</small><strong>${view.final ? view.captures : "—"}</strong><p>${view.final ? `${view.captures} / 4` : rook999Escape(rook999Text(step.title))}</p></section></div></div>
-  </section>`;
+function renderAvailableCapturesForRook999View(step){const v=step.rook999View;if(!v)return;const host=typeof document!=='undefined'?document.getElementById('treeView'):$('treeView'),vi=typeof lang!=='undefined'&&lang==='vi',old=host.querySelector?.('.r999-board-scroll'),scroll={x:old?.scrollLeft??0,y:old?.scrollTop??0},open=host.querySelector?.('.r999-native')?.open??false;
+ const scalars=['row','col','rook_row','rook_col','piece','row_step','col_step'].filter(name=>Object.hasOwn(v.locals,name));
+ host.innerHTML=`<article class="rook999-viz" data-source-line="${v.line}" data-phase="${v.phase}" role="region" aria-label="LeetCode 999"><header class="r999-heading"><div><small>LEETCODE 999 · ♖</small><h2>${vi?'Bốn tia · gặp quân đầu tiên thì dừng':'Four rays · stop at the first piece'}</h2></div><code>numRookCaptures</code></header><nav class="r999-presets" aria-label="Examples">${R999_CASES.map((c,i)=>`<button type="button" data-r999-case="${i}">${c[vi?1:2]}</button>`).join('')}</nav><div class="r999-source"><span>${vi?'Sau dòng':'After line'} <b>L${v.line}</b></span><code>${rook999Escape(v.source.trim())}</code>${v.branch===null?'':`<strong class="${v.branch?'is-true':''}">${v.branch?'True ✓':'False ×'}</strong>`}</div>${rook999Board(v,vi)}${rook999Directions(v,vi)}<section class="r999-score r999-panel"><header><code>captures</code><small>${vi?'Tối đa 1 tốt mỗi hướng':'At most one pawn per direction'}</small></header><div><strong data-native-captures="${v.captures}">${v.captures??'—'}</strong><span class="r999-capture-slots">${R999_DIRS.map(([key,arrow])=>`<b class="${v.directionStates[key]==='captured'?'is-captured':''}">${arrow}<small>${v.directionStates[key]==='captured'?'✓':'·'}</small></b>`).join('')}</span>${v.change?.kind==='capture'?`<b class="r999-plus">${v.change.before} → ${v.change.after} <small>+1</small></b>`:''}</div></section>${rook999Ray(v,vi)}${v.phase==='scan'&&v.direction?`<div class="r999-gates">${[['bounds',vi?'Trong bàn':'On board'],['bishop','piece == B'],['pawn','piece == p']].map(([key,label])=>`<span class="${v.checks[key]===null?'':v.checks[key]?'is-true':'is-false'}"><code>${label}</code><b>${v.checks[key]===null?'…':v.checks[key]?'✓':'×'}</b></span>`).join('')}</div>`:''}<details class="r999-native"><summary>${vi?'Biến Python sau dòng này':'Python locals after this line'}</summary><div>${scalars.map(name=>`<span><code>${name}</code><b data-native-name="${name}">${rook999Escape(v.locals[name])}</b></span>`).join('')}</div></details>${v.final?`<output class="rook999-result is-final" data-answer="${v.answer}"><small>${vi?'Kết quả':'Result'}</small><strong>${v.answer}</strong></output>`:''}<footer class="r999-controls">${[['step',vi?'Từng dòng →':'Next line →'],['read',vi?'Đọc ô →':'Read cell →'],['capture','+1 →'],['result',vi?'Kết quả ↠':'Result ↠']].map(([key,label])=>`<button type="button" data-r999-jump="${key}">${label}</button>`).join('')}</footer></article>`;
+ const board=host.querySelector?.('.r999-board-scroll');if(board){board.scrollLeft=scroll.x;board.scrollTop=scroll.y;const active=board.querySelector('.is-current');if(active){const a=board.getBoundingClientRect(),b=active.getBoundingClientRect();if(b.left<a.left+15)board.scrollLeft-=a.left+15-b.left;if(b.right>a.right-15)board.scrollLeft+=b.right-a.right+15;}}
+ const details=host.querySelector?.('.r999-native');if(details)details.open=open;rook999Bind(host);
 }

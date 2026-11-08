@@ -37,10 +37,33 @@ def picture_tree(values, prefix):
     return root
 
 
+class PictureListNode:
+    """An immutable-input linked-list context with stable IDs."""
+
+    def __init__(self, value, node_id):
+        self.val = value
+        self.node_id = node_id
+        self.next = None
+
+
+def picture_list(values, prefix):
+    head, tail = None, None
+    for index, value in enumerate(values):
+        node = PictureListNode(value, f'{prefix}:{index}')
+        if tail is None:
+            head = node
+        else:
+            tail.next = node
+        tail = node
+    return head
+
+
 def picture_trace(payload):
     code = payload['code']
     filename = '<picture-lesson>'
     scope = {'TreeNode': PictureTreeNode} if payload.get('treeArgs') else {}
+    if payload.get('linkedArgs'):
+        scope['ListNode'] = PictureListNode
     if payload.get('captureNext'):
         class PictureNextNode(PictureTreeNode):
             """Dummy nodes used by bundled next-pointer lessons."""
@@ -63,6 +86,9 @@ def picture_trace(payload):
             branches[node.lineno] = {line for stmt in node.body for line in range(stmt.lineno, stmt.end_lineno + 1)}
 
     def encode(value):
+        if isinstance(value, PictureListNode):
+            return {'id': value.node_id, 'val': value.val,
+                    'next': value.next.node_id if value.next else None}
         if isinstance(value, PictureTreeNode):
             return {'id': value.node_id, 'val': value.val,
                     **({'next': value.next.node_id if value.next else None}
@@ -156,6 +182,8 @@ def picture_trace(payload):
         return trace
 
     args = list(payload['args'])
+    for index in payload.get('linkedArgs', []):
+        args[index] = picture_list(args[index], index)
     for index in payload.get('treeArgs', []):
         args[index] = picture_tree(args[index], index)
         if payload.get('captureTrees') and args[index] is not None:

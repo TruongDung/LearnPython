@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.stackStudyView), surface: "treeView", render: (step) => { renderStackStudyPictures(step); } },
+    { predicate: (step) => Boolean(step.preorderListView), surface: "treeView", render: (step) => { renderPreorderListPictures(step); } },
+    { predicate: (step) => Boolean(step.journeyView), surface: "treeView", render: (step) => { renderJourneyPictures(step); } },
     { predicate: (step) => Boolean(step.studyNativeView), surface: "treeView", render: (step) => { renderStudyNativePictures(step); } },
     { predicate: (step) => Boolean(step.servers1267View), surface: "treeView", render: (step) => { renderServers1267Pictures(step); } },
     { predicate: (step) => Boolean(step.rootPathView), surface: "treeView", render: (step) => { renderRootPathPictures(step); } },

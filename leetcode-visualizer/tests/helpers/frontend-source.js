@@ -4,6 +4,9 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-stack-study-pictures.js',
+  'renderer-preorder-list-pictures.js',
+  'renderer-journey-pictures.js',
   'renderer-count-servers-1267.js',
   'renderer-tree-replay-pictures.js',
   'renderer-study-native-pictures.js',
@@ -208,6 +211,9 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 const STYLESHEET_ASSETS = Object.freeze([
   'count-servers-1267.css',
   'tree-replay-pictures.css',
+  'stack-study-pictures.css',
+  'preorder-list-pictures.css',
+  'journey-pictures.css',
   'study-native-pictures.css',
   'root-path-pictures.css',
   'task-scheduler-ii-2365.css',

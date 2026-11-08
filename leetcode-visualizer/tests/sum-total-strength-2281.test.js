@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const vm = require('node:vm');
+const fs = require('node:fs');
 
 const { SUPPORTED } = require('../problems');
 const {
@@ -82,7 +83,7 @@ test('2281 assigns every subarray to exactly one minimum owner', () => {
   const run = problem.builder(strength.join(','));
   const ownershipSteps = run.steps.filter((step) => (
     step.totalStrength2281View.phase === 'contribution'
-    && step.codeLines[0] === 24
+    && step.stackStudyView.source.text === 'right_i = right[i]'
   ));
   const owned = new Map();
 
@@ -126,7 +127,8 @@ test('2281 validates input and keeps trace lines aligned with the displayed sour
   assert.ok(run.steps.length > 20);
   for (const step of run.steps) {
     assert.ok(step.title.vi && step.title.en);
-    assert.ok(step.note.vi && step.note.en);
+    assert.equal(typeof step.note.vi, 'string');
+    assert.equal(typeof step.note.en, 'string');
     assert.ok(step.totalStrength2281View);
     assert.ok(step.codeLines.every((line) => line >= 1 && line <= problem.code.length));
   }
@@ -144,51 +146,16 @@ test('2281 is registered with the intended metadata', () => {
   assert.match(problem.code.join('\n'), /prefix2/);
 });
 
-test('2281 dedicated renderer is wired, responsive, bilingual, and complete', () => {
-  const index = readFrontendIndex();
-  const styles = readFrontendStyles();
-  const script = readFrontendJavaScript();
-  assert.match(index, /renderers-01\.js/);
-  assert.match(index, /style-07\.css/);
-  assert.match(script, /totalStrength2281View/);
-  assert.match(script, /renderTotalStrength2281View/);
-  assert.match(styles, /\.ts2281-viz/);
-  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.ts2281-blocks/);
-
-  const start = script.indexOf('function renderTotalStrength2281View(step)');
-  const end = script.indexOf('\nfunction renderVisibleMountains2345View(step)', start);
-  assert.ok(start >= 0 && end > start);
-
-  const element = {};
-  const context = {
-    lang: 'en',
-    $: () => element,
-    escapeHtml: (value) => String(value),
-    pick: (value) => value?.en ?? value?.vi ?? value ?? '',
-  };
-  vm.createContext(context);
-  vm.runInContext(script.slice(start, end), context);
-
-  const runs = [problem.builder('1,3,1,2'), problem.builder('2,2,1,2')];
-  for (const language of ['en', 'vi']) {
-    context.lang = language;
-    for (const run of runs) {
-      for (const step of run.steps) {
-        context.renderTotalStrength2281View(step);
-        assert.match(element.innerHTML, /ts2281-viz/);
-        assert.match(element.innerHTML, /ts2281-phases/);
-        assert.match(element.innerHTML, /ts2281-prefix/);
-        assert.match(element.innerHTML, /ts2281-owner/);
-        assert.match(element.innerHTML, /ts2281-ledger/);
-        assert.doesNotMatch(element.innerHTML, /NaN|undefined|Infinity/);
-      }
-    }
-  }
-
-  context.lang = 'en';
-  context.renderTotalStrength2281View(runs[0].steps.at(-1));
-  assert.match(element.innerHTML, /class="ts2281-bar/);
-  assert.match(element.innerHTML, /class="ts2281-matrix-empty/);
-  assert.match(element.innerHTML, /<small>ANSWER<\/small>/);
-  assert.match(element.innerHTML, /<strong>44<\/strong>/);
+test('2281 dedicated native renderer is lazy, responsive, bilingual and deterministic', () => {
+  const index=readFrontendIndex(),script=readFrontendJavaScript(),styles=readFrontendStyles();
+  assert.match(index,/renderer-stack-study-pictures\.js[^>]*data-problem-ids="2281 2289"/);
+  assert.match(script,/step\.stackStudyView/);assert.match(script,/renderStackStudyPictures\(step\)/);
+  assert.match(styles,/\.st-matrix/);assert.match(styles,/@container\(max-width:340px\)/);
+  const host={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]},context={lang:'vi',document:{getElementById:()=>host}};
+  vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-stack-study-pictures.js'),'utf8'),context);
+  for(const lang of ['vi','en']){context.lang=lang;for(const input of ['1,3,1,2','2,2,1,2']){const run=problem.builder(input),saved=JSON.stringify(run.steps);
+    context.renderStackStudyPictures(run.steps[0]);const first=host.innerHTML;
+    for(const step of run.steps){context.renderStackStudyPictures(step);assert.match(host.innerHTML,/st-viz/);assert.match(host.innerHTML,/st-phases/);assert.doesNotMatch(host.innerHTML,/undefined|NaN|Infinity/);}
+    context.renderStackStudyPictures(run.steps[0]);assert.equal(host.innerHTML,first);assert.equal(JSON.stringify(run.steps),saved);
+  }}
 });

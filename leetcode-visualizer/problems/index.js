@@ -43,6 +43,7 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
   if (!replaced) categories.graph[id] = problem;
 }
 
+Object.assign(categories['monotonic-stack'], require('./preorder-list-pictures'), require('./stack-study-pictures'));
 Object.assign(categories.bst, require('./two-sum-bsts-1214'));
 Object.assign(categories.bst, require('./split-bst-776'));
 Object.assign(categories.greedy, require('./burst-balloons-452'));
@@ -63,6 +64,9 @@ Object.assign(categories['binary-tree'], require('./zigzag-level-order-103'));
 Object.assign(categories['binary-tree'], require('./tree-replay-pictures'));
 Object.assign(categories['binary-tree'], require('./root-path-pictures'));
 Object.assign(categories.array, require('./count-servers-1267'));
+const journeyPictures = require('./journey-pictures');
+Object.assign(categories.graph, Object.fromEntries([499,2492,851,1197].map(id=>[id,journeyPictures[id]])));
+Object.assign(categories['binary-tree'], {637:journeyPictures[637]});
 const studyNativePictures = require('./study-native-pictures');
 for (const [id, problem] of Object.entries(studyNativePictures)) {
   let replaced = false;
