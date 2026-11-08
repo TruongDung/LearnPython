@@ -136,15 +136,19 @@ def picture_trace(payload):
         return values
 
     tree_nodes = []
+    linked_nodes = []
 
     def tree_state():
-        if not payload.get('captureTrees'):
-            return {}
-        return {'trees': [{'id': node.node_id, 'val': node.val,
-                           'left': node.left.node_id if node.left else None,
-                           'right': node.right.node_id if node.right else None,
-                           **({'next': node.next.node_id if node.next else None}
-                              if payload.get('captureNext') else {})} for node in tree_nodes]}
+        state = {}
+        if payload.get('captureTrees'):
+            state['trees'] = [{'id': node.node_id, 'val': node.val,
+                               'left': node.left.node_id if node.left else None,
+                               'right': node.right.node_id if node.right else None,
+                               **({'next': node.next.node_id if node.next else None}
+                                  if payload.get('captureNext') else {})} for node in tree_nodes]
+        if payload.get('captureLinked'):
+            state['linked'] = [encode(node) for node in linked_nodes]
+        return state
 
     events, pending = [], {}
     entry, truncated = None, False
@@ -184,6 +188,11 @@ def picture_trace(payload):
     args = list(payload['args'])
     for index in payload.get('linkedArgs', []):
         args[index] = picture_list(args[index], index)
+        if payload.get('captureLinked'):
+            node = args[index]
+            while node is not None:
+                linked_nodes.append(node)
+                node = node.next
     for index in payload.get('treeArgs', []):
         args[index] = picture_tree(args[index], index)
         if payload.get('captureTrees') and args[index] is not None:
