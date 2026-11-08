@@ -35,7 +35,7 @@ test('671 returns the second distinct minimum for the official examples and edge
   for (const [input, expected] of cases) {
     const run = problem.builder(input);
     assert.equal(run.answer, expected, input);
-    assert.equal(run.steps.at(-1).secondMinimum671View.answer, expected, input);
+    assert.equal(run.steps.at(-1).treeReplayView.answer, expected, input);
     assert.equal(run.steps.at(-1).final, true, input);
   }
 });
@@ -60,13 +60,13 @@ test('671 agrees with an independent distinct-value oracle on generated special 
 
 test('671 trace records candidates and prunes their descendants', () => {
   const run = problem.builder('2,2,5,null,null,5,7');
-  const views = run.steps.map((step) => step.secondMinimum671View);
+  const views = run.steps.map((step) => step.treeReplayView);
   const candidate = views.find((view) => view.candidates.length === 1);
   const final = views.at(-1);
 
   assert.ok(candidate);
-  assert.equal(candidate.current, candidate.candidates[0]);
-  assert.deepEqual(final.pruned.sort((a, b) => a - b), [3, 4]);
+  assert.equal(candidate.active, candidate.candidates[0]);
+  assert.deepEqual(final.pruned, ['0:5', '0:6']);
   assert.equal(final.answer, 5);
   assert.equal(run.steps.filter((step) => step.final).length, 1);
   assert.ok(run.steps.every((step) => step.codeLines.length > 0));
@@ -92,11 +92,11 @@ test('671 displayed Python and repository solution agree with the trace', () => 
     'assert Solution().findSecondMinimumValue(root) == 5',
     'assert Solution().findSecondMinimumValue(TreeNode(2, TreeNode(2), TreeNode(2))) == -1',
   ].join('\n');
-  const displayed = spawnSync('python', ['-c', `${setup}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
+  const displayed = spawnSync(process.env.PYTHON || 'python3', ['-c', `${setup}\n${problem.code.join('\n')}\n${assertions}`], { encoding: 'utf8' });
   assert.equal(displayed.status, 0, displayed.stderr);
 
   const solutionPath = path.resolve(__dirname, '../../Leetcode-sln/tree/Leetcode_671.py');
   assert.equal(fs.existsSync(solutionPath), true);
-  const solution = spawnSync('python', [solutionPath], { encoding: 'utf8' });
+  const solution = spawnSync(process.env.PYTHON || 'python3', [solutionPath], { encoding: 'utf8' });
   assert.equal(solution.status, 0, solution.stderr);
 });

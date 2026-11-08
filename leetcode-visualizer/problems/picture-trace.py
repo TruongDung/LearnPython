@@ -15,6 +15,7 @@ class PictureTreeNode:
         self.val = value
         self.left = None
         self.right = None
+        self.next = None
         self.node_id = node_id
 
 
@@ -40,6 +41,16 @@ def picture_trace(payload):
     code = payload['code']
     filename = '<picture-lesson>'
     scope = {'TreeNode': PictureTreeNode} if payload.get('treeArgs') else {}
+    if payload.get('captureNext'):
+        class PictureNextNode(PictureTreeNode):
+            """Dummy nodes used by bundled next-pointer lessons."""
+            count = 0
+
+            def __init__(self, val=0):
+                super().__init__(val, f'dummy:{PictureNextNode.count}')
+                PictureNextNode.count += 1
+
+        scope['Node'] = PictureNextNode
     # Execute bundled lesson code so its real statements can be traced.
     exec(compile(code, filename, 'exec'), scope)  # pylint: disable=exec-used
     branches = {}
@@ -53,7 +64,9 @@ def picture_trace(payload):
 
     def encode(value):
         if isinstance(value, PictureTreeNode):
-            return {'id': value.node_id, 'val': value.val}
+            return {'id': value.node_id, 'val': value.val,
+                    **({'next': value.next.node_id if value.next else None}
+                       if payload.get('captureNext') else {})}
         if value is None or isinstance(value, (str, bool, int)):
             return value
         if isinstance(value, float):
@@ -103,7 +116,9 @@ def picture_trace(payload):
             return {}
         return {'trees': [{'id': node.node_id, 'val': node.val,
                            'left': node.left.node_id if node.left else None,
-                           'right': node.right.node_id if node.right else None} for node in tree_nodes]}
+                           'right': node.right.node_id if node.right else None,
+                           **({'next': node.next.node_id if node.next else None}
+                              if payload.get('captureNext') else {})} for node in tree_nodes]}
 
     events, pending = [], {}
     entry, truncated = None, False

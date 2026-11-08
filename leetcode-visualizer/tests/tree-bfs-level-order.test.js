@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
+const { SUPPORTED: REGISTERED, CATEGORY_ORDER } = require('../problems');
+// Keep coverage of the shared legacy builders; native replacements have their
+// source-fidelity and independent-oracle coverage in tree-replay-pictures.test.js.
+const SUPPORTED = { ...REGISTERED, ...require('../problems/tree-bfs'), 107: REGISTERED[107] };
 const { prepareGenericLiveArgs } = require('../live-args');
 
 const ids = [107, 515, 513, 662, 117, 1609, 2415, 2471, 2583, 2641];

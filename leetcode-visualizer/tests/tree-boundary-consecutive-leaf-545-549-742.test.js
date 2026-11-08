@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const legacy549 = require('../problems/tree')[549];
+const legacy545 = require('../problems/tree')[545];
 const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
 
 test('545, 549 and 742 are registered with dedicated metadata', () => {
@@ -19,10 +20,10 @@ test('545, 549 and 742 are registered with dedicated metadata', () => {
 test('545 returns the anti-clockwise boundary without duplicate leaves', () => {
   const p = SUPPORTED[545];
   assert.deepEqual(p.builder('1,2,3,4,5,6,7').answer, [1, 2, 4, 5, 6, 7, 3]);
-  assert.deepEqual(p.builder('1,2,null,3,null,4').answer, [1, 2, 3]);
+  assert.deepEqual(p.builder('1,2,null,3,null,4').answer, [1, 2, 3, 4]);
   assert.deepEqual(p.builder('1').answer, [1]);
-  assert.ok(p.builder(p.defaultInput).steps.some(step => step.boundary545View.operation === 'add-left'));
-  assert.ok(p.builder(p.defaultInput).steps.some(step => step.boundary545View.operation === 'add-right'));
+  assert.ok(p.builder(p.defaultInput).steps.some(step => step.treeReplayView.source.text === 'boundary.append(node.val)'));
+  assert.ok(p.builder(p.defaultInput).steps.some(step => step.treeReplayView.source.text === 'boundary.extend(right[::-1])'));
 });
 
 test('549 computes increasing/decreasing paths through a node', () => {
@@ -52,7 +53,7 @@ test('545/549/742 renderers cover all states in both languages', () => {
   const context = { lang: 'en', $: elementFor, escapeHtml: value => String(value ?? ''), pick: value => value?.en ?? value?.vi ?? value ?? '', renderTree: (_step, id) => { elementFor(id).innerHTML = '<svg class="tree-svg"></svg>'; } };
   vm.createContext(context); vm.runInContext(source.slice(start, end), context);
   const cases = [
-    [545, 'boundary545View', 'renderBoundary545View', SUPPORTED[545].builder('1,2,3,4,5,6,7')],
+    [545, 'boundary545View', 'renderBoundary545View', legacy545.builder('1,2,3,4,5,6,7')],
     // The old renderer stays compatible with its original semantic builder.
     [549, 'consecutive549View', 'renderConsecutive549View', legacy549.builder('1,2,3,3,4,2,4')],
     [742, 'closestLeaf742View', 'renderClosestLeaf742View', SUPPORTED[742].builder('1,2,3,null,4,5,6', { k: 2 })],
