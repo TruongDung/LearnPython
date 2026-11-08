@@ -16,13 +16,11 @@ const requestedIds = [
   2371, 2392, 2603, 2876, 3383, 3435, 3481, 3530, 3620, 3812,
 ];
 
-const expectedMissing = [
-  1916, 2127,
-];
+const expectedMissing = [];
 
 test("all available requested problems are grouped under Topological Sort", () => {
   const available = requestedIds.filter(id => SUPPORTED[id]);
-  assert.equal(available.length, 38);
+  assert.equal(available.length, 40);
   for (const id of available) {
     const tags = SUPPORTED[id].tags || [];
     const matches = tags.filter(tag => tag.key === "topological-sort");
@@ -30,7 +28,7 @@ test("all available requested problems are grouped under Topological Sort", () =
   }
 });
 
-test("the Topological Sort roster exposes all 40 problems and marks 2 unavailable", () => {
+test("the Topological Sort roster exposes all 40 problems and marks all available", () => {
   const [all] = TOPOLOGICAL_SORT_SUBTABS;
   const rosterIds = all.roster.map(problem => problem.id);
   assert.equal(all.key, "all");
@@ -38,7 +36,7 @@ test("the Topological Sort roster exposes all 40 problems and marks 2 unavailabl
   assert.equal(new Set(rosterIds).size, 40);
   assert.deepEqual(rosterIds, requestedIds);
   assert.deepEqual(all.roster.filter(problem => !problem.available).map(problem => problem.id), expectedMissing);
-  assert.equal(all.roster.filter(problem => problem.available).length, 38);
+  assert.equal(all.roster.filter(problem => problem.available).length, 40);
   for (const problem of all.roster) {
     assert.ok(problem.title.length > 3, `#${problem.id} title`);
     assert.match(problem.difficulty, /^(medium|hard)$/);

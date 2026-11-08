@@ -4,7 +4,9 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-count-servers-1267.js',
   'renderer-tree-replay-pictures.js',
+  'renderer-study-native-pictures.js',
   'renderer-root-path-pictures.js',
   'renderer-task-scheduler-ii-2365.js',
   'renderer-tree-dfs-pictures.js',
@@ -204,7 +206,9 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'count-servers-1267.css',
   'tree-replay-pictures.css',
+  'study-native-pictures.css',
   'root-path-pictures.css',
   'task-scheduler-ii-2365.css',
   'tree-dfs-pictures.css',

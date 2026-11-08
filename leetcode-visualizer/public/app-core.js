@@ -2036,8 +2036,11 @@ function renderProblemSearchResults() {
   }
 
   const matches = [];
+  const seenProblemIds = new Set();
   catalogData.forEach((group) => {
     group.problems.forEach((problem) => {
+      const problemId = Number(problem.id);
+      if (!Number.isInteger(problemId) || problemId <= 0 || seenProblemIds.has(problemId)) return;
       const searchable = normalizeProblemSearch([
         problem.id,
         problem.title && problem.title.vi,
@@ -2048,7 +2051,12 @@ function renderProblemSearchResults() {
         group.en,
         problem.difficulty,
       ].filter(Boolean).join(" "));
-      if (searchable.includes(normalizedQuery)) matches.push({ problem, group });
+      // A problem belongs to several tags. Deduplicate after matching so a
+      // category-only query can still find it in a later group.
+      if (searchable.includes(normalizedQuery)) {
+        seenProblemIds.add(problemId);
+        matches.push({ problem, group });
+      }
     });
   });
 

@@ -1,0 +1,48 @@
+"use strict";
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
+const p=require('../problems').SUPPORTED[1267],run=input=>p.builder(input),last=r=>r.steps.at(-1).servers1267View;
+const examples=[[[1,0],[0,1]],[[1,0],[1,1]],[[1,1,0,0],[0,0,1,0],[0,0,1,0],[0,0,0,1]],[[0]],[[1]],[[1,0,0,1]],[[1],[0],[1]],[[0,1,0],[1,1,1],[0,1,0]]];
+function oracle(grid){const servers=[];grid.forEach((row,r)=>row.forEach((value,c)=>{if(value)servers.push([r,c]);}));return servers.filter(([r,c],i)=>servers.some(([rr,cc],j)=>i!==j&&(rr===r||cc===c))).length;}
+test('1267 is registered with a runnable two-pass Python snippet and matrix/counting tags',()=>{
+ assert.equal(p.id,1267);assert.equal(p.slug,'count-servers-that-communicate');assert.equal(p.difficulty,'medium');assert.equal(p.debugMode,'line-by-line');assert.equal(p.complexity.time,'O(MN)');assert.equal(p.complexity.space,'O(M+N)');assert.ok(p.tags.some(t=>t.key==='2d-array'));assert.match(p.code.join('\n'),/if shares_row or shares_col:/);assert.deepEqual(p.liveArgs('10|11'),[[[1,0],[1,1]]]);
+});
+test('published examples, separated servers, single rows/columns and exhaustive 2×3 grids match a pairwise oracle',()=>{
+ assert.deepEqual(examples.slice(0,3).map(grid=>run(grid).answer),[0,3,4]);
+ const inputs=[...examples];for(let mask=0;mask<64;mask++)inputs.push(Array.from({length:2},(_,r)=>Array.from({length:3},(_,c)=>(mask>>(r*3+c))&1)));
+ let seed=1267;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};for(let i=0;i<40;i++)inputs.push(Array.from({length:1+random(6)},()=>Array.from({length:7},()=>random(2))));
+ for(const grid of inputs){const saved=JSON.stringify(grid),r=run(grid),v=last(r);assert.equal(r.answer,oracle(grid),saved);assert.equal(v.answer,r.answer);assert.equal(r.steps.filter(s=>s.final).length,1);assert.equal(v.trace.truncated,false);assert.equal(JSON.stringify(grid),saved);const shown=v.window.flatMap((row,rr)=>row.map((value,cc)=>({value,state:v.previewStates[rr][cc]})));assert.equal(shown.filter(cell=>cell.state==='accepted').length,r.answer);assert.ok(shown.filter(cell=>cell.value===0).every(cell=>cell.state==='empty'));}
+});
+test('every source line, local, frame, branch and return matches CPython',()=>{
+ const payload={code:p.code.join('\n'),method:'countServers',summarizeLocals:{grid:0}},script="import sys,json,runpy\np=json.load(sys.stdin)\nf=runpy.run_path(p['path'])['picture_trace']\nprint(json.dumps([json.loads(f({**p['payload'],'args':[g]})) for g in p['grids']]))",ref=spawnSync(process.env.PYTHON||'python3',['-c',script],{input:JSON.stringify({path:require.resolve('../problems/picture-trace.py'),payload,grids:examples}),encoding:'utf8',maxBuffer:32e6});assert.equal(ref.status,0,ref.stderr);
+ JSON.parse(ref.stdout).forEach((native,i)=>{const r=run(examples[i]);assert.equal(r.answer,native.answer);assert.equal(r.steps.length,native.events.length);native.events.forEach((event,j)=>{const s=r.steps[j],v=s.servers1267View;assert.deepEqual(s.codeLines,[event.line]);assert.equal(v.source.text,p.code[event.line-1].trim());for(const key of['locals','outer','frames','scope','branch','returned','returning'])assert.deepEqual(v[key],event[key]);assert.deepEqual(v.rowCounts,event.locals.row_count??null);assert.deepEqual(v.colCounts,event.locals.col_count??null);for(const variable of s.vars)assert.deepEqual(variable.rawValue,event.locals[variable.name]);});});
+});
+test('row and column increments are separate completed statements, and classifications wait for the second pass',()=>{
+ const r=run('10|11');let previous=null;for(const s of r.steps){const v=s.servers1267View;if(v.phase==='count')assert.ok(v.previewStates.flat().every(state=>state==='empty'||state==='pending'));if(v.source.line===9){assert.equal(v.rowCounts[v.active[0]],previous.rowCounts[v.active[0]]+1);assert.deepEqual(v.colCounts,previous.colCounts);}if(v.source.line===10){assert.deepEqual(v.rowCounts,previous.rowCounts);assert.equal(v.colCounts[v.active[1]],previous.colCounts[v.active[1]]+1);}if(v.source.line===12){assert.deepEqual(v.rowCounts,[1,2]);assert.deepEqual(v.colCounts,[2,1]);assert.equal(v.counted,0);}previous=v;}
+ assert.ok(r.steps.some(s=>s.servers1267View.source.line===9&&s.servers1267View.rowCounts.reduce((a,b)=>a+b,0)>s.servers1267View.colCounts.reduce((a,b)=>a+b,0)));
+});
+test('both row and column can pass but each server increments answer exactly once',()=>{
+ const r=run(examples.at(-1)),v=last(r),additions=r.steps.filter(s=>s.servers1267View.change?.kind==='answer');assert.equal(r.answer,5);assert.equal(additions.length,5);assert.equal(new Set(additions.map(s=>s.servers1267View.active.join(','))).size,5);
+ const center=additions.find(s=>s.servers1267View.active.join(',')==='1,1').servers1267View;assert.deepEqual(center.checks,{row:true,col:true,pass:true});assert.equal(center.change.after,center.change.before+1);
+ let previous=null;for(const s of r.steps){const current=s.servers1267View;if(previous&&current.source.line!==12&&current.source.line!==19)assert.equal(current.counted,previous.counted);previous=current;}
+ assert.equal(v.previewStates[1][1],'accepted');
+});
+test('new-cell decisions reset while raw Python bindings retain their real prior values',()=>{
+ const r=run('1,1,0|0,0,1');for(const s of r.steps){const v=s.servers1267View;if(v.source.line===14&&v.branch)assert.deepEqual(v.checks,{row:null,col:null,pass:null});if([6,13].includes(v.source.line)||[7,14].includes(v.source.line)&&!v.branch)assert.equal(v.active,null);}const v=last(r);assert.equal(v.previewStates[1][2],'isolated');assert.ok(v.rowCounts&&v.colCounts);
+});
+test('8×8 detailed replay is complete; 250×250 grids retain the full actual answer with bounded snapshots',()=>{
+ const small=run(Array.from({length:8},()=>Array(8).fill(1)));assert.equal(small.answer,64);assert.equal(last(small).trace.truncated,false);assert.equal(last(small).trace.captured,small.steps.length);
+ for(const fill of[0,1]){const r=run(Array.from({length:250},()=>Array(250).fill(fill))),v=last(r);assert.equal(r.answer,fill?62500:0);assert.equal(v.answer,r.answer);assert.equal(v.trace.truncated,true);assert.equal(v.trace.captured,r.steps.length);assert.ok(r.steps.length<=1601);assert.equal(v.window.length,8);assert.equal(v.window[0].length,8);assert.equal(v.rowStart,242);assert.equal(v.colStart,242);assert.ok(v.rowCounts.every(n=>n===fill*250));assert.ok(v.colCounts.every(n=>n===fill*250));assert.ok(v.previewStates.flat().every(state=>state===(fill?'accepted':'empty')));assert.equal(v.counted,r.answer);assert.equal(v.source.text,'return answer');}
+});
+test('input parsing accepts JSON, comma/space/compact binary rows and rejects malformed or oversized grids',()=>{
+ for(const input of['10|11','1,0;1,1','1 0\n1 1','[[1,0],[1,1]]',[[1,0],[1,1]]])assert.deepEqual(p.liveArgs(input),[[[1,0],[1,1]]]);
+ for(const input of['',[],[[]],[1,0],[[1],[0,1]],'1,,0','1|',[[true]],[[2]],[[0.5]],Array.from({length:251},()=>[0]),[Array(251).fill(0)]])assert.throws(()=>run(input),RangeError);
+ const sparse=[1];sparse.length=2;assert.throws(()=>run([sparse]),RangeError);
+});
+function renderer(lang,extra={}){const host={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]},ctx={lang,document:{getElementById:()=>host},...extra};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-count-servers-1267.js'),'utf8'),ctx);return {ctx,render:s=>{ctx.renderServers1267Pictures(s);return host.innerHTML;}};}
+test('every frame renders actual counters, native answer and server states in VI/EN with deterministic rewind',()=>{
+ for(const lang of['vi','en'])for(const grid of examples){const r=run(grid),ui=renderer(lang),first=ui.render(r.steps[0]);for(const s of r.steps){const v=s.servers1267View,html=ui.render(s);assert.doesNotMatch(html,/NaN|undefined|Infinity/);assert.ok(html.includes(`data-source-line="${v.source.line}"`));assert.ok(html.includes(`data-native-answer="${v.locals.answer??null}"`));for(const axis of['row','col'])for(let i=0;i<(axis==='row'?v.rows:v.cols);i++)assert.ok(html.includes(`data-counter-axis="${axis}" data-counter-index="${i}" data-counter-value="${(axis==='row'?v.rowCounts:v.colCounts)?.[i]??null}"`));for(let r=0;r<v.window.length;r++)for(let c=0;c<v.window[0].length;c++)assert.ok(html.includes(`data-c1267-cell="${r+v.rowStart},${c+v.colStart}" data-cell-value="${v.window[r][c]}" data-cell-status="${v.previewStates[r][c]}"`));}assert.equal(ui.render(r.steps[0]),first);}
+});
+test('source jumps and keyboard cell navigation replay the actual checking statement without toggling playback',()=>{
+ const r=run(examples[1]);for(const kind of['count','check','add','result']){const ui=renderer('vi',{steps:r.steps,stepIndex:0,stopPlay(){},renderStep(){}});ui.ctx.c1267Jump(kind);const s=r.steps[ui.ctx.stepIndex],v=s.servers1267View;assert.ok(ui.ctx.stepIndex>0);if(kind==='count')assert.equal(v.change.kind,'counter');if(kind==='check')assert.equal(v.source.line,16);if(kind==='add')assert.equal(v.change.kind,'answer');if(kind==='result')assert.equal(s.final,true);}
+ for(const key of['Enter',' ']){const events={},el={dataset:{c1267Cell:'1,0'},addEventListener:(name,fn)=>events[name]=fn},ui=renderer('en',{steps:r.steps,stepIndex:0,stopPlay(){},renderStep(){}});ui.ctx.c1267Bind({querySelectorAll:s=>s==='[data-c1267-cell]'?[el]:[]});let a=0,b=0;events.keydown({key,preventDefault(){a++;},stopPropagation(){b++;}});const v=r.steps[ui.ctx.stepIndex].servers1267View;assert.deepEqual(v.active,[1,0]);assert.equal(v.source.line,15);assert.equal(a,1);assert.equal(b,1);}
+});

@@ -62,6 +62,16 @@ Object.assign(categories['binary-tree'], require('./level-order-bottom-107'));
 Object.assign(categories['binary-tree'], require('./zigzag-level-order-103'));
 Object.assign(categories['binary-tree'], require('./tree-replay-pictures'));
 Object.assign(categories['binary-tree'], require('./root-path-pictures'));
+Object.assign(categories.array, require('./count-servers-1267'));
+const studyNativePictures = require('./study-native-pictures');
+for (const [id, problem] of Object.entries(studyNativePictures)) {
+  let replaced = false;
+  for (const category of Object.values(categories)) if (Object.hasOwn(category, id)) {
+    category[id] = problem;
+    replaced = true;
+  }
+  if (!replaced) categories.graph[id] = problem;
+}
 Object.assign(categories['union-find'], require('./provinces-547'));
 Object.assign(categories.array, {396: require('./numerical-lessons')[396]});
 Object.assign(categories.bitmask, {1521: require('./numerical-lessons')[1521]});
