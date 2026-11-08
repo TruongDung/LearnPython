@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-fenwick-roadmap.js',
   'renderer-same-label-1519.js',
   'renderer-fenwick-count-pictures.js',
   'renderer-stack-study-pictures.js',
@@ -211,6 +212,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'fenwick-roadmap.css',
   'same-label-1519.css',
   'fenwick-count-pictures.css',
   'count-servers-1267.css',

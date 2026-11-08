@@ -25,6 +25,8 @@ const {
   FLOOD_FILL_TAG,
   PREFIX_MAX_TAG,
   PREFIX_MAX_SUBTABS,
+  FENWICK_TREE_TAG,
+  FENWICK_TREE_SUBTABS,
   COMPANY_SUBTABS,
   COMPANY_TAG,
   KNAPSACK_SUBTABS,
@@ -306,6 +308,16 @@ app.get("/api/problems", (req, res) => {
       premium: entry.available ? isPremium(SUPPORTED[entry.id]) : false,
     }));
     return { ...tab, roster, count: roster.filter(entry => entry.available).length, total: roster.length };
+  });
+  const fenwickGroup = groups.find(group => group.key === FENWICK_TREE_TAG.key) || {
+    ...FENWICK_TREE_TAG, problems: [],
+    recommendedOrderLabel: CATEGORY_ORDER[FENWICK_TREE_TAG.key].label,
+    guide: CATEGORY_ORDER[FENWICK_TREE_TAG.key].guide,
+  };
+  if (!groups.includes(fenwickGroup)) groups.push(fenwickGroup);
+  fenwickGroup.subTabs = FENWICK_TREE_SUBTABS.map(tab => {
+    const roster = tab.roster.map(entry => ({...entry, premium:entry.available ? isPremium(SUPPORTED[entry.id]) : false}));
+    return {...tab, roster, count:roster.filter(entry => entry.available).length, total:roster.length};
   });
   groups.sort((a, b) => a.key.localeCompare(b.key));
   res.json({ groups });

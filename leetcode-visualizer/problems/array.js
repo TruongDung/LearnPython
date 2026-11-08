@@ -10821,6 +10821,7 @@ module.exports = {
     slug: "reverse-pairs",
     category: { key: "divide-and-conquer", vi: "Chia để trị", en: "Divide and Conquer" },
     tags: [
+      { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" },
       { key: "merge-sort", vi: "Merge Sort", en: "Merge Sort" },
       { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
       { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
