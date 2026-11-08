@@ -102,6 +102,7 @@ Object.assign(categories.graph, require('./maximum-probability-1514'));
 Object.assign(categories.graph, require('./minimum-weighted-subgraph-2203'));
 Object.assign(categories.dp, require('./equal-subarrays-3505'));
 Object.assign(categories.graph, require('./time-room-pictures'), require('./shortest-graph-pictures'));
+Object.assign(categories.graph, require('./same-label-subtrees-1519'));
 
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
