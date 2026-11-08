@@ -5,10 +5,12 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+// Retain semantic-builder/renderer coverage; native replay is tested in root-path-pictures.test.js.
+const legacyProblem = require('../problems/tree')[2096];
 const { SUPPORTED } = require('../problems');
 const { prepareGenericLiveArgs } = require('../live-args');
 
-const problem = SUPPORTED[2096];
+const problem = { ...SUPPORTED[2096], ...legacyProblem };
 
 // BFS level-order parser, matching parseTreeEssentialsInput rather than the
 // index-based variant: "5,1,2,3,null,6,4" must put 6 and 4 under node 2.

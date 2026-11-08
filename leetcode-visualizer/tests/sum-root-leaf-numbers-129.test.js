@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
+// Retain semantic-builder/renderer coverage; native replay is tested in root-path-pictures.test.js.
+const legacyProblem = require('../problems/tree')[129];
 const { SUPPORTED, CATEGORY_ORDER } = require('../problems');
 const { prepareGenericLiveArgs } = require('../live-args');
 
-const problem = SUPPORTED[129];
+const problem = { ...SUPPORTED[129], ...legacyProblem };
 
 function parseCompactTree(values) {
   if (!values.length || values[0] === null) return null;
