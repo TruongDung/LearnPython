@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.fenwickCountView), surface: "treeView", render: (step) => { renderFenwickCountPictures(step); } },
     { predicate: (step) => Boolean(step.stackStudyView), surface: "treeView", render: (step) => { renderStackStudyPictures(step); } },
     { predicate: (step) => Boolean(step.preorderListView), surface: "treeView", render: (step) => { renderPreorderListPictures(step); } },
     { predicate: (step) => Boolean(step.journeyView), surface: "treeView", render: (step) => { renderJourneyPictures(step); } },

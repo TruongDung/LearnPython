@@ -44,6 +44,15 @@ for (const [id, problem] of Object.entries(pictureBatch2026)) {
 }
 
 Object.assign(categories['monotonic-stack'], require('./preorder-list-pictures'), require('./stack-study-pictures'));
+const fenwickPictures = require('./fenwick-count-pictures');
+for (const [id, problem] of Object.entries(fenwickPictures)) {
+  let replaced = false;
+  for (const category of Object.values(categories)) if (Object.hasOwn(category, id)) {
+    category[id] = problem;
+    replaced = true;
+  }
+  if (!replaced) categories.array[id] = problem;
+}
 Object.assign(categories.bst, require('./two-sum-bsts-1214'));
 Object.assign(categories.bst, require('./split-bst-776'));
 Object.assign(categories.greedy, require('./burst-balloons-452'));

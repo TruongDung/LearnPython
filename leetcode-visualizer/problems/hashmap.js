@@ -6282,6 +6282,7 @@ module.exports = {
     id: 303,
     difficulty: "easy",
     slug: "range-sum-query-immutable",
+    tags: [{ key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" }],
     category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
     title: { vi: "Range Sum Query - Immutable", en: "Range Sum Query - Immutable" },
     titleVi: { vi: "Truy vấn tổng đoạn bất biến", en: "Immutable range sum query" },
@@ -6328,7 +6329,10 @@ module.exports = {
     difficulty: "medium",
     slug: "range-sum-query-mutable",
     category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
-    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    tags: [
+      { key: "array", vi: "Mảng", en: "Array" },
+      { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" },
+    ],
     title: { vi: "Range Sum Query - Mutable", en: "Range Sum Query - Mutable" },
     titleVi: { vi: "Một điểm đổi, một đường cập nhật", en: "One value changes, one path updates" },
     statement: {

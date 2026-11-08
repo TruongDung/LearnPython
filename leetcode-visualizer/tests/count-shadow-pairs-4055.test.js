@@ -1,9 +1,8 @@
-const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
+const { readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
-const vm = require('node:vm');
 const problem = require('../problems').SUPPORTED[4055];
 
 function oracle(nums) {
@@ -28,7 +27,7 @@ test('4055 is registered with the official signature and metadata', () => {
   assert.equal(problem.id, 4055);
   assert.equal(problem.slug, 'count-shadow-pairs-ii');
   assert.equal(problem.difficulty, 'hard');
-  assert.equal(problem.debugMode, 'semantic');
+  assert.equal(problem.debugMode, 'line-by-line');
   assert.equal(problem.complexity.time, 'O(n log² n)');
   assert.match(problem.code.join('\n'), /def shadowPairs\(self, nums: List\[int\]\) -> int/);
 });
@@ -63,15 +62,11 @@ test('4055 trace separates split, bounds, Fenwick sweep, and combine line by lin
   const built = problem.builder([3, 1, 4, 2, 5]);
   assert.ok(built.steps.length > 40);
   assert.ok(built.steps.every((step) => step.codeLines.length === 1));
-  const operations = new Set(built.steps.map((step) => step.shadowPairs4055View.operation));
-  for (const operation of ['split', 'upper-bound', 'lower-bound', 'sort-right', 'active-window', 'query-lower', 'add-cross', 'return-segment', 'return-final']) {
-    assert.ok(operations.has(operation), operation);
-  }
-  const rootAdds = built.steps.filter((step) => {
-    const view = step.shadowPairs4055View;
-    return view.operation === 'add-cross' && view.left === 0 && view.right === 4;
-  });
-  assert.equal(rootAdds.reduce((sum, step) => sum + step.shadowPairs4055View.qualifying.length, 0), 2);
+  const views = built.steps.map(s => s.fenwickCountView);
+  for (const phase of ['split','upper','lower','sweep','done']) assert.ok(views.some(v => v.phase === phase));
+  for (const scope of ['solve','add','prefix_sum','kth']) assert.ok(views.some(v => v.scope === scope));
+  const rootAdds = views.filter(v => v.change?.kind === 'count' && v.left === 0 && v.right === 4);
+  assert.equal(rootAdds.reduce((sum,v) => sum + v.qualifying.length, 0), 2);
   assert.equal(built.answer, 5);
 });
 
@@ -95,33 +90,6 @@ test('4055 displayed Python and solution file match brute force', () => {
   const fileSource = fs.readFileSync(solutionPath, 'utf8').split('if __name__ == "__main__":')[0];
   const fileRun = spawnSync('python3', ['-c', `${fileSource}\n${assertions}`], { encoding: 'utf8' });
   assert.equal(fileRun.status, 0, fileRun.stderr);
-});
-
-test('4055 custom renderer handles every phase in both languages', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderShadowPairs4055View(step)');
-  const end = source.indexOf('\nfunction renderStep()', start);
-  const element = {};
-  const context = {
-    lang: 'en',
-    $: () => element,
-    escapeHtml: String,
-    pick: (value) => value?.en ?? value?.vi ?? value ?? '',
-    Set,
-  };
-  vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
-  const built = problem.builder([3, 1, 4, 2, 5]);
-  for (const language of ['en', 'vi']) {
-    context.lang = language;
-    for (const step of built.steps) {
-      context.renderShadowPairs4055View(step);
-      assert.match(element.innerHTML, /spii4055-viz/);
-      assert.match(element.innerHTML, /c\[j\].*nums\[i\].*nums\[j\].*b\[i\]/);
-      assert.match(element.innerHTML, new RegExp(`(?:LINE|DÒNG) ${step.codeLines[0]}`));
-      assert.doesNotMatch(element.innerHTML, /undefined|NaN/);
-    }
-  }
 });
 
 test('4055 validates visualization input and includes responsive styles', () => {

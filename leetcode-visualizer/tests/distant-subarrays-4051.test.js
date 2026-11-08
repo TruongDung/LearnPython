@@ -1,10 +1,8 @@
-const { readFrontendJavaScript, readFrontendStyles } = require('./helpers/frontend-source');
+const { readFrontendStyles } = require('./helpers/frontend-source');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
-const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const problem = require('../problems').SUPPORTED[4051];
 
 function brute(nums, goal, k) {
@@ -23,7 +21,7 @@ test('4051 is registered with the official signature and optimal metadata', () =
   assert.equal(problem.id, 4051);
   assert.equal(problem.slug, 'count-subarrays-with-distant-sums');
   assert.equal(problem.difficulty, 'hard');
-  assert.equal(problem.debugMode, 'semantic');
+  assert.equal(problem.debugMode, 'line-by-line');
   assert.equal(problem.complexity.time, 'O(n log n)');
   assert.match(problem.code.join('\n'), /def distantSubarrays\(self, nums: list\[int\], goal: int, k: int\) -> int/);
 });
@@ -62,7 +60,7 @@ test('4051 handles k = 0 without double-counting overlapping ranges', () => {
   for (const nums of [[5], [1, -1], [2, 0, -2, 4]]) {
     const built = problem.builder(nums, { goal: 999, k: 0 });
     assert.equal(built.answer, nums.length * (nums.length + 1) / 2);
-    assert.deepEqual(built.steps.map((step) => step.distantSubarrays4051View.operation), ['k-check', 'set-n', 'return-all']);
+    assert.deepEqual(built.steps.map(step => step.fenwickCountView.source.text), ['if k == 0:', 'n = len(nums)', 'return n * (n + 1) // 2']);
   }
 });
 
@@ -70,12 +68,11 @@ test('4051 trace debugs one source line at a time and covers both Fenwick ranges
   const built = problem.builder([2, -1, 3], { goal: 2, k: 2 });
   assert.ok(built.steps.every((step) => step.codeLines.length === 1));
   assert.ok(built.steps.every((step) => problem.code[step.codeLines[0] - 1].trim().length > 0));
-  const operations = new Set(built.steps.map((step) => step.distantSubarrays4051View.operation));
-  for (const operation of ['k-check', 'init-prefix', 'prefix-loop', 'append-prefix', 'compress', 'init-bit', 'init-counters', 'scan-prefix', 'low-threshold', 'high-threshold', 'query-left', 'query-right', 'count', 'insert', 'increment-seen', 'return']) {
-    assert.ok(operations.has(operation), operation);
-  }
-  assert.ok(built.steps.some((step) => Number(step.distantSubarrays4051View.leftCount) > 0));
-  assert.ok(built.steps.some((step) => Number(step.distantSubarrays4051View.rightCount) > 0));
+  const views = built.steps.map(s => s.fenwickCountView);
+  assert.ok(views.some(v => v.scope === 'query'));
+  assert.ok(views.some(v => v.scope === 'add' && v.change?.kind === 'write'));
+  assert.ok(views.some(v => v.context.left_count > 0));
+  assert.ok(views.some(v => v.context.right_count > 0));
 });
 
 test('4051 final visual subarray records are exact', () => {
@@ -106,36 +103,6 @@ test('4051 displayed Python, solution file, and live arguments agree', () => {
   const solution = spawnSync('python3', [solutionPath], { encoding: 'utf8' });
   assert.equal(solution.status, 0, solution.stderr);
   assert.deepEqual(problem.liveArgs([2, -1, 3], { goal: 2, k: 2 }), [[2, -1, 3], 2, 2]);
-});
-
-test('4051 custom renderer handles every path in English and Vietnamese', () => {
-  const source = readFrontendJavaScript();
-  const start = source.indexOf('function renderDistantSubarrays4051View(step)');
-  const end = source.indexOf('\nfunction renderRectangleOverlap836View(step)', start);
-  assert.ok(start >= 0 && end > start);
-  const element = {};
-  const context = {
-    lang: 'en',
-    $: () => element,
-    escapeHtml: String,
-    pick: (value) => value?.en ?? value?.vi ?? value ?? '',
-  };
-  vm.createContext(context);
-  vm.runInContext(source.slice(start, end), context);
-  const traces = [
-    ...problem.builder([2, -1, 3], { goal: 2, k: 2 }).steps,
-    ...problem.builder([1, 2], { goal: 10, k: 0 }).steps,
-  ];
-  for (const language of ['en', 'vi']) {
-    context.lang = language;
-    for (const step of traces) {
-      context.renderDistantSubarrays4051View(step);
-      assert.match(element.innerHTML, /ds4051-viz/);
-      assert.match(element.innerHTML, /COMPRESSED COORDINATES|TỌA ĐỘ NÉN/);
-      assert.match(element.innerHTML, new RegExp(`(?:LINE|DÒNG) ${step.codeLines[0]}`));
-      assert.doesNotMatch(element.innerHTML, /undefined|NaN|Infinity/);
-    }
-  }
 });
 
 test('4051 validates visual input and includes responsive scoped styles', () => {
