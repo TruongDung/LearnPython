@@ -76,6 +76,8 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.dllRoadmapView), surface: "treeView", render: (step) => { renderDllRoadmap(step); } },
+    { predicate: (step) => Boolean(step.linkedDesignView), surface: "treeView", render: (step) => { renderLinkedDesign(step); } },
     { predicate: (step) => Boolean(step.serverSchedulingView), surface: "treeView", render: (step) => { renderBusiestServers1606(step); } },
     { predicate: (step) => Boolean(step.maximumTreeView), surface: "treeView", render: (step) => { renderMaximumTree654(step); } },
     { predicate: (step) => Boolean(step.stackJumpGridView), surface: "treeView", render: (step) => { renderStackJumpGrid(step); } },

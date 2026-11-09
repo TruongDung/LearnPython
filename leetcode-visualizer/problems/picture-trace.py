@@ -85,7 +85,20 @@ def picture_trace(payload):
         if isinstance(node, (ast.If, ast.While, ast.For)):
             branches[node.lineno] = {line for stmt in node.body for line in range(stmt.lineno, stmt.end_lineno + 1)}
 
+    allocation_classes = set(payload.get('captureAllocations', []))
+    allocated, allocation_ids = [], {}
+
+    def allocation_ref(value):
+        identity = id(value)
+        if identity not in allocation_ids:
+            allocation_ids[identity] = f'object:{len(allocated)}'
+            # Retain detached nodes so IDs cannot be reused during a replay.
+            allocated.append(value)
+        return {'id': allocation_ids[identity], 'type': type(value).__name__}
+
     def encode(value):
+        if type(value).__name__ in allocation_classes:
+            return allocation_ref(value)
         if isinstance(value, PictureListNode):
             return {'id': value.node_id, 'val': value.val,
                     'next': value.next.node_id if value.next else None}
@@ -140,6 +153,9 @@ def picture_trace(payload):
 
     def tree_state():
         state = {}
+        if allocation_classes:
+            state['objects'] = [dict(allocation_ref(value), fields={name: encode(item)
+                                for name, item in vars(value).items()}) for value in allocated]
         if payload.get('captureTrees'):
             state['trees'] = [{'id': node.node_id, 'val': node.val,
                                'left': node.left.node_id if node.left else None,
@@ -159,6 +175,8 @@ def picture_trace(payload):
             return trace
         if frame.f_code.co_name == payload['method'] and entry is None:
             entry = frame
+        if event == 'call' and type(frame.f_locals.get('self')).__name__ in allocation_classes:
+            allocation_ref(frame.f_locals['self'])
         if event in ('line', 'return'):
             # Ignore repeated line events inside an inlined comprehension.
             if event == 'line' and pending.get(frame) == frame.f_lineno:

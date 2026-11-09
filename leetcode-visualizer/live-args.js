@@ -329,6 +329,7 @@ function designConfig(className, constructorArgs, operations) {
 }
 
 function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
+  if (typeof problem.prepareLiveDesign === "function") return problem.prepareLiveDesign(input, params);
   const words = (value) => String(value).split(",").map((item) => item.trim()).filter(Boolean);
   switch (problem.id) {
     case 2353: {
