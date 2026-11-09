@@ -4,6 +4,12 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-advanced-stack-pictures.js',
+  'renderer-remove-k-digits-402.js',
+  'renderer-circular-next-503.js',
+  'renderer-chunk-partitions.js',
+  'renderer-shortest-unsorted-581.js',
+  'renderer-visible-people-2282.js',
   'renderer-stack-sequences-pictures.js',
   'renderer-stack-boundaries-paths.js',
   'renderer-stack-jump-grid.js',
@@ -219,6 +225,11 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'advanced-stack-pictures.css',
+  'remove-k-digits-402.css',
+  'circular-chunks.css',
+  'shortest-unsorted-581.css',
+  'visible-people-2282.css',
   'stack-sequences-pictures.css',
   'stack-boundaries-paths.css',
   'stack-jump-grid.css',

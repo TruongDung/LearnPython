@@ -76,6 +76,12 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.advancedStackView), surface: "treeView", render: (step) => { renderAdvancedStackPictures(step); } },
+    { predicate: (step) => Boolean(step.removeKDigits402View), surface: "treeView", render: (step) => { renderRemoveKDigits402(step); } },
+    { predicate: (step) => Boolean(step.circularNext503View), surface: "treeView", render: (step) => { renderCircularNext503(step); } },
+    { predicate: (step) => Boolean(step.chunkPartitionsView), surface: "treeView", render: (step) => { renderChunkPartitions(step); } },
+    { predicate: (step) => Boolean(step.shortestUnsorted581View), surface: "treeView", render: (step) => { renderShortestUnsorted581(step); } },
+    { predicate: (step) => Boolean(step.visiblePeople2282View), surface: "treeView", render: (step) => { renderVisiblePeople2282(step); } },
     { predicate: (step) => Boolean(step.dllRoadmapView), surface: "treeView", render: (step) => { renderDllRoadmap(step); } },
     { predicate: (step) => Boolean(step.linkedDesignView), surface: "treeView", render: (step) => { renderLinkedDesign(step); } },
     { predicate: (step) => Boolean(step.serverSchedulingView), surface: "treeView", render: (step) => { renderBusiestServers1606(step); } },
