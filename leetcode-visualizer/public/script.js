@@ -76,6 +76,8 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.maximumTreeView), surface: "treeView", render: (step) => { renderMaximumTree654(step); } },
+    { predicate: (step) => Boolean(step.stackJumpGridView), surface: "treeView", render: (step) => { renderStackJumpGrid(step); } },
     { predicate: (step) => Boolean(step.stackBoundaryView), surface: "treeView", render: (step) => { renderStackBoundariesPaths(step); } },
     { predicate: (step) => Boolean(step.stackSequenceView), surface: "treeView", render: (step) => { renderStackSequences(step); } },
     { predicate: (step) => Boolean(step.fenwickRoadmapView), surface: "treeView", render: (step) => { renderFenwickRoadmap(step); } },

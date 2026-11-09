@@ -6,6 +6,8 @@ const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 const JAVASCRIPT_ASSETS = Object.freeze([
   'renderer-stack-sequences-pictures.js',
   'renderer-stack-boundaries-paths.js',
+  'renderer-stack-jump-grid.js',
+  'renderer-maximum-tree-654.js',
   'renderer-fenwick-roadmap.js',
   'renderer-same-label-1519.js',
   'renderer-fenwick-count-pictures.js',
@@ -216,6 +218,8 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 const STYLESHEET_ASSETS = Object.freeze([
   'stack-sequences-pictures.css',
   'stack-boundaries-paths.css',
+  'stack-jump-grid.css',
+  'maximum-tree-654.css',
   'fenwick-roadmap.css',
   'same-label-1519.css',
   'fenwick-count-pictures.css',
