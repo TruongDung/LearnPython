@@ -69,3 +69,23 @@ test('1606 assets are lazy and its dedicated renderer takes precedence over the 
   for(const asset of ['renderer-busiest-servers-1606.js','busiest-servers-1606.css','tree-replay-pictures.css'])assert.match(html.split('\n').find(line=>line.includes(asset)),/data-problem-ids="[^"]*1606/);
   const script=fs.readFileSync(require.resolve('../public/script.js'),'utf8');assert.ok(script.indexOf('Boolean(step.serverSchedulingView)')<script.indexOf('Boolean(step.serverHeap1606View)'));
 });
+test('reference timeline uses per-request load labels, true time coordinates and server zero at the bottom',()=>{
+  const r=run(),renderer=ui(),html=renderer.render(r.steps.at(-1)),v=view(r.steps.at(-1));
+  assert.match(html,/data-reference-timeline data-time-low="1" data-time-high="8"/);
+  for(let time=1;time<=8;time++)assert.ok(html.includes(`data-time-axis-tick="${time}"`));
+  const rows=[...html.matchAll(/data-timeline-server="(\d+)" x="35" y="([\d.]+)"/g)].map(m=>({id:Number(m[1]),y:Number(m[2])}));
+  assert.ok(rows.find(r=>r.id===0).y>rows.find(r=>r.id===1).y);assert.ok(rows.find(r=>r.id===1).y>rows.find(r=>r.id===2).y);
+  for(const job of v.jobs){assert.ok(html.includes(`data-bs1606-job="${job.index}" data-job-server="${job.server}" data-job-start="${job.start}" data-job-end="${job.end}" data-request-duration="${job.end-job.start}"`));assert.ok(html.includes(`R${job.index}: Load = ${job.end-job.start}`));}
+  assert.equal((html.match(/data-bs1606-job=/g)||[]).length,4);assert.match(html,/data-dropped-request="4" data-drop-start="5" data-drop-end="8" data-request-duration="3"/);assert.match(html,/dropped, never processed|bị bỏ, không được xử lý/);
+});
+test('reference timeline never draws future assignments or drops and its bars navigate to native commit lines',()=>{
+  const r=run(),renderer=ui();for(const s of r.steps){const v=view(s),html=renderer.render(s);assert.equal((html.match(/data-bs1606-job=/g)||[]).length,v.jobs.length);assert.equal((html.match(/data-dropped-request=/g)||[]).length,v.requests.filter(r=>r.state==='dropped').length);
+    assert.ok(html.includes('data-time-high="8"'));for(const job of v.jobs)assert.equal(view(r.steps[job.step]).source.text,'heappush(busy, (time + duration, server))');
+    for(const request of v.requests.filter(r=>r.state==='dropped')){const entry=v.ledger.find(e=>e.kind==='drop'&&e.index===request.index);assert.equal(view(r.steps[entry.step]).source.text,'dropped += 1');assert.ok(html.includes(`data-dropped-request="${request.index}" data-drop-start="${request.time}" data-drop-end="${request.time+request.duration}" data-request-duration="${request.duration}" data-bs1606-step="${entry.step}"`));}
+  }
+});
+test('overlapping dropped demands have separate visual rows and never enter the processed-job lanes',()=>{
+  const r=run(2,[1,2,3,4,5],[10,10,10,10,10]),renderer=ui(),v=view(r.steps.at(-1)),html=renderer.render(r.steps.at(-1));
+  const y=[...html.matchAll(/data-dropped-request="\d+"[\s\S]*?<rect[^>]+ y="([\d.]+)"/g)].map(m=>Number(m[1]));
+  assert.equal(y.length,3);assert.equal(new Set(y).size,3);assert.ok(Math.min(...y)>=0);assert.equal((html.match(/data-bs1606-job=/g)||[]).length,2);assert.deepEqual(v.handled,[1,1]);assert.equal(v.droppedCount,3);
+});
