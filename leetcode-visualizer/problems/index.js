@@ -48,6 +48,7 @@ Object.assign(categories['monotonic-stack'], require('./stack-sequences-pictures
 Object.assign(categories['monotonic-stack'], require('./stack-boundaries-paths'));
 Object.assign(categories['monotonic-stack'], require('./stack-jump-grid-pictures'));
 Object.assign(categories['monotonic-stack'], require('./maximum-binary-tree-654'));
+Object.assign(categories.heap, require('./busiest-servers-1606'));
 Object.assign(categories.array, require('./fenwick-roadmap-lessons'));
 const fenwickPictures = require('./fenwick-count-pictures');
 for (const [id, problem] of Object.entries(fenwickPictures)) {
