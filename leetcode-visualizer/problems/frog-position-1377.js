@@ -58,6 +58,108 @@ function parse(input, params = {}) {
 }
 function payload(input, params) { const c = parse(input, params); return { code: CODE, method: 'frogPosition', args: [c.n, c.edges, c.t, c.target] }; }
 
+function explainStep(view, final) {
+  const { current, elapsed, change, children = [], arrivals, decision, share, shareDenominator, flow, t, target } = view;
+  const probability = current === null ? null : arrivals[current]?.probability ?? null;
+  const fraction = (value, denominator) => denominator ? `${Math.round(value * denominator)}/${denominator}` : `${value}`;
+  if (final) {
+    if (view.reason === 'leaf-stay') {
+      return {
+        title: bi(`Ếch đứng yên ở lá ${target}`, `Frog stays at leaf ${target}`),
+        note: bi(`Ếch đến lá ở giây ${elapsed} và không còn đỉnh con để nhảy. Xác suất ${fraction(view.result, view.resultDenominator)} được giữ nguyên đến giây ${t}.`,
+          `The frog reached this leaf at second ${elapsed} and has nowhere else to jump. Its ${fraction(view.result, view.resultDenominator)} probability stays unchanged through second ${t}.`),
+      };
+    }
+    if (view.reason === 'at-time') {
+      return {
+        title: bi(`Đã đến giây ${t} tại đỉnh ${target}`, `Reached second ${t} at node ${target}`),
+        note: bi(`Vừa đủ ${t} lần nhảy để đến target. Xác suất cần tìm là ${fraction(view.result, view.resultDenominator)}.`,
+          `The frog reaches the target in exactly ${t} jumps. Its probability is ${fraction(view.result, view.resultDenominator)}.`),
+      };
+    }
+    const reached = arrivals[target];
+    return {
+      title: bi('Kết thúc tìm kiếm', 'Search complete'),
+      note: reached
+        ? bi(`Ếch đã đến đỉnh ${target} ở giây ${reached.elapsed}, nhưng đỉnh này còn đường đi xuống nên phải nhảy tiếp. Vì thế sau ${t} giây, xác suất tại đây bằng 0.`,
+          `The frog reached node ${target} at second ${reached.elapsed}, but it still has children and must keep moving. Its probability there after ${t} seconds is 0.`)
+        : bi(`Không thể đến đỉnh ${target} trong ${t} giây; xác suất tại target bằng 0.`,
+          `Node ${target} cannot be reached in ${t} seconds, so its probability is 0.`),
+    };
+  }
+  if (change?.kind === 'seed') {
+    return {
+      title: bi('Bắt đầu: ếch ở đỉnh 1', 'Start: frog is at node 1'),
+      note: bi('Chưa nhảy lần nào, nên toàn bộ xác suất nằm ở đỉnh 1: P = 1.',
+        'No jumps have happened yet, so all probability is at node 1: P = 1.'),
+    };
+  }
+  if (change?.kind === 'pop') {
+    return {
+      title: bi(`Xét đỉnh ${current} ở giây ${elapsed}`, `Process node ${current} at second ${elapsed}`),
+      note: bi(`Lấy trạng thái này khỏi hàng đợi BFS. Xác suất để ếch ở đây là ${fraction(probability, arrivals[current]?.denominator)}.`,
+        `Remove this state from the BFS queue. The probability of the frog being here is ${fraction(probability, arrivals[current]?.denominator)}.`),
+    };
+  }
+  if (change?.kind === 'choices') {
+    const list = children.length ? children.join(', ') : 'không có';
+    return {
+      title: bi(`Tìm các đỉnh có thể nhảy từ ${current}`, `Find available jumps from ${current}`),
+      note: bi(`Bỏ qua đỉnh cha ${view.parent || '∅'} để không quay lại. Các lựa chọn: ${list}.`,
+        `Exclude parent ${view.parent || '∅'} to prevent jumping backward. Available children: ${list}.`),
+    };
+  }
+  if (change?.kind === 'decision') {
+    const terminal = decision?.atTime
+      ? bi(`Đã hết ${t} giây`, `The ${t} seconds are up`)
+      : bi(`Đỉnh ${current} là lá`, `Node ${current} is a leaf`);
+    const note = decision?.terminal
+      ? bi(`${terminal.vi}; nhánh này dừng lại${decision.atTime ? '.' : ' và ếch sẽ đứng yên ở lá.'}`,
+        `${terminal.en}; stop this branch${decision.atTime ? '.' : ' and let the frog stay at the leaf.'}`)
+      : bi(`Chưa hết thời gian và còn đỉnh con. Tiếp tục chia xác suất cho ${children.length} lựa chọn.`,
+        `Time remains and children are available. Split the probability across ${children.length} choices.`);
+    return { title: bi('Kiểm tra điều kiện dừng', 'Check the stopping condition'), note };
+  }
+  if (change?.kind === 'split') {
+    return {
+      title: bi(`Chia xác suất tại đỉnh ${current}`, `Split probability at node ${current}`),
+      note: bi(`${fraction(probability, arrivals[current]?.denominator)} ÷ ${children.length} đỉnh con = ${fraction(share, shareDenominator)} cho mỗi nhánh.`,
+        `${fraction(probability, arrivals[current]?.denominator)} ÷ ${children.length} children = ${fraction(share, shareDenominator)} for each branch.`),
+    };
+  }
+  if (change?.kind === 'enqueue' && flow) {
+    return {
+      title: bi(`Nhảy ${flow.from} → ${flow.to}`, `Jump ${flow.from} → ${flow.to}`),
+      note: bi(`Đưa trạng thái (đỉnh ${flow.to}, giây ${elapsed}, xác suất ${fraction(flow.probability, flow.denominator)}) vào cuối hàng đợi BFS.`,
+        `Append (node ${flow.to}, second ${elapsed}, probability ${fraction(flow.probability, flow.denominator)}) to the BFS queue.`),
+    };
+  }
+  if (current !== null && view.source.line === 10) {
+    return {
+      title: bi('Lấy trạng thái tiếp theo trong BFS', 'Take the next BFS state'),
+      note: bi(`Hàng đợi còn ${view.locals.queue?.length ?? 0} trạng thái. BFS xử lý lần lượt từng nhánh xác suất.`,
+        `There are ${view.locals.queue?.length ?? 0} states left in the queue. BFS processes each probability branch in turn.`),
+    };
+  }
+  if (view.source.line === 18) {
+    return {
+      title: bi('Duyệt từng lựa chọn', 'Visit each available choice'),
+      note: bi(`Mỗi đỉnh con của ${current} tạo một trạng thái mới với cùng phần xác suất được chia đều.`,
+        `Each child of ${current} gets a new state with the same evenly divided share.`),
+    };
+  }
+  return {
+    title: current === null
+      ? bi('Tạo danh sách kề từ các cạnh', 'Build the adjacency list from edges')
+      : bi(`Tiếp tục xử lý đỉnh ${current}`, `Continue processing node ${current}`),
+    note: current === null
+      ? bi('Đồ thị là cây vô hướng. Danh sách kề giúp tìm các đỉnh có thể đến từ mỗi đỉnh.',
+        'The graph is an undirected tree. The adjacency list records which nodes can be reached from each node.')
+      : bi('Xác suất đi theo từng nhánh được giữ riêng trong hàng đợi BFS.',
+        'The probability for each path is kept as a separate state in the BFS queue.'),
+  };
+}
+
 function build(input, params) {
   const config = parse(input, params), code = CODE.split('\n');
   const native = runTrace({ code: CODE, method: 'frogPosition', args: [config.n, config.edges, config.t, config.target] });
@@ -104,8 +206,9 @@ function build(input, params) {
       scope: event.scope, branch: event.branch, returning: event.returning, returned: event.returned,
       trace: native.trace, reason, result: final ? native.answer : null,
       resultDenominator: final && native.answer > 0 ? arrivals[config.target].denominator : null };
+    const narration = explainStep(v, final);
     return { arr: [], codeBlock: 1, codeLines: [event.line], final,
-      title: bi(`L${event.line} · ${text}`, `L${event.line} · ${text}`), note: bi('', ''),
+      title: narration.title, note: narration.note,
       vars: Object.entries(x).map(([name, value]) => ({ name, value, rawValue: value })), frog1377View: v };
   });
   // Navigation can target a later recorded statement; it does not expose future probability state.

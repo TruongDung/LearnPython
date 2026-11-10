@@ -103,6 +103,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.scheduler2365View), surface: "treeView", render: (step) => {
       renderScheduler2365View(step);
     } },
+    { predicate: (step) => Boolean(step.frog1377View), surface: "treeView", render: (step) => {
+      renderFrog1377View(step);
+    } },
     { predicate: (step) => Boolean(step.merchant9009View), surface: "treeView", render: (step) => {
       renderNearby9009View(step);
     } },
