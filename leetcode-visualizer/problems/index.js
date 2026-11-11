@@ -115,6 +115,7 @@ Object.assign(categories.graph, require('./network-delay-time-743'));
 Object.assign(categories.graph, require('./maximum-probability-1514'));
 Object.assign(categories.graph, require('./minimum-weighted-subgraph-2203'));
 Object.assign(categories.dp, require('./equal-subarrays-3505'));
+Object.assign(categories.math, require('./minimum-cost-required-items-3789'));
 Object.assign(categories.graph, require('./time-room-pictures'), require('./shortest-graph-pictures'));
 Object.assign(categories.graph, require('./frog-position-1377'));
 Object.assign(categories.graph, require('./same-label-subtrees-1519'));
