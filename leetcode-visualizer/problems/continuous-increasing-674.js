@@ -1,4 +1,4 @@
-// LeetCode 674: Longest Continuous Increasing Subsequence — one pass, picture-first.
+// LeetCode 674: longest increasing window, tracked by left and right pointers.
 
 const label = (vi, en) => ({ vi, en });
 const MAX_STEPS = 400;
@@ -7,167 +7,212 @@ function buildSteps674(input) {
   const nums = Array.isArray(input)
     ? [...input]
     : String(input ?? "").split(/[\s,;]+/).filter(Boolean).map(Number);
-  if (nums.length > 10000 || nums.some((v) => !Number.isInteger(v))) {
+  if (nums.length > 10000 || nums.some((value) => !Number.isInteger(value))) {
     throw new Error("nums must contain at most 10000 integers");
   }
+
   const n = nums.length;
   const steps = [];
-  const runEnds = Array(n).fill(null); // run length ending at each index (null = not scanned yet)
-  let best = 0;
-  let cur = 0;
-  let bestStart = 0;
-  let curStart = 0;
+  let left = 0;
+  let right = null;
+  let maxLen = n ? 1 : 0;
+  let bestStart = n ? 0 : null;
+  let windowStart = n ? 0 : null;
+  let windowEnd = n ? 0 : null;
+  let scannedThrough = n ? 0 : -1;
 
-  const range = (a, b) => {
-    const out = [];
-    for (let k = a; k <= b && k < n; k += 1) out.push(k);
-    return out;
+  const range = (start, end) => {
+    if (start === null || end === null || end < start) return [];
+    return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
   };
-  const bestRange = () => (best > 0 ? range(bestStart, bestStart + best - 1) : []);
+  const bestRange = () => range(bestStart, bestStart === null ? null : bestStart + maxLen - 1);
 
-  function record(title, note, codeLine, opts = {}) {
-    if (steps.length >= MAX_STEPS && !opts.final) return;
+  function record(title, note, codeLine, options = {}) {
+    if (steps.length >= MAX_STEPS && !options.final) return;
+    const currentLeft = options.left ?? left;
+    const currentRight = options.right === undefined ? right : options.right;
+    const currentStart = Object.hasOwn(options, "windowStart") ? options.windowStart : windowStart;
+    const currentEnd = Object.hasOwn(options, "windowEnd") ? options.windowEnd : windowEnd;
+    const bestEnd = bestStart === null ? null : bestStart + maxLen - 1;
+    const cur = currentStart === null || currentEnd === null ? 0 : currentEnd - currentStart + 1;
+    const increasing = options.increasing ?? null;
+    const view = {
+      action: options.action || "scan",
+      n,
+      index: currentRight,
+      left: currentLeft,
+      right: currentRight,
+      previousIndex: currentRight === null || currentRight <= 0 ? null : currentRight - 1,
+      previousValue: currentRight === null || currentRight <= 0 ? null : nums[currentRight - 1],
+      value: currentRight === null ? null : nums[currentRight],
+      increasing,
+      runStart: currentStart,
+      runEnd: currentEnd,
+      cur,
+      best: maxLen,
+      bestStart,
+      bestEnd,
+      improved: Boolean(options.improved),
+      scannedThrough: options.scannedThrough ?? scannedThrough,
+      maxLen,
+      final: Boolean(options.final),
+    };
     steps.push({
       title,
       note,
       arr: [...nums],
-      highlight: opts.highlight || [],
-      mark: opts.mark || [],
-      sub: runEnds.map((v) => (v === null ? "" : v)),
+      highlight: options.highlight || [],
+      mark: bestRange(),
+      sub: [],
       codeLines: [codeLine],
-      vars: opts.vars || [],
-      final: !!opts.final,
-      continuous674View: {
-        action: opts.action || "scan",
-        n,
-        index: opts.index ?? null,
-        previousIndex: opts.index === undefined || opts.index <= 0 ? null : opts.index - 1,
-        previousValue: opts.index > 0 ? nums[opts.index - 1] : null,
-        value: opts.index === undefined ? null : nums[opts.index],
-        increasing: opts.increasing ?? null,
-        runStart: opts.runStart ?? (cur > 0 ? curStart : null),
-        runEnd: opts.runEnd ?? (cur > 0 ? curStart + cur - 1 : null),
-        cur: opts.cur ?? cur,
-        best,
-        bestStart: best > 0 ? bestStart : null,
-        bestEnd: best > 0 ? bestStart + best - 1 : null,
-        improved: opts.improved ?? false,
-        scannedThrough: opts.scannedThrough ?? -1,
-        final: !!opts.final,
-      },
+      vars: options.vars || [],
+      final: Boolean(options.final),
+      continuous674View: view,
     });
   }
 
   if (n === 0) {
     record(
-      label("nums rỗng → return 0", "nums is empty → return 0"),
-      label("Không có phần tử nào.", "There are no elements."),
+      label("return 0", "return 0"),
+      label("Mảng rỗng.", "Empty input."),
       4,
-      { final: true, action: "done", scannedThrough: -1, vars: [{ name: "answer", value: 0 }] },
+      {
+        action: "done",
+        left: null,
+        windowStart: null,
+        windowEnd: null,
+        scannedThrough: -1,
+        final: true,
+        vars: [{ name: "answer", value: 0 }],
+      },
     );
     return { original: nums, answer: 0, steps };
   }
-  record(
-    label(`len(nums) = ${n} > 0`, `len(nums) = ${n} > 0`),
-    label("Mảng không rỗng, bắt đầu quét.", "The array is non-empty; start scanning."),
-    3,
-    { action: "scan", scannedThrough: -1, vars: [{ name: "n", value: n }] },
-  );
 
-  best = 1;
-  cur = 1;
-  bestStart = 0;
-  curStart = 0;
-  runEnds[0] = 1;
   record(
-    label("best = cur = 1", "best = cur = 1"),
-    label("Phần tử đầu tiên tự nó là đoạn tăng dài 1.", "The first element alone is a run of length 1."),
-    5,
+    label("left = 0 · max_len = 1", "left = 0 · max_len = 1"),
+    label("Bắt đầu từ phần tử đầu tiên.", "Start at the first value."),
+    7,
     {
-      action: "seed", index: 0, runStart: 0, runEnd: 0, cur: 1, scannedThrough: 0,
-      highlight: [0], mark: [0], vars: [{ name: "best", value: 1 }, { name: "cur", value: 1 }],
+      action: "seed",
+      left: 0,
+      right: 0,
+      windowStart: 0,
+      windowEnd: 0,
+      scannedThrough: 0,
+      highlight: [0],
+      vars: [{ name: "left", value: 0 }, { name: "max_len", value: 1 }],
     },
   );
 
-  for (let i = 1; i < n; i += 1) {
-    const grows = nums[i] > nums[i - 1];
+  for (let index = 1; index < n; index += 1) {
+    right = index;
+    const grows = nums[right] > nums[right - 1];
     record(
-      label(`${nums[i]} > ${nums[i - 1]}? ${grows ? "✓" : "✗"}`, `${nums[i]} > ${nums[i - 1]}? ${grows ? "✓" : "✗"}`),
-      grows
-        ? label("Tăng nghiêm ngặt → đoạn hiện tại dài thêm.", "Strictly increasing → the current run grows.")
-        : label("Không tăng → đoạn hiện tại đứt tại đây.", "Not increasing → the current run breaks here."),
-      7,
+      label(`${nums[right - 1]} ${grows ? "<" : "≥"} ${nums[right]}`, `${nums[right - 1]} ${grows ? "<" : "≥"} ${nums[right]}`),
+      label(grows ? "✓" : "↻"),
+      10,
       {
         action: "compare",
-        index: i,
+        left,
+        right,
         increasing: grows,
-        runStart: curStart,
-        runEnd: i - 1,
-        cur,
-        scannedThrough: i - 1,
-        highlight: [i - 1, i],
-        mark: bestRange(),
-        vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }],
+        windowStart: left,
+        windowEnd: right - 1,
+        scannedThrough: right - 1,
+        highlight: [right - 1, right],
+        vars: [{ name: "left", value: left }, { name: "right", value: right }],
       },
     );
-    if (grows) {
-      cur += 1;
-      runEnds[i] = cur;
+
+    if (!grows) {
+      left = right;
+      windowStart = left;
+      windowEnd = right;
+      scannedThrough = right;
       record(
-        label(`cur += 1 → ${cur}`, `cur += 1 → ${cur}`),
-        label("Nối nums[i] vào đoạn đang chạy.", "Append nums[i] to the running segment."),
-        8,
+        label(`left = right = ${right}`, `left = right = ${right}`),
+        label("Tạo cửa sổ mới tại right.", "Restart the window at right."),
+        11,
         {
-          action: "extend", index: i, increasing: true, runStart: curStart, runEnd: i,
-          cur, scannedThrough: i, highlight: range(curStart, i), mark: bestRange(),
-          vars: [{ name: "cur", value: cur }],
+          action: "reset",
+          left,
+          right,
+          increasing: false,
+          windowStart: left,
+          windowEnd: right,
+          highlight: [right],
+          vars: [{ name: "left", value: left }],
         },
       );
     } else {
-      cur = 1;
-      curStart = i;
-      runEnds[i] = 1;
+      windowStart = left;
+      windowEnd = right;
+      scannedThrough = right;
       record(
-        label("cur = 1", "cur = 1"),
-        label("Bắt đầu đoạn tăng mới tại nums[i].", "Start a new increasing run at nums[i]."),
+        label(`right = ${right}`, `right = ${right}`),
+        label("Số mới nối dài đoạn tăng.", "The new value extends the window."),
         10,
         {
-          action: "reset", index: i, increasing: false, runStart: i, runEnd: i,
-          cur: 1, scannedThrough: i, highlight: [i], mark: bestRange(),
-          vars: [{ name: "cur", value: 1 }],
+          action: "extend",
+          left,
+          right,
+          increasing: true,
+          windowStart: left,
+          windowEnd: right,
+          highlight: range(left, right),
+          vars: [{ name: "left", value: left }, { name: "right", value: right }],
         },
       );
     }
-    const improved = cur > best;
+
+    const windowLength = right - left + 1;
+    const improved = windowLength > maxLen;
     if (improved) {
-      best = cur;
-      bestStart = curStart;
+      maxLen = windowLength;
+      bestStart = left;
     }
     record(
-      label(`best = max(best, cur) = ${best}`, `best = max(best, cur) = ${best}`),
-      improved
-        ? label("Phá kỷ lục → đoạn xanh là đoạn tốt nhất mới.", "New record → the green segment is the new best.")
-        : label("Chưa phá kỷ lục; đoạn xanh vẫn tốt nhất.", "No record; the green segment stays the best."),
-      11,
+      label(`max_len = ${maxLen}`, `max_len = ${maxLen}`),
+      label(improved ? "★" : "·"),
+      12,
       {
-        action: "best", index: i, increasing: grows, runStart: curStart, runEnd: i,
-        cur, improved, scannedThrough: i, highlight: range(curStart, i), mark: bestRange(),
-        vars: [{ name: "best", value: best }, { name: "cur", value: cur }],
+        action: "best",
+        left,
+        right,
+        increasing: grows,
+        windowStart: left,
+        windowEnd: right,
+        improved,
+        scannedThrough: right,
+        highlight: range(left, right),
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "max_len", value: maxLen },
+        ],
       },
     );
   }
 
   record(
-    label(`Đáp án: ${best}`, `Answer: ${best}`),
-    label(`Đoạn tăng liên tục dài nhất có ${best} phần tử (tô xanh).`, `The longest continuous increasing run has ${best} element(s) (green).`),
-    12,
+    label(`return ${maxLen}`, `return ${maxLen}`),
+    label("★", "★"),
+    14,
     {
-      final: true, action: "done", runStart: bestStart, runEnd: bestStart + best - 1,
-      cur, scannedThrough: n - 1, mark: bestRange(), vars: [{ name: "answer", value: best }],
+      action: "done",
+      left,
+      right: n - 1,
+      windowStart: left,
+      windowEnd: n - 1,
+      scannedThrough: n - 1,
+      highlight: bestRange(),
+      final: true,
+      vars: [{ name: "answer", value: maxLen }],
     },
   );
 
-  return { original: nums, answer: best, steps };
+  return { original: nums, answer: maxLen, steps };
 }
 
 module.exports = {
@@ -176,41 +221,41 @@ module.exports = {
     difficulty: "easy",
     slug: "longest-continuous-increasing-subsequence",
     category: { key: "array", vi: "Mảng", en: "Array" },
-    tags: [
-      { key: "array", vi: "Mảng", en: "Array" },
-    ],
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
     title: label("Longest Continuous Increasing Subsequence", "Longest Continuous Increasing Subsequence"),
-    titleVi: label("Dãy con tăng liên tục dài nhất", "Longest continuous increasing subsequence"),
+    titleVi: label("Đoạn tăng liên tục dài nhất", "Longest Continuous Increasing Subsequence"),
     statement: label(
-      "Tìm độ dài dãy con liên tục tăng nghiêm ngặt dài nhất.",
-      "Find the length of the longest continuous strictly increasing subsequence.",
+      "Tìm độ dài đoạn con liên tục tăng nghiêm ngặt dài nhất.",
+      "Find the length of the longest contiguous strictly increasing subarray.",
     ),
     defaultInput: [1, 3, 5, 4, 7],
     inputKind: "integer",
     inputLabel: label("nums", "nums"),
     approach: [
-      label("Quét một lần: cur là độ dài đoạn tăng đang chạy, best là kỷ lục.", "One pass: cur is the running segment length, best is the record."),
-      label("nums[i] > nums[i-1] thì cur += 1, ngược lại cur = 1.", "If nums[i] > nums[i-1] then cur += 1, else cur = 1."),
-      label("Sau mỗi bước, best = max(best, cur).", "After each step, best = max(best, cur)."),
+      label("right quét mảng, left đánh dấu đầu đoạn hiện tại.", "right scans the array; left marks the current run's start."),
+      label("Nếu nums[right] ≤ nums[right−1], đặt left = right.", "If nums[right] ≤ nums[right−1], set left = right."),
+      label("Độ dài đoạn hiện tại là right − left + 1.", "The window length is right − left + 1."),
     ],
     complexity: {
       time: "O(n)",
       space: "O(1)",
-      note: label("Chỉ giữ hai biến cur và best.", "Only two variables, cur and best, are kept."),
+      note: label("Պահվում են միայն left, right և max_len։", "Only left, right, and max_len are kept."),
     },
     code: [
       "class Solution:",
-      "    def findLengthOfLCIS(self, nums):",
+      "    def findLengthOfLCIS(self, nums: list[int]) -> int:",
       "        if not nums:",
       "            return 0",
-      "        best = cur = 1",
-      "        for i in range(1, len(nums)):",
-      "            if nums[i] > nums[i - 1]:",
-      "                cur += 1",
-      "            else:",
-      "                cur = 1",
-      "            best = max(best, cur)",
-      "        return best",
+      "",
+      "        left = 0",
+      "        max_len = 1",
+      "",
+      "        for right in range(1, len(nums)):",
+      "            if nums[right] <= nums[right - 1]:",
+      "                left = right",
+      "            max_len = max(max_len, right - left + 1)",
+      "",
+      "        return max_len",
     ],
     builder: buildSteps674,
   },

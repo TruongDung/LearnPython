@@ -16,7 +16,11 @@
 .ci674-progress > span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: color-mix(in srgb, var(--ci-run) 58%, transparent); }
 .ci674-progress > i { position: absolute; top: -3px; width: 3px; height: 11px; border-radius: 3px; background: var(--ci-current); }
 .ci674-array { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; padding: 3px 2px 5px; scrollbar-width: thin; }
-.ci674-cell { display: grid; flex: 0 0 42px; gap: 2px; min-height: 55px; justify-items: center; align-content: center; border: 1px solid var(--ci-border); border-radius: 7px; background: color-mix(in srgb, var(--ci-bg) 80%, var(--ci-border)); }
+.ci674-cell { display: grid; flex: 0 0 42px; gap: 2px; min-height: 62px; justify-items: center; align-content: center; border: 1px solid var(--ci-border); border-radius: 7px; background: color-mix(in srgb, var(--ci-bg) 80%, var(--ci-border)); }
+.ci674-pointers { display: flex; justify-content: center; gap: 2px; min-height: 11px; }
+.ci674-pointers > i { display: grid; min-width: 13px; height: 11px; place-items: center; border-radius: 3px; font: 800 8px ui-monospace, monospace; font-style: normal; }
+.ci674-pointers > .left-pointer { background: color-mix(in srgb, var(--ci-run) 18%, var(--ci-bg)); color: var(--ci-run); }
+.ci674-pointers > .right-pointer { background: color-mix(in srgb, var(--ci-current) 18%, var(--ci-bg)); color: var(--ci-current); }
 .ci674-cell > small, .ci674-cell > span { color: var(--ci-muted); font: 9px ui-monospace, monospace; }
 .ci674-cell > b { font: 700 15px ui-monospace, monospace; }
 .ci674-cell.active-run { border-color: var(--ci-run); background: color-mix(in srgb, var(--ci-run) 15%, var(--ci-bg)); }

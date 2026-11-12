@@ -32,6 +32,7 @@ function renderContinuousIncreasing674(step) {
       future ? 'future-value' : '',
     ].filter(Boolean).join(' ');
     cells.push(`<div class="${classes}" aria-label="${t('Chỉ số','Index')} ${index}: ${esc(nums[index])}">
+      <div class="ci674-pointers">${index === view.left ? '<i class="left-pointer">L</i>' : ''}${index === view.right ? '<i class="right-pointer">R</i>' : ''}</div>
       <small>${index}</small><b>${esc(nums[index])}</b>
       <span>${step.sub?.[index] || '·'}</span>
     </div>`);

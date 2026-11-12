@@ -24,26 +24,26 @@ test('674 matches the LeetCode examples', () => {
   assert.equal(problem.builder([]).answer, 0);
 });
 
-test('674 trace is line-by-line and picture-first (bars, run highlight, best mark)', () => {
+test('674 trace follows the left/right sliding-window snippet', () => {
   const { steps, answer } = problem.builder([1, 3, 5, 4, 7]);
   assert.equal(answer, 3);
   assert.equal(steps.at(-1).final, true);
-  // displayed code has 12 lines; every step points at exactly one valid line
+  // displayed code has 14 lines; every step points at exactly one valid line
   for (const s of steps) {
     assert.equal(s.codeLines.length, 1);
-    assert.ok(s.codeLines[0] >= 1 && s.codeLines[0] <= 12, `bad code line ${s.codeLines}`);
+    assert.ok(s.codeLines[0] >= 1 && s.codeLines[0] <= 14, `bad code line ${s.codeLines}`);
     assert.deepEqual(s.arr, [1, 3, 5, 4, 7]);
-    assert.equal(s.sub.length, 5);
+    assert.ok(s.continuous674View);
   }
-  // run lengths under the bars tell the story: 1,2,3 then break to 1,2
-  assert.deepEqual(steps.at(-1).sub, [1, 2, 3, 1, 2]);
-  // final step marks the best run [0..2] in green
+  assert.deepEqual(steps.at(-1).continuous674View.left, 3);
+  assert.equal(steps.at(-1).continuous674View.right, 4);
+  // final step marks the best window [0..2] in green
   assert.deepEqual(steps.at(-1).mark, [0, 1, 2]);
-  // a grow step (code line 8) highlights the whole current run
-  const grow = steps.find((s) => s.codeLines[0] === 8);
+  const grow = steps.find((s) => s.continuous674View.action === 'extend');
   assert.ok(grow.highlight.length >= 2);
-  // a break step (code line 10) exists after the 5 > 4 drop
-  assert.ok(steps.some((s) => s.codeLines[0] === 10));
+  assert.equal(grow.codeLines[0], 10);
+  const reset = steps.find((s) => s.continuous674View.action === 'reset');
+  assert.equal(reset.codeLines[0], 11);
 });
 
 test('674 records the comparison, active run, and best range at every meaningful step', () => {
@@ -57,6 +57,7 @@ test('674 records the comparison, active run, and best range at every meaningful
   const reset = steps.find(step => step.continuous674View.action === 'reset');
   assert.deepEqual([reset.continuous674View.runStart, reset.continuous674View.runEnd], [3, 3]);
   assert.equal(reset.continuous674View.cur, 1);
+  assert.deepEqual([reset.continuous674View.left, reset.continuous674View.right], [3, 3]);
 
   const record = steps.find(step => step.continuous674View.action === 'best' && step.continuous674View.index === 2);
   assert.equal(record.continuous674View.improved, true);
@@ -89,6 +90,8 @@ test('674 renderer explains breaks and shows the final best run in Vietnamese an
   assert.match(host.innerHTML, /↘/);
   assert.match(host.innerHTML, /restart/);
   assert.match(host.innerHTML, /class="ci674-edge edge-break"/);
+  assert.match(host.innerHTML, /class="left-pointer">L/);
+  assert.match(host.innerHTML, /class="right-pointer">R/);
   assert.match(host.innerHTML, /class="ci674-runs"/);
   assert.doesNotMatch(host.innerHTML, /previous run ends because/);
 
@@ -124,8 +127,8 @@ test('674 renderer bounds long-array detail and its assets are wired for lazy lo
     context,
   );
   context.renderContinuousIncreasing674(run.steps.at(-1));
-  assert.match(host.innerHTML, /hidden/);
-  assert.ok((host.innerHTML.match(/class="ci674-cell/g) || []).length <= 28);
+  assert.match(host.innerHTML, /ci674-gap/);
+  assert.ok((host.innerHTML.match(/class="ci674-cell/g) || []).length <= 20);
 
   const html = readFrontendIndex();
   assert.match(html, /continuous-increasing-674\.css[^\n]*data-problem-ids="674"/);
