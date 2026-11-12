@@ -41,11 +41,11 @@ function buildSteps3105(input) {
       highlight: options.highlight || [],
       mark: bestStart === null ? [] : range(bestStart, bestEnd),
       sub: [],
-      codeLines: [line],
+      codeLines: options.codeLines || [line],
       vars: [
-        { name: "increasing", value: options.increasing ?? increasing },
-        { name: "decreasing", value: options.decreasing ?? decreasing },
-        { name: "best", value: best },
+        { name: "inc", value: options.increasing ?? increasing },
+        { name: "dec", value: options.decreasing ?? decreasing },
+        { name: "ans", value: best },
       ],
       final: Boolean(options.final),
       monotonic3105View: {
@@ -106,6 +106,7 @@ function buildSteps3105(input) {
         decreasingStart,
         increasing,
         decreasing,
+        codeLines: [7, 8],
         scannedThrough: i - 1,
         currentEnd: i - 1,
         highlight: [i - 1, i],
@@ -113,23 +114,13 @@ function buildSteps3105(input) {
         titleEn: "Compare adjacent values",
       });
 
-    if (relation === "up") {
-      increasing += 1;
-      decreasing = 1;
-      decreasingStart = i;
-    } else if (relation === "down") {
-      decreasing += 1;
-      increasing = 1;
-      increasingStart = i;
-    } else {
-      increasing = 1;
-      decreasing = 1;
-      increasingStart = i;
-      decreasingStart = i;
-    }
+    increasing = relation === "up" ? increasing + 1 : 1;
+    decreasing = relation === "down" ? decreasing + 1 : 1;
+    if (relation !== "up") increasingStart = i;
+    if (relation !== "down") decreasingStart = i;
     scannedThrough = i;
 
-    record("update", relation === "up" ? 8 : relation === "down" ? 10 : 12,
+    record("update", relation === "up" ? 7 : 8,
       relation === "up"
         ? label("Tăng: tăng độ dài increasing; giảm bắt đầu lại từ 1.", "Up: extend increasing; reset decreasing to 1.")
         : relation === "down"
@@ -138,6 +129,7 @@ function buildSteps3105(input) {
       {
         index: i,
         relation,
+        codeLines: [7, 8],
         increasingStart,
         decreasingStart,
         currentEnd: i,
@@ -159,13 +151,14 @@ function buildSteps3105(input) {
       bestDirection = "down";
       improved = true;
     }
-    record("best", 13,
+    record("best", 9,
       improved
         ? label(`Kỷ lục mới: đoạn ${bestDirection === "up" ? "tăng" : "giảm"} dài ${best}.`, `New record: the ${bestDirection === "up" ? "increasing" : "decreasing"} run has length ${best}.`)
         : label("Chưa có đoạn nào dài hơn kỷ lục hiện tại.", "Neither run is longer than the current record."),
       {
         index: i,
         relation,
+        codeLines: [9],
         increasingStart,
         decreasingStart,
         currentEnd: i,
@@ -176,7 +169,7 @@ function buildSteps3105(input) {
       });
   }
 
-  record("done", 14,
+  record("done", 10,
     label(`Độ dài lớn nhất là ${best}.`, `The longest length is ${best}.`),
     {
       final: true,
@@ -223,18 +216,12 @@ module.exports = {
       "    def longestMonotonicSubarray(self, nums):",
       "        if not nums:",
       "            return 0",
-      "        increasing = decreasing = best = 1",
+      "        inc = dec = ans = 1",
       "        for i in range(1, len(nums)):",
-      "            if nums[i] > nums[i - 1]:",
-      "                increasing += 1",
-      "                decreasing = 1",
-      "            elif nums[i] < nums[i - 1]:",
-      "                decreasing += 1",
-      "                increasing = 1",
-      "            else:",
-      "                increasing = decreasing = 1",
-      "            best = max(best, increasing, decreasing)",
-      "        return best",
+      "            inc = (inc + 1) if nums[i] > nums[i - 1] else 1",
+      "            dec = (dec + 1) if nums[i] < nums[i - 1] else 1",
+      "            ans = max(ans, inc, dec)",
+      "        return ans",
     ],
     builder: buildSteps3105,
   },

@@ -58,7 +58,21 @@ test('3105 trace labels rising, falling, and equal comparisons and resets the ri
   assert.equal(answer.best, 2);
   assert.equal(answer.bestDirection, 'up');
   assert.deepEqual([answer.bestStart, answer.bestEnd], [0, 1]);
-  assert.ok(steps.every(step => step.codeLines.length === 1 && step.codeLines[0] >= 1 && step.codeLines[0] <= 16));
+  assert.deepEqual(steps.find(step => step.monotonic3105View.action === 'update').codeLines, [7, 8]);
+  assert.deepEqual(steps.find(step => step.monotonic3105View.action === 'best').codeLines, [9]);
+  assert.ok(steps.every(step => step.codeLines.length > 0 && step.codeLines.every(line => line >= 1 && line <= 10)));
+  assert.deepEqual(
+    problem.code.slice(4),
+    [
+      '        inc = dec = ans = 1',
+      '        for i in range(1, len(nums)):',
+      '            inc = (inc + 1) if nums[i] > nums[i - 1] else 1',
+      '            dec = (dec + 1) if nums[i] < nums[i - 1] else 1',
+      '            ans = max(ans, inc, dec)',
+      '        return ans',
+    ],
+  );
+  assert.deepEqual(steps.find(step => step.monotonic3105View.action === 'update').vars.map(({ name }) => name), ['inc', 'dec', 'ans']);
 });
 
 test('3105 renderer visualizes comparisons and the final range in Vietnamese and English', () => {
