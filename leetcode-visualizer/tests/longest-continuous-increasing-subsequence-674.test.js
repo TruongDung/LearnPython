@@ -85,21 +85,24 @@ test('674 renderer explains breaks and shows the final best run in Vietnamese an
     context,
   );
   context.renderContinuousIncreasing674(run.steps[context.stepIndex]);
-  assert.match(host.innerHTML, /5 ≥ 4/);
-  assert.match(host.innerHTML, /previous run ends because the current value is not larger/);
-  assert.match(host.innerHTML, /longest so far/);
+  assert.match(host.innerHTML, /<b>5<\/b><span class="ci674-operator">≥<\/span><b>4<\/b>/);
+  assert.match(host.innerHTML, /↘/);
+  assert.match(host.innerHTML, /restart/);
+  assert.match(host.innerHTML, /class="ci674-edge edge-break"/);
+  assert.match(host.innerHTML, /class="ci674-runs"/);
+  assert.doesNotMatch(host.innerHTML, /previous run ends because/);
 
   context.stepIndex = run.steps.findIndex(step => step.continuous674View.action === 'seed');
   context.renderContinuousIncreasing674(run.steps[context.stepIndex]);
-  assert.match(host.innerHTML, /No pair has been compared yet/);
+  assert.match(host.innerHTML, /ci674-no-compare/);
   assert.doesNotMatch(host.innerHTML, /null [≥<]/);
 
   context.lang = 'vi';
   context.stepIndex = run.steps.length - 1;
   context.renderContinuousIncreasing674(run.steps.at(-1));
   assert.match(host.innerHTML, /Đoạn tăng liên tục dài nhất/);
-  assert.match(host.innerHTML, /ĐỘ DÀI ĐOẠN TĂNG LIÊN TỤC DÀI NHẤT/);
-  assert.match(host.innerHTML, /\[0…2\]/);
+  assert.match(host.innerHTML, /ci674-result/);
+  assert.match(host.innerHTML, /<b>1<\/b><i>›<\/i><b>3<\/b><i>›<\/i><b>5<\/b>/);
   assert.match(host.innerHTML, /3/);
 
   const empty = problem.builder([]);
@@ -107,7 +110,7 @@ test('674 renderer explains breaks and shows the final best run in Vietnamese an
   context.steps = empty.steps;
   context.stepIndex = 0;
   context.renderContinuousIncreasing674(empty.steps[0]);
-  assert.match(host.innerHTML, /Empty array/);
+  assert.match(host.innerHTML, /∅ empty array/);
   assert.doesNotMatch(host.innerHTML, /null…null/);
 });
 
