@@ -61,7 +61,7 @@ test('3105 trace labels rising, falling, and equal comparisons and resets the ri
   assert.ok(steps.every(step => step.codeLines.length === 1 && step.codeLines[0] >= 1 && step.codeLines[0] <= 16));
 });
 
-test('3105 renderer explains comparisons and displays its final range in Vietnamese and English', () => {
+test('3105 renderer visualizes comparisons and the final range in Vietnamese and English', () => {
   const run = problem.builder([1, 4, 3, 3, 2]);
   const host = { innerHTML: '' };
   const context = {
@@ -80,19 +80,18 @@ test('3105 renderer explains comparisons and displays its final range in Vietnam
   assert.equal(context.ORDERED_RENDERER_REGISTRY.length, 1);
   assert.ok(context.ORDERED_RENDERER_REGISTRY[0].predicate({ monotonic3105View: {} }));
   context.renderMonotonicSubarray3105(run.steps[context.stepIndex]);
-  assert.match(host.innerHTML, /3 = 3/);
-  assert.match(host.innerHTML, /neither strict increase nor decrease continues/);
-  assert.match(host.innerHTML, /current increasing run/);
-  assert.match(host.innerHTML, /current decreasing run/);
+  assert.match(host.innerHTML, /mono3105-compare equal[\s\S]*?<span>3<\/span>\s*<b>=<\/b>\s*<span>3<\/span>/);
+  assert.match(host.innerHTML, /edge-equal edge-active/);
+  assert.match(host.innerHTML, /mono3105-pointer/);
+  assert.doesNotMatch(host.innerHTML, /neither strict increase nor decrease continues/);
 
   context.lang = 'vi';
   context.stepIndex = run.steps.length - 1;
   context.renderMonotonicSubarray3105(run.steps.at(-1));
-  assert.match(host.innerHTML, /Đoạn tăng hoặc giảm nghiêm ngặt dài nhất/);
-  assert.match(host.innerHTML, /ĐOẠN ĐƠN ĐIỆU DÀI NHẤT/);
-  assert.match(host.innerHTML, /chỉ số 0–1/);
-  assert.match(host.innerHTML, /tăng dần/);
-  assert.match(host.innerHTML, /Quét xong · xem kết quả bên dưới/);
+  assert.match(host.innerHTML, /class="mono3105-result"/);
+  assert.match(host.innerHTML, /class="mono3105-sequence"><b>1<\/b><i>›<\/i><b>4<\/b>/);
+  assert.match(host.innerHTML, /legend-up">↗ tăng/);
+  assert.doesNotMatch(host.innerHTML, /Longest Increasing or Decreasing Subarray|Scan complete/);
   assert.doesNotMatch(host.innerHTML, /3 = 2/);
 
   const empty = problem.builder([]);
@@ -101,7 +100,7 @@ test('3105 renderer explains comparisons and displays its final range in Vietnam
   context.stepIndex = 0;
   context.renderMonotonicSubarray3105(empty.steps[0]);
   assert.match(host.innerHTML, /Empty array/);
-  assert.match(host.innerHTML, /Scan complete/);
+  assert.match(host.innerHTML, /class="mono3105-result"/);
 });
 
 test('3105 renderer bounds long arrays and registers its lazy-loaded assets', () => {
@@ -122,7 +121,8 @@ test('3105 renderer bounds long arrays and registers its lazy-loaded assets', ()
   );
   context.renderMonotonicSubarray3105(run.steps.at(-1));
   assert.match(host.innerHTML, /hidden/);
-  assert.ok((host.innerHTML.match(/class="mono3105-cell/g) || []).length <= 28);
+  assert.ok((host.innerHTML.match(/class="mono3105-cell/g) || []).length <= 20);
+  assert.match(host.innerHTML, /mono3105-edge/);
 
   const html = readFrontendIndex();
   assert.match(html, /monotonic-subarray-3105\.css[^\n]*data-problem-ids="3105"/);
