@@ -681,6 +681,15 @@ body:has(#treeView:not(.hidden) .ao432-viz) #stepNote {
   font-size: 13px;
 }
 
+/* 432 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off.
+   Horizontal scrolling (overflow-x: auto from .code-panel) is unchanged. */
+body:has(#treeView:not(.hidden) .ao432-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
 @keyframes ao432-pop {
   from {
     transform: scale(0.6);
