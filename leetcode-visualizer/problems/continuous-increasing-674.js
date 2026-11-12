@@ -29,7 +29,7 @@ function buildSteps674(input) {
 
   function record(title, note, codeLine, options = {}) {
     if (steps.length >= MAX_STEPS && !options.final) return;
-    const currentLeft = options.left ?? left;
+    const currentLeft = Object.hasOwn(options, "left") ? options.left : left;
     const currentRight = options.right === undefined ? right : options.right;
     const currentStart = Object.hasOwn(options, "windowStart") ? options.windowStart : windowStart;
     const currentEnd = Object.hasOwn(options, "windowEnd") ? options.windowEnd : windowEnd;

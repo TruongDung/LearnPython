@@ -28,6 +28,22 @@ test('674 trace follows the left/right sliding-window snippet', () => {
   const { steps, answer } = problem.builder([1, 3, 5, 4, 7]);
   assert.equal(answer, 3);
   assert.equal(steps.at(-1).final, true);
+  assert.deepEqual(problem.code, [
+    'class Solution:',
+    '    def findLengthOfLCIS(self, nums: list[int]) -> int:',
+    '        if not nums:',
+    '            return 0',
+    '',
+    '        left = 0',
+    '        max_len = 1',
+    '',
+    '        for right in range(1, len(nums)):',
+    '            if nums[right] <= nums[right - 1]:',
+    '                left = right',
+    '            max_len = max(max_len, right - left + 1)',
+    '',
+    '        return max_len',
+  ]);
   // displayed code has 14 lines; every step points at exactly one valid line
   for (const s of steps) {
     assert.equal(s.codeLines.length, 1);
@@ -109,6 +125,7 @@ test('674 renderer explains breaks and shows the final best run in Vietnamese an
   assert.match(host.innerHTML, /3/);
 
   const empty = problem.builder([]);
+  assert.equal(empty.steps[0].continuous674View.left, null);
   context.lang = 'en';
   context.steps = empty.steps;
   context.stepIndex = 0;
