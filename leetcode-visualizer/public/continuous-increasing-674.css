@@ -1,0 +1,59 @@
+#treeView:has(> .ci674-viz) { padding: 0; min-width: 0; border: 0; background: transparent; overflow: visible; }
+#vizPanel:has(.ci674-viz) #codePanel { max-height: none; overflow-x: auto; overflow-y: visible; }
+#vizPanel:has(.ci674-viz) .code-line, #vizPanel:has(.ci674-viz) .code-line .txt { white-space: pre; }
+.ci674-viz { --ci674-bg: #111d30; --ci674-text: #dbe7fa; --ci674-border: #304461; --ci674-muted: #96abc7; --ci674-active: #fbbf24; --ci674-run: #38bdf8; --ci674-best: #34d399; display: grid; gap: 12px; min-width: 0; color: var(--ci674-text); font-size: 13px; }
+[data-theme="light"] .ci674-viz { --ci674-bg: #f7faff; --ci674-text: #18314e; --ci674-border: #c8d8ed; --ci674-muted: #556e8c; --ci674-active: #a65c00; --ci674-run: #0369a1; --ci674-best: #047857; }
+.ci674-viz * { box-sizing: border-box; }
+.ci674-heading, .ci674-panel > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.ci674-heading > span, .ci674-viz small { color: var(--ci674-muted); font-size: 11px; }
+.ci674-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ci674-metrics article { display: grid; gap: 3px; padding: 9px 11px; border: 1px solid var(--ci674-border); border-radius: 10px; background: var(--ci674-bg); }
+.ci674-metrics article b { font-size: 22px; }
+.ci674-metrics article > span { color: var(--ci674-muted); font-size: 11px; }
+.ci674-metrics .cur > small, .ci674-metrics .cur > b { color: var(--ci674-run); }
+.ci674-metrics .best > small, .ci674-metrics .best > b { color: var(--ci674-best); }
+.ci674-panel { display: grid; gap: 10px; min-width: 0; padding: 11px; border: 1px solid var(--ci674-border); border-radius: 12px; background: var(--ci674-bg); }
+.ci674-progress { position: relative; height: 9px; overflow: hidden; border-radius: 8px; background: color-mix(in srgb, var(--ci674-border) 72%, transparent); }
+.ci674-progress > span { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--ci674-run) 35%, transparent); }
+.ci674-progress > b { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--ci674-best) 70%, transparent); }
+.ci674-progress > i { position: absolute; z-index: 1; top: -3px; width: 3px; height: 15px; background: var(--ci674-active); }
+.ci674-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--ci674-muted); font-size: 10px; }
+.ci674-legend .current-legend { color: var(--ci674-active); }
+.ci674-legend .run-legend { color: var(--ci674-run); }
+.ci674-legend .best-legend { color: var(--ci674-best); }
+.ci674-array { display: flex; align-items: stretch; gap: 4px; min-width: 0; overflow-x: auto; padding: 3px 1px 5px; scrollbar-width: thin; }
+.ci674-cell { display: grid; flex: 0 0 53px; gap: 2px; min-height: 73px; justify-items: center; align-content: center; padding: 5px 2px; border: 1px solid var(--ci674-border); border-radius: 8px; background: color-mix(in srgb, var(--ci674-bg) 80%, var(--ci674-border)); }
+.ci674-cell > small, .ci674-cell > span { color: var(--ci674-muted); font: 10px ui-monospace, monospace; }
+.ci674-cell > b { font: 700 15px ui-monospace, monospace; overflow: hidden; max-width: 100%; text-overflow: ellipsis; }
+.ci674-cell.active-run { border-color: var(--ci674-run); background: color-mix(in srgb, var(--ci674-run) 13%, var(--ci674-bg)); }
+.ci674-cell.best-run { box-shadow: inset 0 -3px var(--ci674-best); }
+.ci674-cell.current-value { border: 2px solid var(--ci674-active); }
+.ci674-cell.previous-value:not(.current-value) { border-style: dashed; }
+.ci674-cell.future-value:not(.active-run):not(.best-run) { opacity: .48; }
+.ci674-ellipsis { display: grid; flex: 0 0 54px; place-content: center; text-align: center; color: var(--ci674-muted); font-size: 10px; }
+.ci674-array-help { line-height: 1.4; }
+.ci674-explain-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 9px; }
+.ci674-comparison { align-content: start; border-left: 3px solid var(--ci674-border); }
+.ci674-comparison.rising { border-left-color: var(--ci674-run); }
+.ci674-comparison.break { border-left-color: #fb7185; }
+.ci674-comparison > b { font: 700 22px ui-monospace, monospace; }
+.ci674-comparison > span { color: var(--ci674-muted); line-height: 1.4; }
+.ci674-run-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ci674-run-panel > div { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.ci674-run-panel > div > b { font-size: 23px; }
+.ci674-run-panel > div:first-child > b { color: var(--ci674-run); }
+.ci674-run-panel > div:last-child > b { color: var(--ci674-best); }
+.ci674-run-indices { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ci674-run-indices b { display: grid; min-width: 24px; height: 24px; place-items: center; padding: 0 4px; border: 1px solid var(--ci674-border); border-radius: 6px; font: 11px ui-monospace, monospace; }
+.ci674-run-panel > div:first-child .ci674-run-indices b { border-color: var(--ci674-run); }
+.ci674-run-panel > div:last-child .ci674-run-indices b { border-color: var(--ci674-best); }
+.ci674-run-indices i { color: var(--ci674-muted); font-style: normal; font-size: 10px; }
+.ci674-run-panel > div > small:last-child { line-height: 1.4; }
+.ci674-empty { color: var(--ci674-muted); font-size: 11px; }
+.ci674-answer { display: grid; grid-template-columns: 1fr auto; gap: 5px 12px; align-items: center; padding: 12px; border: 1px solid var(--ci674-best); border-radius: 12px; background: color-mix(in srgb, var(--ci674-best) 8%, var(--ci674-bg)); }
+.ci674-answer > small { grid-column: 1 / -1; color: var(--ci674-best); }
+.ci674-answer > b { color: var(--ci674-best); font: 700 28px ui-monospace, monospace; }
+.ci674-answer > div { display: grid; justify-items: end; gap: 4px; }
+.ci674-answer > div > span { color: var(--ci674-muted); font: 10px ui-monospace, monospace; }
+.ci674-rule { margin: 0; padding: 9px 11px; border-left: 3px solid var(--ci674-run); border-radius: 6px; background: var(--ci674-bg); color: var(--ci674-muted); line-height: 1.5; }
+@media (max-width: 650px) { .ci674-explain-grid { grid-template-columns: minmax(0, 1fr); } .ci674-run-panel { grid-template-columns: minmax(0, 1fr); } .ci674-cell { flex-basis: 48px; } }

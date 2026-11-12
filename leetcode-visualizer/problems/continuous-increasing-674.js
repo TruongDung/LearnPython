@@ -37,6 +37,24 @@ function buildSteps674(input) {
       codeLines: [codeLine],
       vars: opts.vars || [],
       final: !!opts.final,
+      continuous674View: {
+        action: opts.action || "scan",
+        n,
+        index: opts.index ?? null,
+        previousIndex: opts.index === undefined || opts.index <= 0 ? null : opts.index - 1,
+        previousValue: opts.index > 0 ? nums[opts.index - 1] : null,
+        value: opts.index === undefined ? null : nums[opts.index],
+        increasing: opts.increasing ?? null,
+        runStart: opts.runStart ?? (cur > 0 ? curStart : null),
+        runEnd: opts.runEnd ?? (cur > 0 ? curStart + cur - 1 : null),
+        cur: opts.cur ?? cur,
+        best,
+        bestStart: best > 0 ? bestStart : null,
+        bestEnd: best > 0 ? bestStart + best - 1 : null,
+        improved: opts.improved ?? false,
+        scannedThrough: opts.scannedThrough ?? -1,
+        final: !!opts.final,
+      },
     });
   }
 
@@ -45,7 +63,7 @@ function buildSteps674(input) {
       label("nums rỗng → return 0", "nums is empty → return 0"),
       label("Không có phần tử nào.", "There are no elements."),
       4,
-      { final: true, vars: [{ name: "answer", value: 0 }] },
+      { final: true, action: "done", scannedThrough: -1, vars: [{ name: "answer", value: 0 }] },
     );
     return { original: nums, answer: 0, steps };
   }
@@ -53,7 +71,7 @@ function buildSteps674(input) {
     label(`len(nums) = ${n} > 0`, `len(nums) = ${n} > 0`),
     label("Mảng không rỗng, bắt đầu quét.", "The array is non-empty; start scanning."),
     3,
-    { vars: [{ name: "n", value: n }] },
+    { action: "scan", scannedThrough: -1, vars: [{ name: "n", value: n }] },
   );
 
   best = 1;
@@ -65,7 +83,10 @@ function buildSteps674(input) {
     label("best = cur = 1", "best = cur = 1"),
     label("Phần tử đầu tiên tự nó là đoạn tăng dài 1.", "The first element alone is a run of length 1."),
     5,
-    { highlight: [0], mark: [0], vars: [{ name: "best", value: 1 }, { name: "cur", value: 1 }] },
+    {
+      action: "seed", index: 0, runStart: 0, runEnd: 0, cur: 1, scannedThrough: 0,
+      highlight: [0], mark: [0], vars: [{ name: "best", value: 1 }, { name: "cur", value: 1 }],
+    },
   );
 
   for (let i = 1; i < n; i += 1) {
@@ -77,6 +98,13 @@ function buildSteps674(input) {
         : label("Không tăng → đoạn hiện tại đứt tại đây.", "Not increasing → the current run breaks here."),
       7,
       {
+        action: "compare",
+        index: i,
+        increasing: grows,
+        runStart: curStart,
+        runEnd: i - 1,
+        cur,
+        scannedThrough: i - 1,
         highlight: [i - 1, i],
         mark: bestRange(),
         vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }],
@@ -89,7 +117,11 @@ function buildSteps674(input) {
         label(`cur += 1 → ${cur}`, `cur += 1 → ${cur}`),
         label("Nối nums[i] vào đoạn đang chạy.", "Append nums[i] to the running segment."),
         8,
-        { highlight: range(curStart, i), mark: bestRange(), vars: [{ name: "cur", value: cur }] },
+        {
+          action: "extend", index: i, increasing: true, runStart: curStart, runEnd: i,
+          cur, scannedThrough: i, highlight: range(curStart, i), mark: bestRange(),
+          vars: [{ name: "cur", value: cur }],
+        },
       );
     } else {
       cur = 1;
@@ -99,7 +131,11 @@ function buildSteps674(input) {
         label("cur = 1", "cur = 1"),
         label("Bắt đầu đoạn tăng mới tại nums[i].", "Start a new increasing run at nums[i]."),
         10,
-        { highlight: [i], mark: bestRange(), vars: [{ name: "cur", value: 1 }] },
+        {
+          action: "reset", index: i, increasing: false, runStart: i, runEnd: i,
+          cur: 1, scannedThrough: i, highlight: [i], mark: bestRange(),
+          vars: [{ name: "cur", value: 1 }],
+        },
       );
     }
     const improved = cur > best;
@@ -113,7 +149,11 @@ function buildSteps674(input) {
         ? label("Phá kỷ lục → đoạn xanh là đoạn tốt nhất mới.", "New record → the green segment is the new best.")
         : label("Chưa phá kỷ lục; đoạn xanh vẫn tốt nhất.", "No record; the green segment stays the best."),
       11,
-      { highlight: range(curStart, i), mark: bestRange(), vars: [{ name: "best", value: best }, { name: "cur", value: cur }] },
+      {
+        action: "best", index: i, increasing: grows, runStart: curStart, runEnd: i,
+        cur, improved, scannedThrough: i, highlight: range(curStart, i), mark: bestRange(),
+        vars: [{ name: "best", value: best }, { name: "cur", value: cur }],
+      },
     );
   }
 
@@ -121,7 +161,10 @@ function buildSteps674(input) {
     label(`Đáp án: ${best}`, `Answer: ${best}`),
     label(`Đoạn tăng liên tục dài nhất có ${best} phần tử (tô xanh).`, `The longest continuous increasing run has ${best} element(s) (green).`),
     12,
-    { final: true, mark: bestRange(), vars: [{ name: "answer", value: best }] },
+    {
+      final: true, action: "done", runStart: bestStart, runEnd: bestStart + best - 1,
+      cur, scannedThrough: n - 1, mark: bestRange(), vars: [{ name: "answer", value: best }],
+    },
   );
 
   return { original: nums, answer: best, steps };

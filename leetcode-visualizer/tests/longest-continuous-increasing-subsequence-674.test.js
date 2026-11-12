@@ -1,6 +1,10 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const problem = require('../problems').SUPPORTED[674];
+const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles, JAVASCRIPT_ASSETS, STYLESHEET_ASSETS } = require('./helpers/frontend-source');
 
 function brute(nums) {
   let best = 0;
@@ -40,6 +44,93 @@ test('674 trace is line-by-line and picture-first (bars, run highlight, best mar
   assert.ok(grow.highlight.length >= 2);
   // a break step (code line 10) exists after the 5 > 4 drop
   assert.ok(steps.some((s) => s.codeLines[0] === 10));
+});
+
+test('674 records the comparison, active run, and best range at every meaningful step', () => {
+  const { steps } = problem.builder([1, 3, 5, 4, 7]);
+  const compare = steps.find(step => step.continuous674View.action === 'compare' && step.continuous674View.index === 3);
+  assert.equal(compare.continuous674View.increasing, false);
+  assert.equal(compare.continuous674View.previousValue, 5);
+  assert.equal(compare.continuous674View.value, 4);
+  assert.deepEqual([compare.continuous674View.runStart, compare.continuous674View.runEnd], [0, 2]);
+
+  const reset = steps.find(step => step.continuous674View.action === 'reset');
+  assert.deepEqual([reset.continuous674View.runStart, reset.continuous674View.runEnd], [3, 3]);
+  assert.equal(reset.continuous674View.cur, 1);
+
+  const record = steps.find(step => step.continuous674View.action === 'best' && step.continuous674View.index === 2);
+  assert.equal(record.continuous674View.improved, true);
+  assert.deepEqual([record.continuous674View.bestStart, record.continuous674View.bestEnd], [0, 2]);
+  for (const step of steps) {
+    const view = step.continuous674View;
+    assert.ok(view);
+    if (['best', 'done', 'reset'].includes(view.action)) assert.ok(view.best >= view.cur);
+    if (view.bestStart !== null) assert.equal(view.bestEnd - view.bestStart + 1, view.best);
+  }
+});
+
+test('674 renderer explains breaks and shows the final best run in Vietnamese and English', () => {
+  const run = problem.builder([1, 3, 5, 4, 7]);
+  const host = { innerHTML: '' };
+  const context = {
+    lang: 'en',
+    $: () => host,
+    escapeHtml: value => String(value),
+    steps: run.steps,
+    stepIndex: run.steps.findIndex(step => step.continuous674View.action === 'reset'),
+  };
+  vm.createContext(context);
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '../public/renderer-continuous-increasing-674.js'), 'utf8'),
+    context,
+  );
+  context.renderContinuousIncreasing674(run.steps[context.stepIndex]);
+  assert.match(host.innerHTML, /5 ≥ 4/);
+  assert.match(host.innerHTML, /previous run ends because the current value is not larger/);
+  assert.match(host.innerHTML, /longest so far/);
+
+  context.stepIndex = run.steps.findIndex(step => step.continuous674View.action === 'seed');
+  context.renderContinuousIncreasing674(run.steps[context.stepIndex]);
+  assert.match(host.innerHTML, /No pair has been compared yet/);
+  assert.doesNotMatch(host.innerHTML, /null [≥<]/);
+
+  context.lang = 'vi';
+  context.stepIndex = run.steps.length - 1;
+  context.renderContinuousIncreasing674(run.steps.at(-1));
+  assert.match(host.innerHTML, /Đoạn tăng liên tục dài nhất/);
+  assert.match(host.innerHTML, /ĐỘ DÀI ĐOẠN TĂNG LIÊN TỤC DÀI NHẤT/);
+  assert.match(host.innerHTML, /\[0…2\]/);
+  assert.match(host.innerHTML, /3/);
+
+  const empty = problem.builder([]);
+  context.lang = 'en';
+  context.steps = empty.steps;
+  context.stepIndex = 0;
+  context.renderContinuousIncreasing674(empty.steps[0]);
+  assert.match(host.innerHTML, /Empty array/);
+  assert.doesNotMatch(host.innerHTML, /null…null/);
+});
+
+test('674 renderer bounds long-array detail and its assets are wired for lazy loading', () => {
+  const run = problem.builder(Array.from({ length: 300 }, (_, i) => i));
+  const host = { innerHTML: '' };
+  const context = { lang: 'en', $: () => host, escapeHtml: value => String(value), steps: run.steps, stepIndex: run.steps.length - 1 };
+  vm.createContext(context);
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '../public/renderer-continuous-increasing-674.js'), 'utf8'),
+    context,
+  );
+  context.renderContinuousIncreasing674(run.steps.at(-1));
+  assert.match(host.innerHTML, /hidden/);
+  assert.ok((host.innerHTML.match(/class="ci674-cell/g) || []).length <= 28);
+
+  const html = readFrontendIndex();
+  assert.match(html, /continuous-increasing-674\.css[^\n]*data-problem-ids="674"/);
+  assert.match(html, /renderer-continuous-increasing-674\.js[^\n]*data-problem-ids="674"/);
+  assert.ok(JAVASCRIPT_ASSETS.includes('renderer-continuous-increasing-674.js'));
+  assert.ok(STYLESHEET_ASSETS.includes('continuous-increasing-674.css'));
+  assert.match(readFrontendJavaScript(), /renderContinuousIncreasing674/);
+  assert.match(readFrontendStyles(), /\.ci674-viz/);
 });
 
 test('674 agrees with brute force on randomized arrays', () => {
