@@ -214,9 +214,11 @@
 }
 
 /* Bucket chain picture */
+/* Scale down to the card width instead of scrolling, so HEAD and TAIL stay in view. */
 .ao432-svg {
   display: block;
-  max-width: none;
+  max-width: 100%;
+  height: auto;
   margin: 0 auto;
 }
 

@@ -59,6 +59,18 @@ test('432 presets return valid answers and the full-tour preset executes every n
   assert.deepEqual(missing, []);
 });
 
+test('432 default example shows several buckets, several of them holding multiple keys', () => {
+  const views = problem.builder(problem.defaultInput).steps.map((step) => step.allOne432View);
+  const real = (view) => view.structure.order.map((id) => view.structure.buckets.find((b) => b.id === id)).filter((b) => !b.sentinel);
+  assert.ok(Math.max(...views.map((view) => real(view).length)) >= 4, 'at least 4 linked buckets at once');
+  assert.ok(Math.max(...views.map((view) => real(view).filter((b) => b.keys.length >= 2).length)) >= 3, '3 multi-key buckets at once');
+  assert.ok(Math.max(...views.map((view) => Math.max(0, ...real(view).map((b) => b.keys.length)))) >= 3, 'a bucket with 3+ keys');
+  const events = new Set(views.map((view) => view.event));
+  for (const event of ['insert-call', 'remove-call', 'count-one-present', 'dec-complete', 'extreme-key-return']) {
+    assert.ok(events.has(event), event);
+  }
+});
+
 test('432 renders every frame in both languages with the executed line number and short notes', () => {
   for (const lang of ['vi', 'en']) {
     const ui = renderer(lang);
@@ -90,8 +102,8 @@ test('432 renders every frame in both languages with the executed line number an
 test('432 assets are wired with light and dark theme tokens', () => {
   const index = readFrontendIndex();
   const css = readFrontendStyles();
-  assert.match(index, /all-one-432\.css\?v=all-one-432-v4/);
-  assert.match(index, /renderer-all-one-432\.js\?v=all-one-432-v4/);
+  assert.match(index, /all-one-432\.css\?v=all-one-432-v5/);
+  assert.match(index, /renderer-all-one-432\.js\?v=all-one-432-v5/);
   assert.match(css, /\.ao432-viz \{[^}]*--ao432-bg:/s);
   assert.match(css, /\[data-theme="light"\] \.ao432-viz \{[^}]*--ao432-bg:/s);
   assert.equal(problem.debugMode, 'line-by-line');

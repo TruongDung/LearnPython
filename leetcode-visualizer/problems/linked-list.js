@@ -3840,7 +3840,7 @@ module.exports = {
         "inc increases key's count (creating it with count=1 if new). dec decreases key's count (removing it if count hits 0). " +
         "getMaxKey/getMinKey return any key with the highest/lowest count, or an empty string if none exist.",
     },
-    defaultInput: "inc a | inc a | inc b | getMaxKey | dec a | getMinKey",
+    defaultInput: "inc a | inc b | inc c | inc d | inc a | inc b | inc c | inc a | inc b | inc e | inc f | inc d | inc a | inc b | getMaxKey | getMinKey | dec b | dec a | dec e | dec f | dec x | getMaxKey | getMinKey",
     inputKind: "string",
     inputLabel: { vi: "Tối đa 24 thao tác: inc/dec key | getMaxKey | getMinKey", en: "Up to 24: inc/dec key | getMaxKey | getMinKey" },
     extraParams: [],

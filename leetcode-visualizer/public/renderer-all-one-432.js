@@ -7,11 +7,13 @@
 // Number of lines in the builder source (problem.code); the shared #codePanel shows the code itself.
 const AO432_LINE_COUNT = 74;
 
-// Preset inputs: [input, Vietnamese label, English label]. The second preset executes every non-blank line.
+// Preset inputs: [input, Vietnamese label, English label]. The first preset is the default input
+// (up to 4 buckets, several holding 2-4 keys); the second executes every non-blank line.
 const AO432_CASES = Object.freeze([
-  ["inc a | inc a | inc b | getMaxKey | dec a | getMinKey", "Ví dụ", "Example"],
+  ["inc a | inc b | inc c | inc d | inc a | inc b | inc c | inc a | inc b | inc e | inc f | inc d | inc a | inc b | getMaxKey | getMinKey | dec b | dec a | dec e | dec f | dec x | getMaxKey | getMinKey", "Ví dụ", "Example"],
   ["getMinKey | getMaxKey | inc a | inc b | inc a | inc a | getMaxKey | getMinKey | dec b | dec x | dec a | dec a | dec a | getMaxKey", "Chạy hết mọi dòng", "Every code line"],
   ["inc a | inc b | inc c | getMaxKey | inc b | getMaxKey | getMinKey", "Nhiều key cùng count", "Tied counts"],
+  ["inc a | inc a | inc b | getMaxKey | dec a | getMinKey", "Ngắn", "Short"],
 ]);
 
 const AO432_COUNTERS = Object.freeze([
@@ -317,14 +319,15 @@ function ao432Picture(state, copy) {
     return ghost ? [...bucket.keys, ghost] : [...bucket.keys];
   };
   const size = (bucket) => {
-    if (bucket.sentinel) return { w: 64, h: 46 };
+    if (bucket.sentinel) return { w: 52, h: 46 };
     const keys = keysOf(bucket);
     const longest = keys.reduce((max, key) => Math.max(max, key.length), 1);
-    return { w: Math.max(72, Math.round(longest * 7.6 + 34)), h: 42 + Math.max(1, keys.length) * 24 };
+    return { w: Math.max(56, Math.round(longest * 7.6 + 34)), h: 42 + Math.max(1, keys.length) * 24 };
   };
 
-  const GAP = 60;
-  const PAD = 18;
+  // Compact spacing so HEAD, four buckets and TAIL fit the chain card at desktop width.
+  const GAP = 40;
+  const PAD = 12;
   const TOP = 44;
   const boxes = new Map();
   let cursor = PAD;
@@ -431,14 +434,16 @@ function ao432Picture(state, copy) {
     }
     // Linked boxes carry labels above (incoming cross-row arrows use the bottom edge);
     // detached boxes carry them below (incoming arrows use the top edge).
+    // Roles sit on the line next to the box and min/max on a second line, so labels on neighbouring boxes do not collide.
     const labels = roles.map((role) => `<tspan class="tag-${role.replace("_", "-")}">${role}</tspan>`);
-    if (linked.has(id) && !bucket.sentinel && (id === minId || id === maxId)) {
-      labels.push(`<tspan class="tag-extreme">${id === minId && id === maxId ? "min=max" : id === minId ? "min" : "max"}</tspan>`);
-    }
     const tagY = linked.has(id) ? box.y - 9 : box.y + box.h + 16;
-    const tags = labels.length
+    let tags = labels.length
       ? `<text class="ao432-tags" x="${cx}" y="${tagY}">${labels.join('<tspan class="tag-sep"> · </tspan>')}</text>`
       : "";
+    if (linked.has(id) && !bucket.sentinel && (id === minId || id === maxId)) {
+      const extreme = id === minId && id === maxId ? "min=max" : id === minId ? "min" : "max";
+      tags += `<text class="ao432-tags" x="${cx}" y="${labels.length ? tagY - 13 : tagY}"><tspan class="tag-extreme">${extreme}</tspan></text>`;
+    }
     const crown = isExtreme ? `<text class="ao432-crown" x="${box.x + box.w - 4}" y="${box.y + 4}">★</text>` : "";
     shapes.push(`<g class="${classes}" data-bucket-id="${id}"><rect class="ao432-frame" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="11"/>${inner}${tags}${crown}</g>`);
   });
