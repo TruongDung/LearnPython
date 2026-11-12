@@ -59,7 +59,7 @@ test('432 presets return valid answers and the full-tour preset executes every n
   assert.deepEqual(missing, []);
 });
 
-test('432 renders every frame in both languages with the executed line highlighted', () => {
+test('432 renders every frame in both languages with the executed line number and short notes', () => {
   for (const lang of ['vi', 'en']) {
     const ui = renderer(lang);
     for (const [input] of ui.cases) {
@@ -69,10 +69,12 @@ test('432 renders every frame in both languages with the executed line highlight
         const html = ui.render(step, steps, index);
         const view = step.allOne432View;
         const line = step.codeLines[0];
+        assert.ok(step.note[lang].length <= 40, `short note: ${step.note[lang]}`);
         assert.doesNotMatch(html, /undefined|NaN|Infinity|object Object/, `${lang} ${input} #${index}`);
         assert.ok(html.includes(`data-source-line="${line}"`));
-        assert.ok(html.includes(`<li class="is-current" data-code-line="${line}" aria-current="step">`), `line ${line} highlighted`);
-        assert.equal((html.match(/class="is-current" data-code-line=/g) || []).length, 1);
+        assert.ok(html.includes(`<div class="ao432-now" data-code-line="${line}" aria-current="step"><span class="ao432-lineno">L${line}</span>`), `line ${line} shown`);
+        assert.equal((html.match(/data-code-line=/g) || []).length, 1);
+        assert.doesNotMatch(html, /ao432-lines|def inc\(self/, 'source is shown only in the shared #codePanel');
         for (const id of view.structure.order) assert.ok(html.includes(`data-bucket-id="${id}"`), `bucket ${id} drawn`);
         for (const { key } of view.maps.keyCount) assert.ok(html.includes(`data-map-key="${key}"`));
         if (view.condition.result !== null) assert.match(html, /ao432-branch is-(true|false)/);
@@ -88,8 +90,8 @@ test('432 renders every frame in both languages with the executed line highlight
 test('432 assets are wired with light and dark theme tokens', () => {
   const index = readFrontendIndex();
   const css = readFrontendStyles();
-  assert.match(index, /all-one-432\.css\?v=all-one-432-v2/);
-  assert.match(index, /renderer-all-one-432\.js\?v=all-one-432-v2/);
+  assert.match(index, /all-one-432\.css\?v=all-one-432-v3/);
+  assert.match(index, /renderer-all-one-432\.js\?v=all-one-432-v3/);
   assert.match(css, /\.ao432-viz \{[^}]*--ao432-bg:/s);
   assert.match(css, /\[data-theme="light"\] \.ao432-viz \{[^}]*--ao432-bg:/s);
   assert.equal(problem.debugMode, 'line-by-line');

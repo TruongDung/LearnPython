@@ -453,54 +453,32 @@
   font-size: 10px;
 }
 
-.ao432-lines {
-  margin: 0;
-  padding: 0;
-  overflow-x: auto;
-  list-style: none;
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-.ao432-lines li {
+.ao432-now {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  border-left: 3px solid transparent;
-  border-radius: 4px;
-  padding: 0 6px 0 4px;
-}
-
-.ao432-lines li > span {
-  flex: 0 0 22px;
-  color: var(--ao432-muted);
-  font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
-  text-align: right;
-  user-select: none;
-}
-
-.ao432-lines code {
-  color: var(--ao432-text);
-  white-space: pre;
-}
-
-.ao432-lines li.is-current {
-  border-left-color: var(--ao432-amber);
+  border-left: 3px solid var(--ao432-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
   background: color-mix(in srgb, var(--ao432-amber) 18%, transparent);
+  font-size: 12.5px;
 }
 
-[data-theme="light"] .ao432-lines li.is-current {
+[data-theme="light"] .ao432-now {
   background: var(--ao432-line);
 }
 
-.ao432-lines li.is-current > span {
+.ao432-lineno {
   color: var(--ao432-amber);
-  font-weight: 700;
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
-.ao432-lines li.ao432-effect code {
-  color: var(--ao432-amber);
+.ao432-now .ao432-effect {
+  color: var(--ao432-text);
   font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .ao432-branch {
@@ -698,9 +676,9 @@
   font-size: 16px;
 }
 
-/* The picture replaces the long prose note under the panel. */
+/* 432 step notes are a few words; keep them on one short caption line under the picture. */
 body:has(#treeView:not(.hidden) .ao432-viz) #stepNote {
-  display: none;
+  font-size: 13px;
 }
 
 @keyframes ao432-pop {

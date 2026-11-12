@@ -1,89 +1,11 @@
 "use strict";
 
 // LeetCode 432 — All O`one. Picture-first renderer: bucket chain (SVG), hash maps,
-// and an in-view Python code window that highlights the executed line.
+// and a current-line strip (line number, effect, branch, stack, locals). The Python source itself
+// is shown once, in the shared #codePanel, which script.js highlights from step.codeLines.
 
-const AO432_SOURCE = Object.freeze([
-  "class Bucket:",
-  "    def __init__(self, count):",
-  "        self.count = count",
-  "        self.keys = {}",
-  "        self.prev = None",
-  "        self.next = None",
-  "",
-  "class AllOne:",
-  "    def __init__(self):",
-  "        self.head = Bucket(0)",
-  "        self.tail = Bucket(0)",
-  "        self.head.next = self.tail",
-  "        self.tail.prev = self.head",
-  "        self.keyCount = {}",
-  "        self.keyBucket = {}",
-  "",
-  "    def insert_after(self, bucket, count):",
-  "        new_bucket = Bucket(count)",
-  "        new_bucket.prev = bucket",
-  "        new_bucket.next = bucket.next",
-  "        bucket.next.prev = new_bucket",
-  "        bucket.next = new_bucket",
-  "        return new_bucket",
-  "",
-  "    def remove_bucket(self, bucket):",
-  "        bucket.prev.next = bucket.next",
-  "        bucket.next.prev = bucket.prev",
-  "    def inc(self, key: str) -> None:",
-  "        if key not in self.keyCount:",
-  "            self.keyCount[key] = 1",
-  "            if self.head.next.count != 1:",
-  "                self.insert_after(self.head, 1)",
-  "            target = self.head.next",
-  "        else:",
-  "            old_count = self.keyCount[key]",
-  "            self.keyCount[key] = old_count + 1",
-  "            bucket = self.keyBucket[key]",
-  "            del bucket.keys[key]",
-  "            target = bucket.next",
-  "            if target.count != old_count + 1:",
-  "                target = self.insert_after(bucket, old_count + 1)",
-  "            if not bucket.keys:",
-  "                self.remove_bucket(bucket)",
-  "        target.keys[key] = None",
-  "        self.keyBucket[key] = target",
-  "",
-  "    def dec(self, key: str) -> None:",
-  "        if key not in self.keyCount:",
-  "            return",
-  "        old_count = self.keyCount[key]",
-  "        bucket = self.keyBucket[key]",
-  "        del bucket.keys[key]",
-  "        if old_count == 1:",
-  "            del self.keyCount[key]",
-  "            del self.keyBucket[key]",
-  "        else:",
-  "            self.keyCount[key] = old_count - 1",
-  "            target = bucket.prev",
-  "            if target.count != old_count - 1:",
-  "                target = self.insert_after(bucket.prev, old_count - 1)",
-  "            target.keys[key] = None",
-  "            self.keyBucket[key] = target",
-  "        if not bucket.keys:",
-  "            self.remove_bucket(bucket)",
-  "",
-  "    def getMaxKey(self) -> str:",
-  "        if self.tail.prev is self.head:",
-  "            return \"\"",
-  "        return next(iter(self.tail.prev.keys))",
-  "",
-  "    def getMinKey(self) -> str:",
-  "        if self.head.next is self.tail:",
-  "            return \"\"",
-  "        return next(iter(self.head.next.keys))",
-]);
-
-// Source blocks shown in the code window; the block containing the current line is displayed.
-const AO432_BLOCKS = Object.freeze([
-  [1, 6], [8, 15], [17, 23], [25, 27], [28, 45], [47, 64], [66, 69], [71, 74],
-]);
+// Number of lines in the builder source (problem.code); the shared #codePanel shows the code itself.
+const AO432_LINE_COUNT = 74;
 
 // Preset inputs: [input, Vietnamese label, English label]. The second preset executes every non-blank line.
 const AO432_CASES = Object.freeze([
@@ -107,7 +29,7 @@ const AO432_COPY = Object.freeze({
   vi: Object.freeze({
     chain: "Chuỗi bucket · count tăng dần →",
     maps: "Hash map",
-    code: "Code Python · từng dòng",
+    code: "Dòng đang chạy",
     ops: "Thao tác",
     consistent: "Khớp",
     midUpdate: "Đang cập nhật",
@@ -134,7 +56,7 @@ const AO432_COPY = Object.freeze({
   en: Object.freeze({
     chain: "Bucket chain · count grows →",
     maps: "Hash maps",
-    code: "Python code · line by line",
+    code: "Current line",
     ops: "Operations",
     consistent: "Consistent",
     midUpdate: "Mid-update",
@@ -211,8 +133,8 @@ function ao432Normalize(step) {
   const raw = step && step.allOne432View && typeof step.allOne432View === "object" ? step.allOne432View : {};
   const sourceRaw = raw.source && typeof raw.source === "object" ? raw.source : {};
   const fallbackLine = step && Array.isArray(step.codeLines) ? step.codeLines[0] : null;
-  const line = ao432Integer(sourceRaw.line, 1, AO432_SOURCE.length)
-    ?? ao432Integer(fallbackLine, 1, AO432_SOURCE.length)
+  const line = ao432Integer(sourceRaw.line, 1, AO432_LINE_COUNT)
+    ?? ao432Integer(fallbackLine, 1, AO432_LINE_COUNT)
     ?? 1;
   const event = typeof raw.event === "string" && /^[a-z-]{1,40}$/.test(raw.event) ? raw.event : "";
   const phase = ["setup", "helper", "operation", "query", "done"].includes(raw.phase) ? raw.phase : "setup";
@@ -567,7 +489,7 @@ function ao432Maps(state, copy) {
   return `<ul class="ao432-map" role="list"><li class="ao432-map-head" aria-hidden="true"><span>key</span><span>keyCount</span><span>keyBucket</span></li>${rows}</ul>`;
 }
 
-// ---------- Code window ----------
+// ---------- Current-line strip (source lives in the shared #codePanel) ----------
 
 function ao432Effect(state) {
   const M = state.mutation;
@@ -605,20 +527,11 @@ function ao432Stack(state) {
 
 function ao432Code(state, copy) {
   const line = state.line;
-  const block = AO432_BLOCKS.find(([from, to]) => line >= from && line <= to) || [line, line];
-  const texts = AO432_SOURCE.slice(block[0] - 1, block[1]);
-  const indent = Math.min(...texts.filter(Boolean).map((text) => text.length - text.trimStart().length));
   const effect = ao432Effect(state);
-  const rows = [];
-  texts.forEach((text, offset) => {
-    const number = block[0] + offset;
-    const current = number === line;
-    const badge = current && state.condition !== null
-      ? `<b class="ao432-branch is-${state.condition ? "true" : "false"}">${state.condition ? "True" : "False"}</b>`
-      : "";
-    rows.push(`<li class="${current ? "is-current" : ""}" data-code-line="${number}"${current ? ' aria-current="step"' : ""}><span>${number}</span><code>${ao432Escape(text.slice(indent)) || " "}</code>${badge}</li>`);
-    if (current && effect) rows.push(`<li class="ao432-effect"><span>↳</span><code>${ao432Escape(effect)}</code></li>`);
-  });
+  const badge = state.condition !== null
+    ? `<b class="ao432-branch is-${state.condition ? "true" : "false"}">${state.condition ? "True" : "False"}</b>`
+    : "";
+  const now = `<div class="ao432-now" data-code-line="${line}" aria-current="step"><span class="ao432-lineno">L${line}</span>${effect ? `<code class="ao432-effect">↳ ${ao432Escape(effect)}</code>` : ""}${badge}</div>`;
   const stack = ao432Stack(state);
   const crumbs = stack.length ? `<span class="ao432-stack">${stack.map((name) => `<code>${ao432Escape(name)}</code>`).join("<i>▸</i>")}</span>` : "";
   const L = state.locals;
@@ -632,7 +545,7 @@ function ao432Code(state, copy) {
   const locals = chips.length
     ? `<div class="ao432-locals">${chips.map(([name, value, kind]) => `<span class="chip-${kind}"><code>${name}</code><b>${ao432Escape(value)}</b></span>`).join("")}</div>`
     : "";
-  return `<header><b>${ao432Escape(copy.code)}</b>${crumbs}</header><ol class="ao432-lines" role="list">${rows.join("")}</ol>${locals}`;
+  return `<header><b>${ao432Escape(copy.code)}</b>${crumbs}</header>${now}${locals}`;
 }
 
 // ---------- Operations strip ----------

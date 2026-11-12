@@ -438,7 +438,7 @@ function buildSteps432Exact(input) {
       phase: "helper",
       timing: "before",
       title: localized(`Enter Bucket.__init__(${count})`, `Vào Bucket.__init__(${count})`),
-      note: localized("A bucket object exists, but its four fields are initialized one source line at a time.", "Object bucket đã tồn tại, nhưng bốn field được khởi tạo từng dòng mã nguồn."),
+      note: localized("Fill 4 fields, one per line.", "Gán 4 field, mỗi dòng một."),
     });
     bucket.count = count;
     setMutation("field-write", id, "count", null, count);
@@ -447,7 +447,7 @@ function buildSteps432Exact(input) {
       event: "set-bucket-count",
       phase: "helper",
       title: localized(`Set ${id}.count = ${count}`, `Đặt ${id}.count = ${count}`),
-      note: localized("This count determines the bucket's ordered-list position.", "Count này quyết định vị trí bucket trong danh sách có thứ tự."),
+      note: localized("Count sets list position.", "Count quyết định vị trí."),
     });
     bucket.keys = new Set();
     setMutation("field-write", id, "keys", null, "ordered-dict");
@@ -456,7 +456,7 @@ function buildSteps432Exact(input) {
       event: "allocate-key-dict",
       phase: "helper",
       title: localized("Allocate an empty ordered key dictionary", "Tạo dictionary key có thứ tự rỗng"),
-      note: localized("Dictionary insertion order chooses a stable representative while all key operations remain average O(1).", "Thứ tự chèn của dictionary chọn representative ổn định, còn mọi thao tác key vẫn O(1) trung bình."),
+      note: localized("Ordered dict, O(1) ops.", "Dict có thứ tự, O(1)."),
     });
     counters.pointerWrites++;
     setMutation("pointer-write", id, "prev", null, null);
@@ -465,7 +465,7 @@ function buildSteps432Exact(input) {
       event: "initialize-prev",
       phase: "helper",
       title: localized("Initialize prev = None", "Khởi tạo prev = None"),
-      note: localized("The bucket is not linked yet.", "Bucket chưa được nối vào danh sách."),
+      note: localized("Not linked yet.", "Chưa nối."),
     });
     counters.pointerWrites++;
     setMutation("pointer-write", id, "next", null, null);
@@ -474,7 +474,7 @@ function buildSteps432Exact(input) {
       event: "initialize-next",
       phase: "helper",
       title: localized("Initialize next = None", "Khởi tạo next = None"),
-      note: localized("Both links are empty when construction finishes.", "Cả hai liên kết đều rỗng khi khởi tạo xong."),
+      note: localized("Both links empty.", "Hai liên kết rỗng."),
     });
     constructingId = null;
     return id;
@@ -492,7 +492,7 @@ function buildSteps432Exact(input) {
       phase: "helper",
       timing: "before",
       title: localized(`Call insert_after(${bucketName(anchorId)}, ${count})`, `Gọi insert_after(${bucketName(anchorId)}, ${count})`),
-      note: localized("The call-site assignment waits while the helper performs four pointer writes.", "Phép gán tại call-site chờ helper thực hiện bốn lần ghi pointer."),
+      note: localized("Helper does 4 pointer writes.", "Helper ghi 4 pointer."),
     });
     emit({
       line: 17,
@@ -500,7 +500,7 @@ function buildSteps432Exact(input) {
       phase: "helper",
       timing: "before",
       title: localized("Enter insert_after", "Vào insert_after"),
-      note: localized(`Insert a count-${count} bucket between ${bucketName(anchorId)} and ${bucketName(buckets.get(anchorId).next)}.`, `Chèn bucket count-${count} giữa ${bucketName(anchorId)} và ${bucketName(buckets.get(anchorId).next)}.`),
+      note: localized(`Insert [${count}] between ${bucketName(anchorId)} and ${bucketName(buckets.get(anchorId).next)}.`, `Chèn [${count}] giữa ${bucketName(anchorId)} và ${bucketName(buckets.get(anchorId).next)}.`),
     });
     const newId = `b${bucketSerial++}`;
     emit({
@@ -509,7 +509,7 @@ function buildSteps432Exact(input) {
       phase: "helper",
       timing: "before",
       title: localized(`Evaluate Bucket(${count})`, `Đánh giá Bucket(${count})`),
-      note: localized("new_bucket is unassigned until Bucket.__init__ returns.", "new_bucket chưa được gán cho đến khi Bucket.__init__ trả về."),
+      note: localized("Construct first, then assign.", "Tạo xong mới gán."),
     });
     constructBucket(count, newId);
     locals.newBucket = newId;
@@ -518,7 +518,7 @@ function buildSteps432Exact(input) {
       event: "new-bucket-assignment",
       phase: "helper",
       title: localized(`new_bucket = ${bucketName(newId)}`, `new_bucket = ${bucketName(newId)}`),
-      note: localized("The initialized bucket is still detached from the linked chain.", "Bucket đã khởi tạo vẫn chưa nối vào chain."),
+      note: localized("Still detached.", "Vẫn chưa nối."),
     });
 
     const newBucket = buckets.get(newId);
@@ -530,7 +530,7 @@ function buildSteps432Exact(input) {
       event: "link-new-prev",
       phase: "helper",
       title: localized(`new_bucket.prev = ${bucketName(anchorId)}`, `new_bucket.prev = ${bucketName(anchorId)}`),
-      note: localized("Only the new bucket knows its predecessor so far.", "Hiện chỉ bucket mới biết predecessor của nó."),
+      note: localized("Link 1 of 4.", "Liên kết 1/4."),
     });
 
     const successorId = buckets.get(anchorId).next;
@@ -543,7 +543,7 @@ function buildSteps432Exact(input) {
       event: "link-new-next",
       phase: "helper",
       title: localized(`new_bucket.next = ${bucketName(successorId)}`, `new_bucket.next = ${bucketName(successorId)}`),
-      note: localized("The new bucket now knows both neighbors, but neither forward chain nor reciprocal links are complete.", "Bucket mới đã biết hai hàng xóm, nhưng chain xuôi và liên kết đối ứng chưa hoàn tất."),
+      note: localized("Link 2 of 4.", "Liên kết 2/4."),
     });
 
     const successor = buckets.get(successorId);
@@ -556,7 +556,7 @@ function buildSteps432Exact(input) {
       event: "link-successor-prev",
       phase: "helper",
       title: localized(`${bucketName(successorId)}.prev = new_bucket`, `${bucketName(successorId)}.prev = new_bucket`),
-      note: localized("This is an intentional transient state: the predecessor still skips the new bucket.", "Đây là trạng thái tạm thời có chủ ý: predecessor vẫn bỏ qua bucket mới."),
+      note: localized("Link 3 of 4.", "Liên kết 3/4."),
     });
 
     const anchor = buckets.get(anchorId);
@@ -570,7 +570,7 @@ function buildSteps432Exact(input) {
       event: "link-predecessor-next",
       phase: "helper",
       title: localized(`${bucketName(anchorId)}.next = new_bucket`, `${bucketName(anchorId)}.next = new_bucket`),
-      note: localized("All four links now place the new bucket in the chain; it remains empty until the caller moves a key.", "Bốn liên kết đã đặt bucket mới vào chain; nó vẫn rỗng đến khi caller chuyển key vào."),
+      note: localized("Link 4 of 4: linked.", "Liên kết 4/4: đã nối."),
     });
 
     emit({
@@ -578,7 +578,7 @@ function buildSteps432Exact(input) {
       event: "insert-return",
       phase: "helper",
       title: localized(`Return ${bucketName(newId)}`, `Trả về ${bucketName(newId)}`),
-      note: localized("Return the exact bucket object created by this constant-time splice.", "Trả đúng object bucket được tạo bởi phép splice thời gian hằng số."),
+      note: localized("O(1) splice done.", "Chèn O(1) xong."),
     });
     if (assignTarget) locals.target = newId;
     emit({
@@ -586,7 +586,7 @@ function buildSteps432Exact(input) {
       event: "insert-call-return",
       phase: "operation",
       title: localized(assignTarget ? `target = ${bucketName(newId)}` : "insert_after returned", assignTarget ? `target = ${bucketName(newId)}` : "insert_after đã trả về"),
-      note: localized(assignTarget ? "The call-site assignment now receives the new bucket." : "This call ignores the returned bucket; the next line reads head.next.", assignTarget ? "Phép gán tại call-site giờ nhận bucket mới." : "Call này bỏ qua bucket trả về; dòng kế tiếp đọc head.next."),
+      note: localized(assignTarget ? "target = new bucket." : "Return value unused.", assignTarget ? "target = bucket mới." : "Bỏ qua giá trị trả về."),
     });
     return newId;
   };
@@ -603,7 +603,7 @@ function buildSteps432Exact(input) {
       phase: "helper",
       timing: "before",
       title: localized(`Call remove_bucket(${bucketName(bucketId)})`, `Gọi remove_bucket(${bucketName(bucketId)})`),
-      note: localized("The empty bucket is removed with two reciprocal pointer writes.", "Bucket rỗng được xóa bằng hai lần ghi pointer đối ứng."),
+      note: localized("Unlink with 2 writes.", "Tháo bằng 2 lần ghi."),
     });
     emit({
       line: 25,
@@ -611,7 +611,7 @@ function buildSteps432Exact(input) {
       phase: "helper",
       timing: "before",
       title: localized("Enter remove_bucket", "Vào remove_bucket"),
-      note: localized(`${bucketName(bucket.prev)} and ${bucketName(bucket.next)} will become adjacent.`, `${bucketName(bucket.prev)} và ${bucketName(bucket.next)} sẽ trở thành kề nhau.`),
+      note: localized(`Join ${bucketName(bucket.prev)} ↔ ${bucketName(bucket.next)}.`, `Nối ${bucketName(bucket.prev)} ↔ ${bucketName(bucket.next)}.`),
     });
 
     const predecessor = buckets.get(bucket.prev);
@@ -625,7 +625,7 @@ function buildSteps432Exact(input) {
       event: "bypass-forward",
       phase: "helper",
       title: localized(`${bucketName(predecessor.id)}.next = ${bucketName(successorId)}`, `${bucketName(predecessor.id)}.next = ${bucketName(successorId)}`),
-      note: localized("Forward traversal bypasses the removed bucket; the backward pointer is temporarily stale.", "Duyệt xuôi đã bỏ qua bucket bị xóa; pointer ngược tạm thời còn cũ."),
+      note: localized("Link 1 of 2.", "Liên kết 1/2."),
     });
 
     const successor = buckets.get(successorId);
@@ -639,14 +639,14 @@ function buildSteps432Exact(input) {
       event: "bypass-backward",
       phase: "helper",
       title: localized(`${bucketName(successorId)}.prev = ${bucketName(predecessor.id)}`, `${bucketName(successorId)}.prev = ${bucketName(predecessor.id)}`),
-      note: localized("The live chain is reciprocal again; the old bucket remains only as a detached object in this debug snapshot.", "Chain đang hoạt động lại đối ứng; bucket cũ chỉ còn là object tách rời trong snapshot debug."),
+      note: localized("Link 2 of 2: unlinked.", "Liên kết 2/2: đã tháo."),
     });
     emit({
       line: callLine,
       event: "remove-call-return",
       phase: "operation",
       title: localized(`${bucketName(bucketId)} is detached`, `${bucketName(bucketId)} đã tách khỏi chain`),
-      note: localized("remove_bucket returns implicitly after its second pointer write.", "remove_bucket trả về ngầm sau lần ghi pointer thứ hai."),
+      note: localized("Back to caller.", "Về hàm gọi."),
     });
   };
 
@@ -660,9 +660,9 @@ function buildSteps432Exact(input) {
   };
 
   // Class body binding events.
-  emit({ line: 1, event: "bind-bucket-class", phase: "setup", title: localized("Bind Bucket class", "Liên kết lớp Bucket"), note: localized("Bucket nodes store one count, ordered keys, and reciprocal neighbors.", "Node Bucket lưu một count, các key có thứ tự và hai hàng xóm đối ứng.") });
-  emit({ line: 2, event: "bind-bucket-init", phase: "setup", title: localized("Bind Bucket.__init__", "Liên kết Bucket.__init__"), note: localized("Each constructor body will be traced whenever a sentinel or real bucket is created.", "Mỗi thân constructor sẽ được trace khi tạo sentinel hoặc bucket thật.") });
-  emit({ line: 8, event: "bind-allone-class", phase: "setup", title: localized("Bind AllOne class", "Liên kết lớp AllOne"), note: localized("All operations share one ordered doubly linked bucket chain.", "Mọi thao tác dùng chung một chain bucket liên kết đôi có thứ tự.") });
+  emit({ line: 1, event: "bind-bucket-class", phase: "setup", title: localized("Bind Bucket class", "Liên kết lớp Bucket"), note: localized("count + keys + prev/next.", "count + keys + prev/next.") });
+  emit({ line: 2, event: "bind-bucket-init", phase: "setup", title: localized("Bind Bucket.__init__", "Liên kết Bucket.__init__"), note: localized("Constructor defined.", "Định nghĩa constructor.") });
+  emit({ line: 8, event: "bind-allone-class", phase: "setup", title: localized("Bind AllOne class", "Liên kết lớp AllOne"), note: localized("One sorted bucket chain.", "Một chain bucket có thứ tự.") });
   [
     [9, "bind-allone-init", "AllOne.__init__"],
     [17, "bind-insert-method", "insert_after"],
@@ -676,40 +676,40 @@ function buildSteps432Exact(input) {
     event,
     phase: "setup",
     title: localized(`Bind ${name}`, `Liên kết ${name}`),
-    note: localized("Method binding changes no runtime bucket state.", "Liên kết method không đổi trạng thái bucket runtime."),
+    note: localized("Definition only.", "Chỉ định nghĩa."),
   }));
 
   operation.status = "running";
-  emit({ line: 9, event: "allone-init-entry", phase: "setup", timing: "before", title: localized("Enter AllOne.__init__", "Vào AllOne.__init__"), note: localized("Construct two sentinels, connect them, then allocate both key maps.", "Tạo hai sentinel, nối chúng, rồi cấp phát hai map key.") });
-  emit({ line: 10, event: "head-constructor-call", phase: "setup", timing: "before", title: localized("Evaluate Bucket(0) for head", "Đánh giá Bucket(0) cho head"), note: localized("self.head is assigned after the constructor returns.", "self.head được gán sau khi constructor trả về.") });
+  emit({ line: 9, event: "allone-init-entry", phase: "setup", timing: "before", title: localized("Enter AllOne.__init__", "Vào AllOne.__init__"), note: localized("2 sentinels + 2 maps.", "2 sentinel + 2 map.") });
+  emit({ line: 10, event: "head-constructor-call", phase: "setup", timing: "before", title: localized("Evaluate Bucket(0) for head", "Đánh giá Bucket(0) cho head"), note: localized("Build HEAD.", "Tạo HEAD.") });
   constructBucket(0, "head", "head");
   headId = "head";
   locals.newBucket = headId;
-  emit({ line: 10, event: "assign-head", phase: "setup", title: localized("Assign the HEAD sentinel", "Gán sentinel HEAD"), note: localized("HEAD never stores user keys and marks the low-count boundary.", "HEAD không bao giờ chứa user key và đánh dấu biên count thấp.") });
+  emit({ line: 10, event: "assign-head", phase: "setup", title: localized("Assign the HEAD sentinel", "Gán sentinel HEAD"), note: localized("Low end, no keys.", "Đầu thấp, không key.") });
 
-  emit({ line: 11, event: "tail-constructor-call", phase: "setup", timing: "before", title: localized("Evaluate Bucket(0) for tail", "Đánh giá Bucket(0) cho tail"), note: localized("self.tail is assigned after its constructor returns.", "self.tail được gán sau khi constructor trả về.") });
+  emit({ line: 11, event: "tail-constructor-call", phase: "setup", timing: "before", title: localized("Evaluate Bucket(0) for tail", "Đánh giá Bucket(0) cho tail"), note: localized("Build TAIL.", "Tạo TAIL.") });
   constructBucket(0, "tail", "tail");
   tailId = "tail";
   locals.newBucket = tailId;
-  emit({ line: 11, event: "assign-tail", phase: "setup", title: localized("Assign the TAIL sentinel", "Gán sentinel TAIL"), note: localized("TAIL never stores user keys and marks the high-count boundary.", "TAIL không bao giờ chứa user key và đánh dấu biên count cao.") });
+  emit({ line: 11, event: "assign-tail", phase: "setup", title: localized("Assign the TAIL sentinel", "Gán sentinel TAIL"), note: localized("High end, no keys.", "Đầu cao, không key.") });
 
   buckets.get(headId).next = tailId;
   counters.pointerWrites++;
   setMutation("pointer-write", headId, "next", null, tailId, headId, tailId);
-  emit({ line: 12, event: "connect-head-next", phase: "setup", title: localized("HEAD.next = TAIL", "HEAD.next = TAIL"), note: localized("Forward traversal now reaches TAIL; the reverse link is assigned next.", "Duyệt xuôi giờ tới TAIL; liên kết ngược được gán tiếp theo.") });
+  emit({ line: 12, event: "connect-head-next", phase: "setup", title: localized("HEAD.next = TAIL", "HEAD.next = TAIL"), note: localized("Forward link.", "Liên kết xuôi.") });
   buckets.get(tailId).prev = headId;
   counters.pointerWrites++;
   setMutation("pointer-write", tailId, "prev", null, headId, tailId, headId);
-  emit({ line: 13, event: "connect-tail-prev", phase: "setup", title: localized("TAIL.prev = HEAD", "TAIL.prev = HEAD"), note: localized("The empty sentinel chain is now reciprocal.", "Chain sentinel rỗng giờ đã đối ứng.") });
+  emit({ line: 13, event: "connect-tail-prev", phase: "setup", title: localized("TAIL.prev = HEAD", "TAIL.prev = HEAD"), note: localized("Backward link.", "Liên kết ngược.") });
   keyCount = new Map();
   setMutation("map-allocate", "AllOne", "keyCount", null, "{}");
-  emit({ line: 14, event: "allocate-key-count", phase: "setup", title: localized("Allocate keyCount", "Cấp phát keyCount"), note: localized("keyCount maps every live key to its integer count.", "keyCount ánh xạ mỗi key đang sống tới count nguyên.") });
+  emit({ line: 14, event: "allocate-key-count", phase: "setup", title: localized("Allocate keyCount", "Cấp phát keyCount"), note: localized("key → count.", "key → count.") });
   keyBucket = new Map();
   setupComplete = true;
   stableExpected = true;
   operation.status = "complete";
   setMutation("map-allocate", "AllOne", "keyBucket", null, "{}");
-  emit({ line: 15, event: "allocate-key-bucket", phase: "setup", title: localized("Allocate keyBucket", "Cấp phát keyBucket"), note: localized("Initialization boundary: both maps are empty and HEAD ↔ TAIL is a valid stable chain.", "Biên khởi tạo: hai map rỗng và HEAD ↔ TAIL là chain ổn định hợp lệ.") });
+  emit({ line: 15, event: "allocate-key-bucket", phase: "setup", title: localized("Allocate keyBucket", "Cấp phát keyBucket"), note: localized("key → bucket. Ready.", "key → bucket. Sẵn sàng.") });
   if (!steps[steps.length - 1].allOne432View.invariants.stable) throw new Error("AllOne initialization invariant failed.");
 
   commands.forEach((command, commandIndex) => {
@@ -733,9 +733,9 @@ function buildSteps432Exact(input) {
     if (command.op === "inc") {
       counters.incCalls++;
       const key = command.key;
-      emit({ line: 28, event: "inc-entry", phase: "operation", timing: "before", title: localized(`Enter inc(${key})`, `Vào inc(${key})`), note: localized("Move this key exactly one count to the right, creating a neighbor only if absent.", "Chuyển key đúng một count sang phải, chỉ tạo hàng xóm nếu chưa có.") });
+      emit({ line: 28, event: "inc-entry", phase: "operation", timing: "before", title: localized(`Enter inc(${key})`, `Vào inc(${key})`), note: localized("Move key one bucket right.", "Dời key sang phải 1 bucket.") });
       const isNew = !keyCount.has(key);
-      emit({ line: 29, event: isNew ? "inc-new-key" : "inc-existing-key", phase: "operation", condition: { expression: `${key} not in keyCount`, result: isNew }, title: localized(`Is ${key} new? ${isNew}`, `${key} là key mới? ${isNew}`), note: isNew ? localized("A new key starts at count 1.", "Key mới bắt đầu tại count 1.") : localized("Read and increment the existing key's count.", "Đọc rồi tăng count hiện tại của key.") });
+      emit({ line: 29, event: isNew ? "inc-new-key" : "inc-existing-key", phase: "operation", condition: { expression: `${key} not in keyCount`, result: isNew }, title: localized(`Is ${key} new? ${isNew}`, `${key} là key mới? ${isNew}`), note: isNew ? localized("A new key starts at count 1.", "Key mới bắt đầu tại count 1.") : localized("Existing key.", "Key đã có.") });
 
       let targetId = null;
       if (isNew) {
@@ -743,11 +743,11 @@ function buildSteps432Exact(input) {
         keyCount.set(key, 1);
         counters.keyCountWrites++;
         setMutation("map-write", "keyCount", key, before, 1);
-        emit({ line: 30, event: "create-key-count", phase: "operation", title: localized(`keyCount[${key}] = 1`, `keyCount[${key}] = 1`), note: localized("The map is temporarily ahead of the bucket state until lines 44–45 finish.", "Map tạm thời đi trước trạng thái bucket cho đến khi dòng 44–45 hoàn tất.") });
+        emit({ line: 30, event: "create-key-count", phase: "operation", title: localized(`keyCount[${key}] = 1`, `keyCount[${key}] = 1`), note: localized("Map first, bucket later.", "Map trước, bucket sau.") });
         const headNext = buckets.get(headId).next;
         const needBucket = buckets.get(headNext).count !== 1;
         locals.target = headNext;
-        emit({ line: 31, event: needBucket ? "count-one-missing" : "count-one-present", phase: "operation", condition: { expression: `${bucketName(headNext)}.count != 1`, result: needBucket }, title: localized(`Need count-1 bucket? ${needBucket}`, `Cần bucket count-1? ${needBucket}`), note: needBucket ? localized("The immediate successor is TAIL or a larger count, so insert count 1.", "Successor trực tiếp là TAIL hoặc count lớn hơn, nên chèn count 1.") : localized("HEAD.next already has count 1; reuse it in O(1).", "HEAD.next đã có count 1; dùng lại trong O(1).") });
+        emit({ line: 31, event: needBucket ? "count-one-missing" : "count-one-present", phase: "operation", condition: { expression: `${bucketName(headNext)}.count != 1`, result: needBucket }, title: localized(`Need count-1 bucket? ${needBucket}`, `Cần bucket count-1? ${needBucket}`), note: needBucket ? localized("No [1] yet: insert.", "Chưa có [1]: chèn.") : localized("Reuse [1].", "Dùng lại [1].") });
         if (needBucket) {
           traceInsertAfter(headId, 1, 32, false);
         } else {
@@ -756,30 +756,30 @@ function buildSteps432Exact(input) {
         targetId = buckets.get(headId).next;
         locals.target = targetId;
         clearMutation();
-        emit({ line: 33, event: "select-count-one", phase: "operation", title: localized(`target = ${bucketName(targetId)}`, `target = ${bucketName(targetId)}`), note: localized("HEAD.next is now exactly the count-1 destination.", "HEAD.next giờ chính xác là đích count-1.") });
+        emit({ line: 33, event: "select-count-one", phase: "operation", title: localized(`target = ${bucketName(targetId)}`, `target = ${bucketName(targetId)}`), note: localized("Target is [1].", "Đích là [1].") });
       } else {
-        emit({ line: 34, event: "inc-else", phase: "operation", timing: "before", title: localized("Enter existing-key branch", "Vào nhánh key đã tồn tại"), note: localized("The false branch preserves the old count before changing either map or bucket.", "Nhánh sai giữ lại count cũ trước khi đổi map hoặc bucket.") });
+        emit({ line: 34, event: "inc-else", phase: "operation", timing: "before", title: localized("Enter existing-key branch", "Vào nhánh key đã tồn tại"), note: localized("Existing key branch.", "Nhánh key đã có.") });
         const oldCount = keyCount.get(key);
         locals.oldCount = oldCount;
-        emit({ line: 35, event: "read-old-count", phase: "operation", title: localized(`old_count = ${oldCount}`, `old_count = ${oldCount}`), note: localized("This saved value determines both the source and destination counts.", "Giá trị lưu này quyết định count nguồn và đích.") });
+        emit({ line: 35, event: "read-old-count", phase: "operation", title: localized(`old_count = ${oldCount}`, `old_count = ${oldCount}`), note: localized("Save old count.", "Lưu count cũ.") });
         keyCount.set(key, oldCount + 1);
         counters.keyCountWrites++;
         setMutation("map-write", "keyCount", key, oldCount, oldCount + 1);
-        emit({ line: 36, event: "increment-key-count", phase: "operation", title: localized(`keyCount[${key}] = ${oldCount + 1}`, `keyCount[${key}] = ${oldCount + 1}`), note: localized("The count map changes before the key physically moves, so full invariants are intentionally transient.", "Map count đổi trước khi key di chuyển vật lý, nên invariant đầy đủ tạm thời chưa đúng.") });
+        emit({ line: 36, event: "increment-key-count", phase: "operation", title: localized(`keyCount[${key}] = ${oldCount + 1}`, `keyCount[${key}] = ${oldCount + 1}`), note: localized("Map first, bucket later.", "Map trước, bucket sau.") });
         const bucketId = keyBucket.get(key);
         locals.bucket = bucketId;
         clearMutation();
-        emit({ line: 37, event: "read-key-bucket", phase: "operation", title: localized(`bucket = ${bucketName(bucketId)}`, `bucket = ${bucketName(bucketId)}`), note: localized("keyBucket gives the old bucket directly in average O(1).", "keyBucket cho bucket cũ trực tiếp trong O(1) trung bình.") });
+        emit({ line: 37, event: "read-key-bucket", phase: "operation", title: localized(`bucket = ${bucketName(bucketId)}`, `bucket = ${bucketName(bucketId)}`), note: localized("O(1) lookup.", "Tra O(1).") });
         buckets.get(bucketId).keys.delete(key);
         counters.keyRemoves++;
         setMutation("key-remove", bucketId, "keys", key, null);
-        emit({ line: 38, event: "remove-key-from-old", phase: "operation", title: localized(`Delete ${key} from ${bucketName(bucketId)}`, `Xóa ${key} khỏi ${bucketName(bucketId)}`), note: localized("The old bucket may now be empty, but removal waits until the destination is secured.", "Bucket cũ có thể đã rỗng, nhưng chỉ xóa sau khi đảm bảo đích.") });
+        emit({ line: 38, event: "remove-key-from-old", phase: "operation", title: localized(`Delete ${key} from ${bucketName(bucketId)}`, `Xóa ${key} khỏi ${bucketName(bucketId)}`), note: localized("Key leaves old bucket.", "Key rời bucket cũ.") });
         let candidate = buckets.get(bucketId).next;
         locals.target = candidate;
         clearMutation();
-        emit({ line: 39, event: "read-next-bucket", phase: "operation", title: localized(`target = ${bucketName(candidate)}`, `target = ${bucketName(candidate)}`), note: localized("A +1 move can only reuse the immediate next bucket.", "Một bước +1 chỉ có thể dùng lại bucket kế tiếp trực tiếp.") });
+        emit({ line: 39, event: "read-next-bucket", phase: "operation", title: localized(`target = ${bucketName(candidate)}`, `target = ${bucketName(candidate)}`), note: localized("Check next bucket.", "Xét bucket kế.") });
         const needBucket = buckets.get(candidate).count !== oldCount + 1;
-        emit({ line: 40, event: needBucket ? "increment-target-missing" : "increment-target-present", phase: "operation", condition: { expression: `${bucketName(candidate)}.count != ${oldCount + 1}`, result: needBucket }, title: localized(`Need count-${oldCount + 1} bucket? ${needBucket}`, `Cần bucket count-${oldCount + 1}? ${needBucket}`), note: needBucket ? localized("Insert the missing adjacent count before moving the key.", "Chèn count kề còn thiếu trước khi chuyển key.") : localized("The adjacent target already exists; no list mutation is needed.", "Đích kề đã tồn tại; không cần đổi list.") });
+        emit({ line: 40, event: needBucket ? "increment-target-missing" : "increment-target-present", phase: "operation", condition: { expression: `${bucketName(candidate)}.count != ${oldCount + 1}`, result: needBucket }, title: localized(`Need count-${oldCount + 1} bucket? ${needBucket}`, `Cần bucket count-${oldCount + 1}? ${needBucket}`), note: needBucket ? localized("Missing: insert it.", "Thiếu: chèn.") : localized("Exists: reuse.", "Có rồi: dùng lại.") });
         if (needBucket) {
           candidate = traceInsertAfter(bucketId, oldCount + 1, 41, true);
         } else {
@@ -788,14 +788,14 @@ function buildSteps432Exact(input) {
         targetId = candidate;
         locals.target = targetId;
         const empty = buckets.get(bucketId).keys.size === 0;
-        emit({ line: 42, event: empty ? "old-bucket-empty" : "old-bucket-kept", phase: "operation", condition: { expression: `not ${bucketName(bucketId)}.keys`, result: empty }, title: localized(`Old bucket empty? ${empty}`, `Bucket cũ rỗng? ${empty}`), note: empty ? localized("Splice out the empty source bucket.", "Tách bucket nguồn rỗng khỏi chain.") : localized("Other keys still use this count, so keep the bucket.", "Key khác vẫn dùng count này, nên giữ bucket.") });
+        emit({ line: 42, event: empty ? "old-bucket-empty" : "old-bucket-kept", phase: "operation", condition: { expression: `not ${bucketName(bucketId)}.keys`, result: empty }, title: localized(`Old bucket empty? ${empty}`, `Bucket cũ rỗng? ${empty}`), note: empty ? localized("Empty: remove it.", "Rỗng: xóa.") : localized("Not empty: keep.", "Còn key: giữ.") });
         if (empty) traceRemoveBucket(bucketId, 43);
       }
 
       buckets.get(targetId).keys.add(key);
       counters.keyAdds++;
       setMutation("key-add", targetId, "keys", null, key);
-      emit({ line: 44, event: "add-key-to-target", phase: "operation", title: localized(`Add ${key} to ${bucketName(targetId)}`, `Thêm ${key} vào ${bucketName(targetId)}`), note: localized("The ordered dictionary records this key at the destination bucket's insertion-order tail.", "Dictionary có thứ tự ghi key ở cuối thứ tự chèn của bucket đích.") });
+      emit({ line: 44, event: "add-key-to-target", phase: "operation", title: localized(`Add ${key} to ${bucketName(targetId)}`, `Thêm ${key} vào ${bucketName(targetId)}`), note: localized("Key enters target.", "Key vào đích.") });
       const beforeBucket = keyBucket.get(key) ?? null;
       keyBucket.set(key, targetId);
       counters.keyBucketWrites++;
@@ -806,7 +806,7 @@ function buildSteps432Exact(input) {
         45,
         "set-key-bucket",
         localized(`keyBucket[${key}] = ${bucketName(targetId)}`, `keyBucket[${key}] = ${bucketName(targetId)}`),
-        localized("Operation boundary: maps, key membership, count order, and reciprocal links agree again.", "Biên thao tác: map, membership key, thứ tự count và pointer đối ứng lại đồng nhất."),
+        localized("Done: all consistent.", "Xong: tất cả khớp."),
         isFinalOperation,
       );
       return;
@@ -815,50 +815,50 @@ function buildSteps432Exact(input) {
     if (command.op === "dec") {
       counters.decCalls++;
       const key = command.key;
-      emit({ line: 47, event: "dec-entry", phase: "operation", timing: "before", title: localized(`Enter dec(${key})`, `Vào dec(${key})`), note: localized("Move an existing key one count left, or delete it when count reaches zero.", "Chuyển key đang tồn tại một count sang trái, hoặc xóa khi count về 0.") });
+      emit({ line: 47, event: "dec-entry", phase: "operation", timing: "before", title: localized(`Enter dec(${key})`, `Vào dec(${key})`), note: localized("Move key one bucket left.", "Dời key sang trái 1 bucket.") });
       const missing = !keyCount.has(key);
-      emit({ line: 48, event: missing ? "dec-missing" : "dec-existing", phase: "operation", condition: { expression: `${key} not in keyCount`, result: missing }, title: localized(`Is ${key} missing? ${missing}`, `${key} không tồn tại? ${missing}`), note: missing ? localized("The defensive source returns without mutating state.", "Mã nguồn phòng thủ trả về mà không đổi trạng thái.") : localized("The key exists, so read its current count and bucket.", "Key tồn tại, nên đọc count và bucket hiện tại.") });
+      emit({ line: 48, event: missing ? "dec-missing" : "dec-existing", phase: "operation", condition: { expression: `${key} not in keyCount`, result: missing }, title: localized(`Is ${key} missing? ${missing}`, `${key} không tồn tại? ${missing}`), note: missing ? localized("Missing: do nothing.", "Không có: bỏ qua.") : localized("Key exists.", "Key tồn tại.") });
       if (missing) {
         outputs.push(null);
         operation.result = null;
-        completeOperation(49, "dec-missing-return", localized("Return without change", "Trả về không thay đổi"), localized("Operation boundary remains valid because no map, key, or pointer changed.", "Biên thao tác vẫn hợp lệ vì không map, key hay pointer nào thay đổi."), isFinalOperation);
+        completeOperation(49, "dec-missing-return", localized("Return without change", "Trả về không thay đổi"), localized("Nothing changed.", "Không đổi gì."), isFinalOperation);
         return;
       }
 
       const oldCount = keyCount.get(key);
       locals.oldCount = oldCount;
-      emit({ line: 50, event: "read-dec-count", phase: "operation", title: localized(`old_count = ${oldCount}`, `old_count = ${oldCount}`), note: localized("Count 1 deletes the key; larger counts move it to old_count − 1.", "Count 1 xóa key; count lớn hơn chuyển nó tới old_count − 1.") });
+      emit({ line: 50, event: "read-dec-count", phase: "operation", title: localized(`old_count = ${oldCount}`, `old_count = ${oldCount}`), note: localized("Save old count.", "Lưu count cũ.") });
       const bucketId = keyBucket.get(key);
       locals.bucket = bucketId;
-      emit({ line: 51, event: "read-dec-bucket", phase: "operation", title: localized(`bucket = ${bucketName(bucketId)}`, `bucket = ${bucketName(bucketId)}`), note: localized("Direct map lookup avoids scanning the bucket list.", "Tra map trực tiếp tránh quét danh sách bucket.") });
+      emit({ line: 51, event: "read-dec-bucket", phase: "operation", title: localized(`bucket = ${bucketName(bucketId)}`, `bucket = ${bucketName(bucketId)}`), note: localized("O(1) lookup.", "Tra O(1).") });
       buckets.get(bucketId).keys.delete(key);
       counters.keyRemoves++;
       setMutation("key-remove", bucketId, "keys", key, null);
-      emit({ line: 52, event: "remove-key-for-dec", phase: "operation", title: localized(`Delete ${key} from ${bucketName(bucketId)}`, `Xóa ${key} khỏi ${bucketName(bucketId)}`), note: localized("The source bucket may be empty transiently until line 64 removes it.", "Bucket nguồn có thể rỗng tạm thời cho đến khi dòng 64 xóa nó.") });
+      emit({ line: 52, event: "remove-key-for-dec", phase: "operation", title: localized(`Delete ${key} from ${bucketName(bucketId)}`, `Xóa ${key} khỏi ${bucketName(bucketId)}`), note: localized("Key leaves old bucket.", "Key rời bucket cũ.") });
       const becomesZero = oldCount === 1;
-      emit({ line: 53, event: becomesZero ? "count-becomes-zero" : "count-stays-positive", phase: "operation", condition: { expression: `${oldCount} == 1`, result: becomesZero }, title: localized(`Does count reach zero? ${becomesZero}`, `Count về 0? ${becomesZero}`), note: becomesZero ? localized("Delete both key mappings; no count-0 bucket is allowed.", "Xóa cả hai mapping; không cho phép bucket count-0.") : localized(`Move the key to count ${oldCount - 1}.`, `Chuyển key tới count ${oldCount - 1}.`) });
+      emit({ line: 53, event: becomesZero ? "count-becomes-zero" : "count-stays-positive", phase: "operation", condition: { expression: `${oldCount} == 1`, result: becomesZero }, title: localized(`Does count reach zero? ${becomesZero}`, `Count về 0? ${becomesZero}`), note: becomesZero ? localized("Count 0: delete key.", "Count 0: xóa key.") : localized(`Go to [${oldCount - 1}].`, `Sang [${oldCount - 1}].`) });
 
       if (becomesZero) {
         keyCount.delete(key);
         counters.mapDeletes++;
         setMutation("map-delete", "keyCount", key, oldCount, null);
-        emit({ line: 54, event: "delete-key-count", phase: "operation", title: localized(`Delete keyCount[${key}]`, `Xóa keyCount[${key}]`), note: localized("The key no longer has a positive count.", "Key không còn count dương.") });
+        emit({ line: 54, event: "delete-key-count", phase: "operation", title: localized(`Delete keyCount[${key}]`, `Xóa keyCount[${key}]`), note: localized("Drop from keyCount.", "Bỏ khỏi keyCount.") });
         const beforeBucket = keyBucket.get(key);
         keyBucket.delete(key);
         counters.mapDeletes++;
         setMutation("map-delete", "keyBucket", key, beforeBucket, null);
-        emit({ line: 55, event: "delete-key-bucket", phase: "operation", title: localized(`Delete keyBucket[${key}]`, `Xóa keyBucket[${key}]`), note: localized("Both key maps now omit the deleted key; the empty bucket cleanup still follows.", "Hai map key giờ đều bỏ key đã xóa; bước dọn bucket rỗng vẫn còn phía sau.") });
+        emit({ line: 55, event: "delete-key-bucket", phase: "operation", title: localized(`Delete keyBucket[${key}]`, `Xóa keyBucket[${key}]`), note: localized("Drop from keyBucket.", "Bỏ khỏi keyBucket.") });
       } else {
-        emit({ line: 56, event: "dec-else", phase: "operation", timing: "before", title: localized("Enter positive-count branch", "Vào nhánh count vẫn dương"), note: localized("The key will move exactly one bucket count to the left.", "Key sẽ chuyển đúng một count bucket sang trái.") });
+        emit({ line: 56, event: "dec-else", phase: "operation", timing: "before", title: localized("Enter positive-count branch", "Vào nhánh count vẫn dương"), note: localized("Count stays positive.", "Count vẫn dương.") });
         keyCount.set(key, oldCount - 1);
         counters.keyCountWrites++;
         setMutation("map-write", "keyCount", key, oldCount, oldCount - 1);
-        emit({ line: 57, event: "decrement-key-count", phase: "operation", title: localized(`keyCount[${key}] = ${oldCount - 1}`, `keyCount[${key}] = ${oldCount - 1}`), note: localized("The count map changes before bucket membership, creating a truthful transient mismatch.", "Map count đổi trước membership bucket, tạo mismatch tạm thời đúng với thực thi.") });
+        emit({ line: 57, event: "decrement-key-count", phase: "operation", title: localized(`keyCount[${key}] = ${oldCount - 1}`, `keyCount[${key}] = ${oldCount - 1}`), note: localized("Map first, bucket later.", "Map trước, bucket sau.") });
         let candidate = buckets.get(bucketId).prev;
         locals.target = candidate;
-        emit({ line: 58, event: "read-prev-bucket", phase: "operation", title: localized(`target = ${bucketName(candidate)}`, `target = ${bucketName(candidate)}`), note: localized("A −1 move can only reuse the immediate previous bucket.", "Một bước −1 chỉ có thể dùng lại bucket trước trực tiếp.") });
+        emit({ line: 58, event: "read-prev-bucket", phase: "operation", title: localized(`target = ${bucketName(candidate)}`, `target = ${bucketName(candidate)}`), note: localized("Check previous bucket.", "Xét bucket trước.") });
         const needBucket = buckets.get(candidate).count !== oldCount - 1;
-        emit({ line: 59, event: needBucket ? "decrement-target-missing" : "decrement-target-present", phase: "operation", condition: { expression: `${bucketName(candidate)}.count != ${oldCount - 1}`, result: needBucket }, title: localized(`Need count-${oldCount - 1} bucket? ${needBucket}`, `Cần bucket count-${oldCount - 1}? ${needBucket}`), note: needBucket ? localized("Insert the missing bucket immediately before the source.", "Chèn bucket còn thiếu ngay trước bucket nguồn.") : localized("The previous bucket already has the destination count.", "Bucket trước đã có count đích.") });
+        emit({ line: 59, event: needBucket ? "decrement-target-missing" : "decrement-target-present", phase: "operation", condition: { expression: `${bucketName(candidate)}.count != ${oldCount - 1}`, result: needBucket }, title: localized(`Need count-${oldCount - 1} bucket? ${needBucket}`, `Cần bucket count-${oldCount - 1}? ${needBucket}`), note: needBucket ? localized("Missing: insert it.", "Thiếu: chèn.") : localized("Exists: reuse.", "Có rồi: dùng lại.") });
         if (needBucket) {
           candidate = traceInsertAfter(buckets.get(bucketId).prev, oldCount - 1, 60, true);
         } else {
@@ -868,16 +868,16 @@ function buildSteps432Exact(input) {
         buckets.get(candidate).keys.add(key);
         counters.keyAdds++;
         setMutation("key-add", candidate, "keys", null, key);
-        emit({ line: 61, event: "add-key-to-decrement-target", phase: "operation", title: localized(`Add ${key} to ${bucketName(candidate)}`, `Thêm ${key} vào ${bucketName(candidate)}`), note: localized("The destination now contains the key at its lower count.", "Đích giờ chứa key tại count thấp hơn.") });
+        emit({ line: 61, event: "add-key-to-decrement-target", phase: "operation", title: localized(`Add ${key} to ${bucketName(candidate)}`, `Thêm ${key} vào ${bucketName(candidate)}`), note: localized("Key enters target.", "Key vào đích.") });
         const beforeBucket = keyBucket.get(key);
         keyBucket.set(key, candidate);
         counters.keyBucketWrites++;
         setMutation("map-write", "keyBucket", key, beforeBucket, candidate);
-        emit({ line: 62, event: "redirect-key-bucket", phase: "operation", title: localized(`keyBucket[${key}] = ${bucketName(candidate)}`, `keyBucket[${key}] = ${bucketName(candidate)}`), note: localized("Both key maps now describe the destination; only an empty source bucket may remain.", "Hai map key giờ mô tả đích; chỉ có thể còn bucket nguồn rỗng.") });
+        emit({ line: 62, event: "redirect-key-bucket", phase: "operation", title: localized(`keyBucket[${key}] = ${bucketName(candidate)}`, `keyBucket[${key}] = ${bucketName(candidate)}`), note: localized("Point map to target.", "Map trỏ tới đích.") });
       }
 
       const sourceEmpty = buckets.get(bucketId).keys.size === 0;
-      emit({ line: 63, event: sourceEmpty ? "dec-source-empty" : "dec-source-kept", phase: "operation", condition: { expression: `not ${bucketName(bucketId)}.keys`, result: sourceEmpty }, title: localized(`Source bucket empty? ${sourceEmpty}`, `Bucket nguồn rỗng? ${sourceEmpty}`), note: sourceEmpty ? localized("Remove the empty count bucket to preserve the no-empty-bucket invariant.", "Xóa bucket count rỗng để giữ invariant không có bucket rỗng.") : localized("Other keys still use this count; keep the source bucket linked.", "Key khác vẫn dùng count này; giữ bucket nguồn trong chain.") });
+      emit({ line: 63, event: sourceEmpty ? "dec-source-empty" : "dec-source-kept", phase: "operation", condition: { expression: `not ${bucketName(bucketId)}.keys`, result: sourceEmpty }, title: localized(`Source bucket empty? ${sourceEmpty}`, `Bucket nguồn rỗng? ${sourceEmpty}`), note: sourceEmpty ? localized("Empty: remove it.", "Rỗng: xóa.") : localized("Not empty: keep.", "Còn key: giữ.") });
       if (sourceEmpty) traceRemoveBucket(bucketId, 64);
       outputs.push(null);
       operation.result = null;
@@ -885,7 +885,7 @@ function buildSteps432Exact(input) {
         sourceEmpty ? 64 : 63,
         "dec-complete",
         localized(`Complete dec(${key})`, `Hoàn tất dec(${key})`),
-        localized("Operation boundary: every remaining key appears once in the correctly ordered reciprocal chain.", "Biên thao tác: mỗi key còn lại xuất hiện đúng một lần trong chain đối ứng có thứ tự đúng."),
+        localized("Done: all consistent.", "Xong: tất cả khớp."),
         isFinalOperation,
       );
       return;
@@ -907,8 +907,8 @@ function buildSteps432Exact(input) {
     query.candidates = empty ? [] : [...buckets.get(bucketId).keys];
     query.displayCandidates = [...query.candidates].sort();
     locals.target = query.bucket;
-    emit({ line: signatureLine, event: isMax ? "max-entry" : "min-entry", phase: "query", timing: "before", title: localized(`Enter ${command.op}()`, `Vào ${command.op}()`), note: localized(isMax ? "The maximum bucket is immediately before TAIL." : "The minimum bucket is immediately after HEAD.", isMax ? "Bucket lớn nhất nằm ngay trước TAIL." : "Bucket nhỏ nhất nằm ngay sau HEAD.") });
-    emit({ line: conditionLine, event: empty ? "query-empty" : "query-nonempty", phase: "query", condition: { expression: isMax ? "tail.prev is head" : "head.next is tail", result: empty }, title: localized(`Is the structure empty? ${empty}`, `Cấu trúc rỗng? ${empty}`), note: empty ? localized("No real bucket exists between the sentinels.", "Không có bucket thật giữa hai sentinel.") : localized(`${bucketName(bucketId)} is the extremal bucket and contains ${query.candidates.length} valid candidate(s).`, `${bucketName(bucketId)} là bucket cực trị và chứa ${query.candidates.length} ứng viên hợp lệ.`) });
+    emit({ line: signatureLine, event: isMax ? "max-entry" : "min-entry", phase: "query", timing: "before", title: localized(`Enter ${command.op}()`, `Vào ${command.op}()`), note: localized(isMax ? "Max is TAIL.prev." : "Min is HEAD.next.", isMax ? "Max là TAIL.prev." : "Min là HEAD.next.") });
+    emit({ line: conditionLine, event: empty ? "query-empty" : "query-nonempty", phase: "query", condition: { expression: isMax ? "tail.prev is head" : "head.next is tail", result: empty }, title: localized(`Is the structure empty? ${empty}`, `Cấu trúc rỗng? ${empty}`), note: empty ? localized("Empty: no buckets.", "Rỗng: không có bucket.") : localized(`Answer from ${bucketName(bucketId)}.`, `Lấy từ ${bucketName(bucketId)}.`) });
     const result = empty ? "" : query.candidates[0];
     query.chosen = result;
     outputs.push(result);
@@ -922,8 +922,8 @@ function buildSteps432Exact(input) {
       phase: "query",
       title: localized(empty ? "Return empty string" : `Return ${result}`, empty ? "Trả chuỗi rỗng" : `Trả ${result}`),
       note: empty
-        ? localized("The required empty-structure result is an empty string.", "Kết quả bắt buộc cho cấu trúc rỗng là chuỗi rỗng.")
-        : localized(`The source returns the first insertion-ordered key in ${bucketName(bucketId)}; every listed candidate is a legally correct answer.`, `Mã nguồn trả key đầu theo thứ tự chèn trong ${bucketName(bucketId)}; mọi ứng viên liệt kê đều là đáp án hợp lệ.`),
+        ? localized("Empty → ''.", "Rỗng → ''.")
+        : localized(`Any key in ${bucketName(bucketId)} is valid.`, `Key nào trong ${bucketName(bucketId)} cũng đúng.`),
       final: isFinalOperation,
     });
     if (!steps[steps.length - 1].allOne432View.invariants.stable) throw new Error(`AllOne query invariant failed at operation ${operation.index}.`);
