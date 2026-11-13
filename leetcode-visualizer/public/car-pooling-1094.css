@@ -324,6 +324,11 @@
   stroke-dasharray: 5 4;
 }
 
+/* Capacity far above the load: the line is pinned above the bars, not drawn to scale. */
+.cp1094-cap.is-off-scale {
+  stroke-dasharray: 2 4;
+}
+
 .cp1094-svg .cp1094-cap-label {
   fill: var(--cp1094-amber);
   font-size: 12px;
@@ -433,6 +438,20 @@ body:has(#treeView:not(.hidden) .cp1094-viz) #codePanel {
   position: static;
   max-height: none;
   overflow-y: visible;
+}
+
+/* Long lines (the 74-char signature) wrap inside the panel instead of being cut off at its right edge. */
+body:has(#treeView:not(.hidden) .cp1094-viz) #codePanel .code-line {
+  width: auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+body:has(#treeView:not(.hidden) .cp1094-viz) #codePanel .code-line .txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 @container cp1094 (max-width: 420px) {

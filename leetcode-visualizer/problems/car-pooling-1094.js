@@ -69,7 +69,8 @@ function buildSteps1094(input, params) {
   const steps = [];
   let last = null;
   let diff = null;
-  let trip = null; // index into trips during the first loop
+  let trip = null; // index into trips during the first loop (drives the picture)
+  let lastTrip = null; // Python keeps num/start/end after the loop, so the Variables panel does too
   let i = null;
   let curr = null;
   let answer = null;
@@ -83,7 +84,7 @@ function buildSteps1094(input, params) {
   const dash = (value) => (value === null ? "—" : value);
 
   const emit = ({ line, event, title, note, condition = null, changed = null, delta = null, final = false }) => {
-    const t = trip === null ? null : trips[trip];
+    const t = lastTrip === null ? null : trips[lastTrip];
     steps.push({
       title,
       note,
@@ -136,6 +137,7 @@ function buildSteps1094(input, params) {
 
   trips.forEach(([num, from, to], index) => {
     trip = index;
+    lastTrip = index;
     emit({ line: 7, event: "for-trip", title: bi(`T${index + 1}: [${num}, ${from}, ${to}]`, `T${index + 1}: [${num}, ${from}, ${to}]`), note: bi(`T${index + 1}: ${num} khách, ${from}→${to}.`, `T${index + 1}: ${num} riders, ${from}→${to}.`) });
     diff[from] += num;
     emit({ line: 8, event: "plus", changed: from, delta: num, title: bi(`diff[${from}] += ${num}`, `diff[${from}] += ${num}`), note: bi(`Lên ở ${from}: +${num}.`, `Pick up at ${from}: +${num}.`) });

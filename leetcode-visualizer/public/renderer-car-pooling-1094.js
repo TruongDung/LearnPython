@@ -92,7 +92,7 @@ function cp1094Normalize(step) {
     i: index(raw.i),
     curr: cp1094Int(raw.curr, 0, 999),
     prefix,
-    peak: Math.max(cp1094Int(raw.peak, 0, 999) ?? 0, capacity),
+    peak: cp1094Int(raw.peak, 0, 999) ?? 0,
     answer: typeof raw.answer === "boolean" ? raw.answer : null,
     final: raw.final === true || Boolean(step && step.final),
   };
@@ -119,14 +119,19 @@ function cp1094Signed(value) {
 function cp1094Layout(state) {
   const unit = Math.max(22, Math.min(40, Math.floor(CP1094_MAX_W / Math.max(1, state.cells))));
   const x = (cell) => CP1094_PAD_L + cell * unit;
-  const unitH = Math.min(18, CP1094_CHART_H / Math.max(1, state.peak));
+  // Scale to the riders. A capacity far above the peak would flatten the bars, so its line is then pinned
+  // one unit above the tallest bar (offScale) and labelled with an up arrow instead of drawn to scale.
+  const offScale = state.capacity > Math.max(Math.ceil(state.peak * 1.5), state.peak + 2);
+  const scale = offScale ? state.peak + 1 : Math.max(state.peak, state.capacity);
+  const capLevel = offScale ? scale : state.capacity;
+  const unitH = Math.min(18, CP1094_CHART_H / Math.max(1, scale));
   const rowsTop = CP1094_TOP;
   const deltaTop = rowsTop + state.trips.length * CP1094_ROW + 2;
   const diffTop = deltaTop + CP1094_DELTA_H;
   const chartTop = diffTop + CP1094_CELL_H + CP1094_GAP;
-  const base = chartTop + CP1094_HEAD + state.peak * unitH;
+  const base = chartTop + CP1094_HEAD + scale * unitH;
   const currTop = base + 24;
-  return { unit, unitH, x, rowsTop, deltaTop, diffTop, chartTop, base, currTop, width: x(state.cells) + CP1094_PAD_R, height: currTop + CP1094_CELL_H + 4 };
+  return { unit, unitH, offScale, capLevel, x, rowsTop, deltaTop, diffTop, chartTop, base, currTop, width: x(state.cells) + CP1094_PAD_R, height: currTop + CP1094_CELL_H + 4 };
 }
 
 const cp1094N = (value) => Math.round(value * 100) / 100;
@@ -185,9 +190,9 @@ function cp1094Picture(state, copy) {
     parts.push(`<rect class="cp1094-load${over ? " is-over" : ""}${state.i === cell ? " is-current" : ""}${status}" data-load="${cell}" x="${x(cell) + 3}" y="${top}" width="${unit - 6}" height="${cp1094N(value * L.unitH)}" rx="3"/>`);
   });
   // Capacity line over the bars, its value in the right margin.
-  const capY = cp1094N(L.base - state.capacity * L.unitH);
-  parts.push(`<line class="cp1094-cap" data-cap="${state.capacity}" x1="${CP1094_PAD_L}" y1="${capY}" x2="${x(state.cells)}" y2="${capY}"/>`);
-  parts.push(`<text class="cp1094-cap-label" x="${x(state.cells) + 4}" y="${cp1094N(capY + 4)}">${state.capacity}</text>`);
+  const capY = cp1094N(L.base - L.capLevel * L.unitH);
+  parts.push(`<line class="cp1094-cap${L.offScale ? " is-off-scale" : ""}" data-cap="${state.capacity}" x1="${CP1094_PAD_L}" y1="${capY}" x2="${x(state.cells)}" y2="${capY}"/>`);
+  parts.push(`<text class="cp1094-cap-label" x="${x(state.cells) + 4}" y="${cp1094N(capY + 4)}">${L.offScale ? "↑" : ""}${state.capacity}</text>`);
 
   // Stop axis: one cell per stop.
   parts.push(`<line class="cp1094-axis" x1="${CP1094_PAD_L}" y1="${L.base}" x2="${x(state.cells)}" y2="${L.base}"/>`);

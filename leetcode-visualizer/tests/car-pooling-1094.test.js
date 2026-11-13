@@ -184,7 +184,7 @@ function svgBoxes(html) {
     texts.push({ kind, name: `${kind}:${label}@${tx},${ty}`, x, y: +ty - size, w, h: size + 2 });
   }
   const marks = [];
-  for (const m of html.matchAll(/<line class="cp1094-cap"[^>]* x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="[\d.]+"/g)) {
+  for (const m of html.matchAll(/<line class="cp1094-cap[^"]*"[^>]* x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="[\d.]+"/g)) {
     marks.push({ name: 'cap-line', x: +m[1], y: +m[2] - 0.75, w: +m[3] - +m[1], h: 1.5 });
   }
   return { width, height, shapes, trips, cells, texts, marks };
@@ -261,6 +261,21 @@ test('1094 picture colors differ from the fits/over/capacity colors in both them
   assert.doesNotMatch(CSS.match(/\.cp1094-load\.is-check-ok \{[^}]*\}/s)[0], /stroke-dasharray/);
 });
 
+test('1094 load bars stay readable when capacity is far above the load; the capacity line is then pinned above them', () => {
+  const ui = renderer('en');
+  for (const [input, capacity, pinned] of [['[[1,0,16]]', 99, true], ['[[9,0,1]]', 99, true], ['[[2,1,5],[3,3,7]]', 4, false], ['[[2,1,5],[3,3,7]]', 6, false]]) {
+    const { steps } = problem.builder(input, { capacity });
+    const html = ui.render(steps.at(-1), steps, steps.length - 1);
+    const heights = [...html.matchAll(/<rect class="cp1094-load[^"]*"[^>]* y="([\d.]+)" width="[\d.]+" height="([\d.]+)"/g)].map((m) => [+m[1], +m[2]]);
+    const capY = +html.match(/<line class="cp1094-cap[^"]*"[^>]* y1="([\d.]+)"/)[1];
+    assert.ok(heights.length > 0);
+    assert.ok(Math.max(...heights.map(([, h]) => h)) >= 14, `${input} cap ${capacity}: tallest bar readable`);
+    assert.equal(/cp1094-cap is-off-scale/.test(html), pinned, `${input} cap ${capacity}`);
+    assert.equal(html.includes(`>↑${capacity}</text>`), pinned);
+    if (pinned) assert.ok(heights.every(([y]) => y > capY), 'pinned line sits above every bar');
+  }
+});
+
 test('1094 aria-labels follow the page language', () => {
   const { steps } = problem.builder(problem.defaultInput);
   const last = steps.at(-1);
@@ -286,6 +301,15 @@ test('1094 shows locals once: in the shared Variables panel, not in the line str
   });
 });
 
+test('1094 keeps the last trip in num/start/end after the first loop, as Python does', () => {
+  const { steps } = problem.builder('[[2,1,5],[3,3,7]]', { capacity: 9 });
+  const vars = (step) => Object.fromEntries(step.vars.map((v) => [v.name, v.value]));
+  const done = steps.findIndex((step) => step.carPool1094View.event === 'for-trip-done');
+  for (const step of steps.slice(done)) assert.deepEqual([vars(step).num, vars(step).start, vars(step).end], [3, 3, 7]);
+  assert.equal(steps[done + 1].carPool1094View.trip, null, 'the picture no longer marks a current trip');
+  assert.deepEqual([vars(steps[0]).num, vars(steps[0]).start, vars(steps[0]).end], ['—', '—', '—']);
+});
+
 test('1094 rejects inputs outside the visualizer limits', () => {
   const bad = ['', '[]', 'nope', '[[1,2,2]]', '[[1,3,2]]', '[[0,1,2]]', '[[10,1,2]]', '[[1,-1,2]]', '[[1,0,17]]', '[[1,0]]',
     JSON.stringify(Array.from({ length: 9 }, () => [1, 0, 1]))];
@@ -303,4 +327,6 @@ test('1094 assets are wired with light/dark tokens and no code-panel height cap'
   assert.match(CSS, /\.cp1094-viz \{[^}]*--cp1094-bg:/s);
   assert.match(CSS, /\[data-theme="light"\] \.cp1094-viz \{[^}]*--cp1094-bg:/s);
   assert.match(CSS, /\.cp1094-viz\) #codePanel \{[^}]*max-height: none;/s);
+  assert.match(CSS, /\.cp1094-viz\) #codePanel \.code-line \{[^}]*white-space: pre-wrap;/s, 'long code lines wrap instead of being cut off');
+  assert.match(CSS, /\.cp1094-viz\) #codePanel \.code-line \.txt \{[^}]*white-space: pre-wrap;[^}]*overflow-wrap: anywhere;/s);
 });
