@@ -3,8 +3,8 @@ const { test } = require('node:test');
 const { SUPPORTED } = require('../problems');
 const { prepareDesignLiveRun } = require('../live-args');
 const p = SUPPORTED[729];
-test('729 is grouped under Segment Tree', () => {
-  assert.deepEqual(p.tags.map(tag => tag.key), ['segment-tree']);
+test('729 remains under Segment Tree and joins the Sweep Line study path', () => {
+  assert.deepEqual(p.tags.map(tag => tag.key), ['segment-tree', 'sweep-line']);
 });
 test('example, adjacent endpoints, duplicate and containment bookings', () => {
   assert.deepEqual(p.builder(p.defaultInput).answer, [true, false, true]);

@@ -76,6 +76,8 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.trending9024View), surface: "treeView", render: (step) => { renderTrending9024View(step); } },
+    { predicate: (step) => Boolean(step.sweepStudyView), surface: "treeView", render: (step) => { renderSweepStudy(step); } },
     { predicate: (step) => Boolean(step.advancedStackView), surface: "treeView", render: (step) => { renderAdvancedStackPictures(step); } },
     { predicate: (step) => Boolean(step.removeKDigits402View), surface: "treeView", render: (step) => { renderRemoveKDigits402(step); } },
     { predicate: (step) => Boolean(step.circularNext503View), surface: "treeView", render: (step) => { renderCircularNext503(step); } },

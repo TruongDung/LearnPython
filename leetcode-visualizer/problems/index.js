@@ -35,6 +35,16 @@ const categories = {
   interview: Object.assign(require("./interview"), require("./requested-visualizations"), require("./square-arrangement-9013"), require("./k-sum-2386"), require("./next-word-predictor-9005"), require("./k-smallest-matrix-9008"), require("./safe-level-path-9021"), require("./underpaid-managers-9022"), require("./directory-size-9023")),
 };
 
+Object.assign(categories.interview, require('./youtube-trending-9024'));
+
+// Missing lessons from the requested sweep-line study lists, in study order.
+Object.assign(categories.array,
+  require('./sweep-interval-lessons'),
+  require('./sweep-difference-lessons'),
+  require('./sweep-scheduling-lessons'),
+  require('./sweep-calendar-lessons'),
+  require('./sweep-geometry-lessons'));
+
 // Replace existing lessons in their original category; add new grid lessons to Graph.
 const pictureBatch2026 = require("./flood-batch-2026");
 for (const [id, problem] of Object.entries(pictureBatch2026)) {
@@ -460,6 +470,8 @@ for (const [catKey, mod] of Object.entries(categories)) {
     }
   }
 }
+
+require('./sweep-study-path').registerSweepStudyPath(SUPPORTED, CATEGORY_ORDER);
 
 for (const { id } of PREFIX_MAX_ROSTER) {
   const problem = SUPPORTED[id];
