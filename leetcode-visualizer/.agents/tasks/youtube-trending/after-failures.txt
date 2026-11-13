@@ -1,0 +1,53 @@
+0/1 Knapsack uses one canonical key across categories and tags
+1275 board state and actual local watches agree with Python after each displayed statement
+1337 row counts, sorting, final selection and watches match CPython instructions
+1368 registers five solutions, complexities and the recommended default
+1373 includes scoped responsive styles and refreshed assets
+1514 rejects malformed graphs and bundles its Python helper
+1728 main and move-helper line snapshots match CPython, with exact queue and table projections
+1765 renderer and styles are registered for lazy loading
+1857 renderer and no-scroll styles are registered and cache-busted
+1971 matches every completed Python statement, exact adjacency, visited, worklist and recursive frame locals
+2003 exact CPython trace includes failed index lookup, child-list construction, blocked continue, mex and answer updates
+2054 is registered as the heap sweep-line interval lesson
+207 line-by-line frames point to executable lines in the updated snippet
+207 uses the requested typed Kahn implementation
+218 matches CPython after every line, including heapq tuple ties, stale height and for-loop exhaustion
+2203 validates input, permits parallel edges and prepares live arguments
+2204 every highlighted line, loop exhaustion and bound local matches CPython
+2440 all executed lines, locals, and six fixed watches match CPython
+286 renderer and no-scroll styles are registered for lazy loading
+2872 approach 1 matches CPython events and locals after every line
+2872 approach 2 matches CPython events and locals after every line
+2872 recursive calls, returns, frame locals and line timing match CPython
+300 code view keeps both scroll directions for long approach 5 lines
+300 opens the editor full-screen without wrapping for approaches 1 through 7
+307 styles are responsive and theme-aware with concise interview metadata
+3286 validates input/health and prepares both arguments for live editing
+3435 every executed source line and bound local matches CPython, including both call scopes
+347 matches CPython after each line, including equal-frequency tuple ties and loop exhaustion
+37 matches every executed CPython statement, frame local, board mutation and live row/column/box set
+378 and 977 trace the actual Python state after each executable line
+3963 matches every completed Python statement, grid mutation and actual local variable
+417 renderer and no-scroll styles are registered for lazy loading
+474 source and locals match CPython after each executable line
+51 matches every completed CPython statement, actual local, board, set and recursive frame across the full eight-queen trace
+628 preserves the viewport and viz panel height between steps
+65 complete physical line events, locals, branches and returns agree with native Python
+694 styles keep the grid and shape board responsive
+743 validates network input and exposes the three live-debug arguments
+9005 every source line, local variable and cached winner matches CPython
+9005 snippet runs train then predict through the real live design tracer
+9006 keeps six essential watches stable and agrees with Python after each instruction
+9007 snapshots and six stable watches match CPython after each displayed instruction
+9008 watches and exact heap layout match CPython after every source line
+934 renderer and no-scroll styles are registered for lazy loading
+all available requested problems are grouped under Segment Tree
+all picture renderers work in day/night languages without changing trace state
+displayed Python implementations return the sample answers
+every highlighted Python line, deque, set, dictionary mutation and return matches native CPython
+HTTP metadata, solve, editor calls and lazy picture assets work for all six problems
+index loads only the shell assets synchronously and keeps visualization chunks inert
+standalone 1915 solution stays identical to the visualized source
+the Segment Tree roster exposes all 87 requested problems
+WASM Python records each completed statement and helper frame like native CPython, including heap and union-find mutations

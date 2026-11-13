@@ -1,0 +1,525 @@
+/* Interview 9025 — YouTube Trending Videos (Top K). Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.yt9025-viz {
+  --yt9025-bg: #0f1a25;
+  --yt9025-panel: #152434;
+  --yt9025-soft: #1e3144;
+  --yt9025-border: #36506a;
+  --yt9025-text: #eaf3fb;
+  --yt9025-muted: #9fb3c6;
+  /* Status colors: True (green), False / dropped (red), current line and call (amber). */
+  --yt9025-green: #4fd69c;
+  --yt9025-red: #ff8f8f;
+  --yt9025-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above. */
+  --yt9025-bar: #3d8bff;
+  --yt9025-plus: #e070d0;
+  --yt9025-node: #8c6cff;
+  --yt9025-bucket: #a0b4c8;
+  --yt9025-cut: #7fe0ff;
+  --yt9025-scan: #b8e986;
+  --yt9025-line: #2a4560;
+  container: yt9025 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--yt9025-border);
+  border-radius: 16px;
+  background: var(--yt9025-bg);
+  color: var(--yt9025-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .yt9025-viz {
+  --yt9025-bg: #f4f7fb;
+  --yt9025-panel: #ffffff;
+  --yt9025-soft: #e9eff7;
+  --yt9025-border: #c2d1e2;
+  --yt9025-text: #17283a;
+  --yt9025-muted: #55697e;
+  --yt9025-green: #08784f;
+  --yt9025-red: #b4232f;
+  --yt9025-amber: #9a6200;
+  --yt9025-bar: #2f7dff;
+  --yt9025-plus: #c0309f;
+  --yt9025-node: #8a4dff;
+  --yt9025-bucket: #6b8196;
+  --yt9025-cut: #0096c7;
+  --yt9025-scan: #4d8a14;
+  --yt9025-line: #fff3cf;
+}
+
+.yt9025-viz,
+.yt9025-viz * {
+  box-sizing: border-box;
+}
+
+.yt9025-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.yt9025-viz button {
+  border: 1px solid var(--yt9025-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--yt9025-panel);
+  color: var(--yt9025-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.yt9025-viz button:hover:not(:disabled) {
+  border-color: var(--yt9025-bar);
+  background: var(--yt9025-soft);
+}
+
+.yt9025-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.yt9025-viz :focus-visible {
+  outline: 3px solid var(--yt9025-bar);
+  outline-offset: 2px;
+}
+
+/* Header */
+.yt9025-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.yt9025-head > div {
+  min-width: 0;
+}
+
+.yt9025-head small {
+  color: var(--yt9025-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.yt9025-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.yt9025-head h2 code {
+  color: var(--yt9025-amber);
+}
+
+.yt9025-viz.is-final .yt9025-head h2 code {
+  color: var(--yt9025-green);
+}
+
+.yt9025-status {
+  border: 1px solid var(--yt9025-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--yt9025-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.yt9025-viz.is-final .yt9025-status {
+  border-color: var(--yt9025-green);
+  color: var(--yt9025-green);
+}
+
+.yt9025-presets,
+.yt9025-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.yt9025-card {
+  min-width: 0;
+  border: 1px solid var(--yt9025-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--yt9025-panel);
+}
+
+.yt9025-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.yt9025-card > header > b {
+  color: var(--yt9025-muted);
+  font-weight: 700;
+}
+
+/* Call chips: "+1 id" and, once returned, the top-k ids below it. */
+.yt9025-calls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.yt9025-call {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 48px;
+  border: 1.5px dashed var(--yt9025-border);
+  border-radius: 10px;
+  padding: 2px 9px;
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.yt9025-call b {
+  color: var(--yt9025-plus);
+}
+
+.yt9025-call small {
+  color: var(--yt9025-green);
+  font-size: 11px;
+}
+
+.yt9025-call.is-done {
+  border-style: solid;
+}
+
+.yt9025-call.is-cur {
+  background: color-mix(in srgb, var(--yt9025-amber) 22%, transparent);
+  border-color: var(--yt9025-amber);
+  border-style: solid;
+}
+
+/* Picture: drawn about as wide as the card; scales down only on narrow screens. */
+.yt9025-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.yt9025-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--yt9025-text);
+}
+
+.yt9025-svg .yt9025-head-label {
+  fill: var(--yt9025-muted);
+}
+
+.yt9025-svg .yt9025-row-label,
+.yt9025-svg .yt9025-node-score,
+.yt9025-svg .yt9025-ptr {
+  fill: var(--yt9025-muted);
+}
+
+.yt9025-svg .yt9025-id.is-bump,
+.yt9025-svg .yt9025-score.is-bump,
+.yt9025-svg .yt9025-node-id.is-bump,
+.yt9025-svg .yt9025-chip-text.is-bump {
+  fill: var(--yt9025-plus);
+}
+
+/* Background highlight: the scanned video (approach 1) or the walked bucket (approach 3). */
+.yt9025-band {
+  fill: color-mix(in srgb, var(--yt9025-scan) 18%, transparent);
+  stroke: var(--yt9025-scan);
+  stroke-width: 1.2;
+}
+
+.yt9025-bar {
+  fill: var(--yt9025-bar);
+}
+
+.yt9025-plus {
+  fill: var(--yt9025-plus);
+}
+
+/* Heap nodes and SortedList entries */
+.yt9025-node {
+  fill: color-mix(in srgb, var(--yt9025-node) 18%, transparent);
+  stroke: var(--yt9025-node);
+  stroke-width: 1.5;
+}
+
+.yt9025-node.is-root {
+  stroke-width: 2.5;
+}
+
+.yt9025-node.is-top {
+  fill: color-mix(in srgb, var(--yt9025-green) 16%, transparent);
+}
+
+.yt9025-node.is-new,
+.yt9025-node.is-moved {
+  fill: color-mix(in srgb, var(--yt9025-amber) 24%, transparent);
+  stroke: var(--yt9025-amber);
+  stroke-width: 2.5;
+}
+
+.yt9025-node.is-drop {
+  fill: color-mix(in srgb, var(--yt9025-red) 16%, transparent);
+  stroke: var(--yt9025-red);
+  stroke-dasharray: 4 3;
+}
+
+.yt9025-node.is-take {
+  fill: color-mix(in srgb, var(--yt9025-green) 18%, transparent);
+  stroke: var(--yt9025-green);
+}
+
+.yt9025-node.is-lifted {
+  fill: none;
+  stroke: var(--yt9025-plus);
+  stroke-dasharray: 4 3;
+}
+
+.yt9025-svg .yt9025-node-id.is-drop {
+  fill: var(--yt9025-red);
+  text-decoration: line-through;
+}
+
+.yt9025-edge {
+  fill: none;
+  stroke: var(--yt9025-node);
+  stroke-width: 1.5;
+}
+
+/* The moved SortedList entry slides from its old (lifted) slot to the new one. */
+.yt9025-move {
+  animation: yt9025-slide 0.6s ease-out;
+}
+
+@keyframes yt9025-slide {
+  from {
+    transform: translate(var(--yt9025-dx), var(--yt9025-dy));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yt9025-move {
+    animation: none;
+  }
+}
+
+.yt9025-cut {
+  fill: var(--yt9025-cut);
+}
+
+.yt9025-svg .yt9025-cut-label {
+  fill: var(--yt9025-cut);
+}
+
+/* res and the returned top */
+.yt9025-box {
+  fill: var(--yt9025-soft);
+  stroke: var(--yt9025-border);
+  stroke-width: 1.2;
+}
+
+.yt9025-box.is-empty {
+  fill: none;
+  stroke-dasharray: 4 3;
+}
+
+.yt9025-box.is-out {
+  fill: color-mix(in srgb, var(--yt9025-green) 20%, transparent);
+  stroke: var(--yt9025-green);
+}
+
+.yt9025-svg .yt9025-box-text.is-out {
+  fill: var(--yt9025-green);
+}
+
+/* Approach 3: score buckets, video chips, prev/next links, pointers */
+.yt9025-bucket {
+  fill: color-mix(in srgb, var(--yt9025-bucket) 22%, transparent);
+  stroke: var(--yt9025-bucket);
+  stroke-width: 1.5;
+}
+
+.yt9025-bucket.is-sentinel {
+  fill: none;
+  stroke-dasharray: 2 2;
+}
+
+.yt9025-bucket.is-float,
+.yt9025-bucket.is-new {
+  stroke: var(--yt9025-amber);
+  stroke-width: 2.5;
+}
+
+.yt9025-bucket.is-float {
+  stroke-dasharray: 4 3;
+}
+
+.yt9025-bucket.is-ghost {
+  fill: none;
+  stroke: var(--yt9025-red);
+  stroke-dasharray: 4 3;
+}
+
+.yt9025-svg .yt9025-bucket-score.is-ghost {
+  fill: var(--yt9025-red);
+  text-decoration: line-through;
+}
+
+.yt9025-chip {
+  fill: var(--yt9025-soft);
+  stroke: var(--yt9025-border);
+  stroke-width: 1.2;
+}
+
+.yt9025-chip.is-bump {
+  fill: color-mix(in srgb, var(--yt9025-plus) 22%, transparent);
+  stroke: var(--yt9025-plus);
+  stroke-width: 2;
+}
+
+.yt9025-chip.is-leaving {
+  fill: none;
+  stroke: var(--yt9025-plus);
+  stroke-dasharray: 3 2;
+}
+
+.yt9025-chip.is-picked {
+  stroke: var(--yt9025-green);
+  stroke-width: 2.5;
+}
+
+.yt9025-link {
+  fill: none;
+  stroke: var(--yt9025-muted);
+  stroke-width: 1.4;
+}
+
+.yt9025-link.is-pending {
+  stroke: var(--yt9025-amber);
+  stroke-dasharray: 2 2;
+}
+
+.yt9025-svg .yt9025-ptr.is-cur {
+  fill: var(--yt9025-plus);
+}
+
+.yt9025-svg .yt9025-ptr.is-nxt {
+  fill: var(--yt9025-amber);
+}
+
+.yt9025-svg .yt9025-ptr.is-node {
+  fill: var(--yt9025-scan);
+}
+
+.yt9025-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--yt9025-muted);
+  font-size: 11px;
+}
+
+.yt9025-legend .lg-bar { color: var(--yt9025-bar); }
+.yt9025-legend .lg-plus { color: var(--yt9025-plus); }
+.yt9025-legend .lg-scan { color: var(--yt9025-scan); }
+.yt9025-legend .lg-node { color: var(--yt9025-node); }
+.yt9025-legend .lg-drop { color: var(--yt9025-red); }
+.yt9025-legend .lg-out { color: var(--yt9025-green); }
+.yt9025-legend .lg-cut { color: var(--yt9025-cut); }
+.yt9025-legend .lg-bucket { color: var(--yt9025-bucket); }
+.yt9025-legend .lg-link { color: var(--yt9025-muted); }
+
+/* Current-line strip */
+.yt9025-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--yt9025-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--yt9025-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .yt9025-now {
+  background: var(--yt9025-line);
+}
+
+.yt9025-lineno {
+  color: var(--yt9025-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.yt9025-now .yt9025-effect {
+  color: var(--yt9025-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.yt9025-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.yt9025-branch.is-true {
+  background: color-mix(in srgb, var(--yt9025-green) 20%, transparent);
+  color: var(--yt9025-green);
+}
+
+.yt9025-branch.is-false {
+  background: color-mix(in srgb, var(--yt9025-red) 18%, transparent);
+  color: var(--yt9025-red);
+}
+
+/* 9025 step notes are a few words. */
+body:has(#treeView:not(.hidden) .yt9025-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 9025 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Long lines (the signatures, the while condition) wrap inside the panel instead of being cut off at its right edge. */
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line {
+  width: auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@container yt9025 (max-width: 420px) {
+  .yt9025-head h2 {
+    font-size: 18px;
+  }
+}
