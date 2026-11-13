@@ -89,7 +89,24 @@ async function main() {
   };
   const report = { runs: {} };
   const presets = [['default', null], ['short', '[[5,10],[6,8],[1,5],[2,3],[1,10]]'], ['touch', '[[1,2],[2,3],[3,4]]'], ['none', '[[1,3],[5,6],[8,10],[11,13]]'], ['wide', '[[1,40],[2,3],[999,999]]'.replace('[999,999]', '[39,40]')], ['ten', JSON.stringify(Array.from({ length: 10 }, (_, i) => [999961 + i, 1000000]))]];
-  report.listed = await evaluate(`(() => { const t = document.body.innerText; return { has2406: /2406/.test(t) }; })()`);
+  // Catalog listing: load 2406, open the (collapsed by default) Heap category, then check the chip is there and active.
+  // Also check the search-result chip and the Recent chip get the active highlight (needs a numeric id).
+  await load(2406, null);
+  report.listed = await evaluate(`(async () => {
+    const out = { currentProblemId, idType: typeof currentProblemId };
+    openCatalogGroupExclusively('heap'); markActiveChip();
+    await new Promise((r) => setTimeout(r, 300));
+    const cat = document.querySelector('#catalog .cat-group[data-group-key="heap"] .prob-chip[data-id="2406"], #catalog [data-group-key="heap"] .prob-chip[data-id="2406"]');
+    out.catalogChip = Boolean(cat); out.catalogActive = Boolean(cat && cat.classList.contains('active'));
+    out.catalogVisible = Boolean(cat && cat.offsetParent !== null);
+    const recent = document.querySelector('#recentItems .prob-chip[data-id="2406"]');
+    out.recentChip = Boolean(recent); out.recentActive = Boolean(recent && recent.classList.contains('active'));
+    const kw = document.getElementById('problemKeyword'); kw.value = '2406'; kw.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    const found = document.querySelector('#problemSearchItems .prob-chip[data-id="2406"]');
+    out.searchChip = Boolean(found); out.searchActive = Boolean(found && found.classList.contains('active'));
+    kw.value = ''; kw.dispatchEvent(new Event('input', { bubbles: true }));
+    return out; })()`);
   for (const theme of ['dark', 'light']) {
     for (const [name, input] of presets) {
       await load(2406, input);

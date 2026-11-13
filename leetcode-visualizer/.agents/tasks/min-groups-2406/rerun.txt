@@ -1,0 +1,10 @@
+﻿Γ£ö 114 HTTP metadata, valid/invalid solve calls, materialized arguments and lazy assets agree (837.7105ms)
+Γ£ö HTTP metadata, solve, editor calls and lazy picture assets work for all six problems (802.3226ms)
+Γä╣ tests 2
+Γä╣ suites 0
+Γä╣ pass 2
+Γä╣ fail 0
+Γä╣ cancelled 0
+Γä╣ skipped 0
+Γä╣ todo 0
+Γä╣ duration_ms 1254.1643

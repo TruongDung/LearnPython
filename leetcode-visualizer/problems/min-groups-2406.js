@@ -218,7 +218,7 @@ function buildSteps2406(input) {
 
 module.exports = {
   2406: {
-    id: "2406",
+    id: 2406,
     difficulty: "medium",
     slug: "divide-intervals-into-minimum-number-of-groups",
     category: { key: "heap", vi: "Heap / Hàng đợi ưu tiên", en: "Heap / Priority Queue" },

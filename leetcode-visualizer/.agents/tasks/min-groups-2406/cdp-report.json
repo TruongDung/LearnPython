@@ -182,7 +182,15 @@
   }
  },
  "listed": {
-  "has2406": false
+  "currentProblemId": 2406,
+  "idType": "number",
+  "catalogChip": true,
+  "catalogActive": true,
+  "catalogVisible": true,
+  "recentChip": true,
+  "recentActive": true,
+  "searchChip": true,
+  "searchActive": true
  },
  "code-dark": {
   "maxHeight": "none",

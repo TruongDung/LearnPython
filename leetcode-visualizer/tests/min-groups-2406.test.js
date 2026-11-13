@@ -251,6 +251,9 @@ test('2406 rejects inputs outside the visualizer limits', () => {
 
 test('2406 is listed under Heap and its assets are wired with light/dark tokens and no code-panel height cap', () => {
   assert.equal(problem.category.key, 'heap');
+  // Numeric like every other module: app-core compares Number(chip.dataset.id) === currentProblemId.
+  assert.equal(typeof problem.id, 'number');
+  assert.equal(problem.id, 2406);
   assert.equal(problem.debugMode, 'line-by-line');
   const index = readFrontendIndex();
   assert.match(index, /min-groups-2406\.css\?v=min-groups-2406-v2" data-problem-ids="2406"/);
