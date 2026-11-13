@@ -35,7 +35,6 @@ const categories = {
   interview: Object.assign(require("./interview"), require("./requested-visualizations"), require("./square-arrangement-9013"), require("./k-sum-2386"), require("./next-word-predictor-9005"), require("./k-smallest-matrix-9008"), require("./safe-level-path-9021"), require("./underpaid-managers-9022"), require("./directory-size-9023")),
 };
 
-Object.assign(categories.interview, require('./youtube-trending-9024'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.
 Object.assign(categories.array,
