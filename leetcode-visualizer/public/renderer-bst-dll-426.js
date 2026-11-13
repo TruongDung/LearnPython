@@ -186,13 +186,16 @@ function dl426Picture(state, copy) {
       const xb = cx(b.rank);
       let path;
       let close = false;
+      // Only the closing writes touch head this way (tail.right = head, head.left = tail), so they always take
+      // the arc under the row, even when head and tail are neighbours (n = 2) and would share the straight lane.
+      const closing = field === "right" ? to === state.head : from === state.head;
       if (from === to) {
         // Single node: self loop on the right (next) or left (prev) side.
         const sx = field === "right" ? xa + DL426_BOX_W / 2 : xa - DL426_BOX_W / 2;
         const dx = field === "right" ? 22 : -22;
         path = `M${sx},${listY + 10}C${sx + dx},${listY - 6} ${sx + dx},${listY + DL426_BOX_H + 6} ${sx + (field === "right" ? 3 : -3)},${listY + DL426_BOX_H - 10}`;
         close = true;
-      } else if (Math.abs(a.rank - b.rank) === 1) {
+      } else if (!closing && Math.abs(a.rank - b.rank) === 1) {
         const y = listY + (field === "right" ? 11 : 24);
         const sign = Math.sign(xb - xa);
         path = `M${xa + sign * DL426_BOX_W / 2},${y}H${xb - sign * (DL426_BOX_W / 2 + 3)}`;
@@ -245,13 +248,8 @@ function dl426Code(state, copy) {
   const now = `<div class="dl426-now" data-code-line="${state.line}" aria-current="step"><span class="dl426-lineno">L${state.line}</span>${effect ? `<code class="dl426-effect">↳ ${dl426Escape(effect)}</code>` : ""}${badge}</div>`;
   const frames = state.stack.map((id) => `inorder(${id === null ? "None" : dl426Name(state, id)})`);
   const crumbs = frames.length ? `<span class="dl426-stack">${frames.map((frame) => `<code>${dl426Escape(frame)}</code>`).join("<i>▸</i>")}</span>` : "";
-  const chips = [
-    ["node", state.nullSlot ? "None" : state.current === null ? null : dl426Name(state, state.current), "node"],
-    ["prev", dl426Name(state, state.prev), "prev"],
-    ["head", dl426Name(state, state.head), "head"],
-  ].filter(([, value]) => value !== null);
-  const locals = state.line >= 6 ? `<div class="dl426-locals">${chips.map(([name, value, kind]) => `<span class="chip-${kind}"><code>${name}</code><b>${dl426Escape(value)}</b></span>`).join("")}</div>` : "";
-  return `<header><b>${dl426Escape(copy.code)}</b>${crumbs}</header>${now}${locals}`;
+  // node/prev/head values live only in the shared Variables panel (step.vars), not repeated here.
+  return `<header><b>${dl426Escape(copy.code)}</b>${crumbs}</header>${now}`;
 }
 
 // ---------- Navigation (same contract as other line-by-line renderers) ----------

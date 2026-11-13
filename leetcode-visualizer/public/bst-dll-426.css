@@ -397,42 +397,6 @@
   color: var(--dl426-red);
 }
 
-.dl426-locals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.dl426-locals span {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  border: 1px solid var(--dl426-border);
-  border-radius: 8px;
-  padding: 3px 8px;
-  background: var(--dl426-soft);
-  font-size: 12px;
-}
-
-.dl426-locals code {
-  color: var(--dl426-muted);
-  font-size: 11px;
-}
-
-.dl426-locals .chip-node {
-  border-color: var(--dl426-amber);
-}
-
-.dl426-locals .chip-node b,
-.dl426-locals .chip-prev b {
-  color: var(--dl426-amber);
-}
-
-.dl426-locals .chip-head b {
-  color: var(--dl426-violet);
-}
-
 /* 426 step notes are a few words. */
 body:has(#treeView:not(.hidden) .dl426-viz) #stepNote {
   font-size: 13px;
