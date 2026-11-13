@@ -1,0 +1,509 @@
+/* LeetCode 2406 — Minimum groups of intervals. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.mg2406-viz {
+  --mg2406-bg: #0f1a25;
+  --mg2406-panel: #152434;
+  --mg2406-soft: #1e3144;
+  --mg2406-border: #36506a;
+  --mg2406-text: #eaf3fb;
+  --mg2406-muted: #9fb3c6;
+  --mg2406-green: #4fd69c;
+  --mg2406-amber: #f5c451;
+  --mg2406-red: #ff8f8f;
+  --mg2406-violet: #c6abff;
+  --mg2406-line: #2a4560;
+  --mg2406-g0: #6cb8ff;
+  --mg2406-g1: #4fd69c;
+  --mg2406-g2: #ff9f6b;
+  --mg2406-g3: #c6abff;
+  --mg2406-g4: #ff7eb6;
+  --mg2406-g5: #5ee0e0;
+  --mg2406-g6: #d8d86a;
+  --mg2406-g7: #9fb0ff;
+  --mg2406-g8: #ffb3b3;
+  --mg2406-g9: #a6e07a;
+  container: mg2406 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--mg2406-border);
+  border-radius: 16px;
+  background: var(--mg2406-bg);
+  color: var(--mg2406-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .mg2406-viz {
+  --mg2406-bg: #f4f7fb;
+  --mg2406-panel: #ffffff;
+  --mg2406-soft: #e9eff7;
+  --mg2406-border: #c2d1e2;
+  --mg2406-text: #17283a;
+  --mg2406-muted: #55697e;
+  --mg2406-green: #08784f;
+  --mg2406-amber: #9a6200;
+  --mg2406-red: #b4232f;
+  --mg2406-violet: #6c3fb8;
+  --mg2406-line: #fff3cf;
+  --mg2406-g0: #1663b8;
+  --mg2406-g1: #08784f;
+  --mg2406-g2: #c2560c;
+  --mg2406-g3: #6c3fb8;
+  --mg2406-g4: #b8336f;
+  --mg2406-g5: #0f7f86;
+  --mg2406-g6: #7a7400;
+  --mg2406-g7: #3d4fc4;
+  --mg2406-g8: #a83a3a;
+  --mg2406-g9: #4a7d14;
+}
+
+.mg2406-viz .g0 { --mg2406-c: var(--mg2406-g0); }
+.mg2406-viz .g1 { --mg2406-c: var(--mg2406-g1); }
+.mg2406-viz .g2 { --mg2406-c: var(--mg2406-g2); }
+.mg2406-viz .g3 { --mg2406-c: var(--mg2406-g3); }
+.mg2406-viz .g4 { --mg2406-c: var(--mg2406-g4); }
+.mg2406-viz .g5 { --mg2406-c: var(--mg2406-g5); }
+.mg2406-viz .g6 { --mg2406-c: var(--mg2406-g6); }
+.mg2406-viz .g7 { --mg2406-c: var(--mg2406-g7); }
+.mg2406-viz .g8 { --mg2406-c: var(--mg2406-g8); }
+.mg2406-viz .g9 { --mg2406-c: var(--mg2406-g9); }
+
+.mg2406-viz,
+.mg2406-viz * {
+  box-sizing: border-box;
+}
+
+.mg2406-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.mg2406-viz button {
+  border: 1px solid var(--mg2406-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--mg2406-panel);
+  color: var(--mg2406-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.mg2406-viz button:hover:not(:disabled) {
+  border-color: var(--mg2406-violet);
+  background: var(--mg2406-soft);
+}
+
+.mg2406-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mg2406-viz :focus-visible {
+  outline: 3px solid var(--mg2406-violet);
+  outline-offset: 2px;
+}
+
+/* Header */
+.mg2406-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mg2406-head small {
+  color: var(--mg2406-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.mg2406-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.mg2406-head h2 code {
+  color: var(--mg2406-amber);
+}
+
+.mg2406-status {
+  border: 1px solid var(--mg2406-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--mg2406-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mg2406-viz.is-final .mg2406-status {
+  border-color: var(--mg2406-green);
+  color: var(--mg2406-green);
+}
+
+.mg2406-presets,
+.mg2406-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.mg2406-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.mg2406-card {
+  min-width: 0;
+  border: 1px solid var(--mg2406-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--mg2406-panel);
+}
+
+.mg2406-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.mg2406-card > header > b {
+  color: var(--mg2406-muted);
+  font-weight: 700;
+}
+
+/* Interval chips (input order, then sorted order) */
+.mg2406-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.mg2406-chips > code {
+  color: var(--mg2406-muted);
+  margin-right: 2px;
+}
+
+.mg2406-chip {
+  border: 1.5px solid var(--mg2406-c, var(--mg2406-border));
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: color-mix(in srgb, var(--mg2406-c, transparent) 22%, transparent);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.mg2406-chip.is-pending {
+  border-style: dashed;
+  color: var(--mg2406-muted);
+  background: transparent;
+}
+
+.mg2406-chip.is-current {
+  border-color: var(--mg2406-amber);
+  border-style: solid;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mg2406-amber) 35%, transparent);
+  color: var(--mg2406-text);
+}
+
+.mg2406-sorted {
+  color: var(--mg2406-green);
+  font-style: normal;
+  font-size: 11px;
+}
+
+/* Picture: scales down to the card width. */
+.mg2406-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.mg2406-svg text {
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--mg2406-text);
+}
+
+.mg2406-lane {
+  fill: color-mix(in srgb, var(--mg2406-c) 8%, transparent);
+  stroke: color-mix(in srgb, var(--mg2406-c) 30%, transparent);
+  stroke-width: 1;
+}
+
+.mg2406-lane.is-free {
+  fill: color-mix(in srgb, var(--mg2406-green) 16%, transparent);
+  stroke: var(--mg2406-green);
+  stroke-width: 2;
+}
+
+.mg2406-lane.is-busy {
+  fill: color-mix(in srgb, var(--mg2406-red) 14%, transparent);
+  stroke: var(--mg2406-red);
+  stroke-width: 2;
+}
+
+.mg2406-lane.is-pushed {
+  stroke: var(--mg2406-amber);
+  stroke-width: 2;
+}
+
+.mg2406-svg .mg2406-lane-label {
+  fill: var(--mg2406-c);
+  text-anchor: end;
+}
+
+.mg2406-bar {
+  fill: var(--mg2406-c);
+  stroke: none;
+}
+
+.mg2406-bar.is-current {
+  fill: color-mix(in srgb, var(--mg2406-amber) 30%, transparent);
+  stroke: var(--mg2406-amber);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+
+.mg2406-bar.is-new {
+  stroke: var(--mg2406-amber);
+  stroke-width: 2.5;
+  animation: mg2406-pop 320ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.mg2406-sweep {
+  stroke: var(--mg2406-amber);
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+.mg2406-endmark {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.mg2406-endmark.is-free {
+  stroke: var(--mg2406-green);
+}
+
+.mg2406-endmark.is-busy {
+  stroke: var(--mg2406-red);
+}
+
+.mg2406-band {
+  fill: color-mix(in srgb, var(--mg2406-amber) 22%, transparent);
+  stroke: var(--mg2406-amber);
+  stroke-width: 1.5;
+}
+
+.mg2406-svg .mg2406-peak {
+  fill: var(--mg2406-amber);
+  font-size: 14px;
+  text-anchor: middle;
+}
+
+.mg2406-axis,
+.mg2406-tick {
+  stroke: var(--mg2406-muted);
+  stroke-width: 1;
+}
+
+.mg2406-svg .mg2406-tick-label {
+  fill: var(--mg2406-muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-anchor: middle;
+}
+
+.mg2406-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--mg2406-muted);
+  font-size: 11px;
+}
+
+.mg2406-legend .lg-sweep,
+.mg2406-legend .lg-peak {
+  color: var(--mg2406-amber);
+}
+
+.mg2406-legend .lg-end {
+  color: var(--mg2406-green);
+}
+
+/* Heap slots: array order, index 0 = min */
+.mg2406-heap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 52px;
+}
+
+.mg2406-slot {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  min-width: 40px;
+  border: 2px solid var(--mg2406-c);
+  border-radius: 8px;
+  padding: 3px 6px 2px;
+  background: color-mix(in srgb, var(--mg2406-c) 18%, transparent);
+}
+
+.mg2406-slot b {
+  font: 700 15px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.mg2406-slot small {
+  color: var(--mg2406-c);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.mg2406-slot i {
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  line-height: 12px;
+  transform: translateX(-50%);
+  color: var(--mg2406-muted);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.mg2406-heap .mg2406-slot.is-top {
+  margin-top: 18px;
+}
+
+.mg2406-slot.is-free {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg2406-green) 55%, transparent);
+}
+
+.mg2406-slot.is-busy {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg2406-red) 55%, transparent);
+}
+
+.mg2406-slot.is-pushed {
+  outline: 2px solid var(--mg2406-amber);
+  outline-offset: 2px;
+  animation: mg2406-pop 320ms ease-out;
+}
+
+.mg2406-slot.is-popped {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.mg2406-out {
+  align-self: center;
+  color: var(--mg2406-green);
+  font-size: 16px;
+}
+
+.mg2406-heap-empty {
+  align-self: center;
+  color: var(--mg2406-muted);
+  font: 700 15px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+/* Current-line strip */
+.mg2406-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--mg2406-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--mg2406-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .mg2406-now {
+  background: var(--mg2406-line);
+}
+
+.mg2406-lineno {
+  color: var(--mg2406-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.mg2406-now .mg2406-effect {
+  color: var(--mg2406-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mg2406-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.mg2406-branch.is-true {
+  background: color-mix(in srgb, var(--mg2406-green) 20%, transparent);
+  color: var(--mg2406-green);
+}
+
+.mg2406-branch.is-false {
+  background: color-mix(in srgb, var(--mg2406-red) 18%, transparent);
+  color: var(--mg2406-red);
+}
+
+/* 2406 step notes are a few words. */
+body:has(#treeView:not(.hidden) .mg2406-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 2406 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .mg2406-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+@keyframes mg2406-pop {
+  from {
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@container mg2406 (max-width: 420px) {
+  .mg2406-head h2 {
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg2406-viz *,
+  .mg2406-viz *::before,
+  .mg2406-viz *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
