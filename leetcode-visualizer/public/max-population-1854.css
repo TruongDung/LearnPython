@@ -1,0 +1,414 @@
+/* LeetCode 1854 — Maximum Population Year. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.mp1854-viz {
+  --mp1854-bg: #0f1a25;
+  --mp1854-panel: #152434;
+  --mp1854-soft: #1e3144;
+  --mp1854-border: #36506a;
+  --mp1854-text: #eaf3fb;
+  --mp1854-muted: #9fb3c6;
+  /* Status colors: True / False of the if, and the best year. */
+  --mp1854-green: #4fd69c;
+  --mp1854-red: #ff8f8f;
+  --mp1854-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above. */
+  --mp1854-life: #8fb3c9;
+  --mp1854-plus: #6cb8ff;
+  --mp1854-minus: #e88ad8;
+  --mp1854-cur: #c6abff;
+  --mp1854-pop: #5b7fa8;
+  --mp1854-line: #2a4560;
+  container: mp1854 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--mp1854-border);
+  border-radius: 16px;
+  background: var(--mp1854-bg);
+  color: var(--mp1854-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .mp1854-viz {
+  --mp1854-bg: #f4f7fb;
+  --mp1854-panel: #ffffff;
+  --mp1854-soft: #e9eff7;
+  --mp1854-border: #c2d1e2;
+  --mp1854-text: #17283a;
+  --mp1854-muted: #55697e;
+  --mp1854-green: #08784f;
+  --mp1854-red: #b4232f;
+  --mp1854-amber: #9a6200;
+  --mp1854-life: #4f6f86;
+  --mp1854-plus: #1663b8;
+  --mp1854-minus: #a8389a;
+  --mp1854-cur: #6c3fb8;
+  --mp1854-pop: #8fa9c6;
+  --mp1854-line: #fff3cf;
+}
+
+.mp1854-viz,
+.mp1854-viz * {
+  box-sizing: border-box;
+}
+
+.mp1854-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.mp1854-viz button {
+  border: 1px solid var(--mp1854-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--mp1854-panel);
+  color: var(--mp1854-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.mp1854-viz button:hover:not(:disabled) {
+  border-color: var(--mp1854-cur);
+  background: var(--mp1854-soft);
+}
+
+.mp1854-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mp1854-viz :focus-visible {
+  outline: 3px solid var(--mp1854-cur);
+  outline-offset: 2px;
+}
+
+/* Header */
+.mp1854-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mp1854-head small {
+  color: var(--mp1854-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.mp1854-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.mp1854-head h2 code {
+  color: var(--mp1854-amber);
+}
+
+.mp1854-status {
+  border: 1px solid var(--mp1854-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--mp1854-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mp1854-viz.is-final .mp1854-status {
+  border-color: var(--mp1854-amber);
+  color: var(--mp1854-amber);
+}
+
+.mp1854-presets,
+.mp1854-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.mp1854-card {
+  min-width: 0;
+  border: 1px solid var(--mp1854-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--mp1854-panel);
+}
+
+.mp1854-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.mp1854-card > header > b {
+  color: var(--mp1854-muted);
+  font-weight: 700;
+}
+
+/* Picture: scales down to the card width. */
+.mp1854-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.mp1854-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--mp1854-text);
+  text-anchor: middle;
+}
+
+.mp1854-svg .mp1854-row-label {
+  fill: var(--mp1854-muted);
+  text-anchor: end;
+}
+
+.mp1854-svg .mp1854-row-label.is-current {
+  fill: var(--mp1854-cur);
+}
+
+.mp1854-band.is-current {
+  fill: color-mix(in srgb, var(--mp1854-cur) 16%, transparent);
+  stroke: color-mix(in srgb, var(--mp1854-cur) 55%, transparent);
+  stroke-width: 1;
+}
+
+.mp1854-band.is-best {
+  fill: color-mix(in srgb, var(--mp1854-amber) 18%, transparent);
+  stroke: var(--mp1854-amber);
+  stroke-width: 1.5;
+}
+
+.mp1854-life {
+  fill: color-mix(in srgb, var(--mp1854-life) 55%, transparent);
+  stroke: none;
+}
+
+.mp1854-life.is-alive {
+  fill: var(--mp1854-life);
+}
+
+.mp1854-life.is-current {
+  fill: color-mix(in srgb, var(--mp1854-cur) 45%, transparent);
+  stroke: var(--mp1854-cur);
+  stroke-width: 2;
+}
+
+.mp1854-death {
+  fill: var(--mp1854-panel);
+  stroke: var(--mp1854-life);
+  stroke-width: 1.5;
+}
+
+.mp1854-death.is-current {
+  stroke: var(--mp1854-cur);
+  stroke-width: 2;
+}
+
+.mp1854-svg .mp1854-delta {
+  font-size: 12px;
+}
+
+.mp1854-svg .mp1854-delta.is-plus,
+.mp1854-svg .mp1854-cell-value.is-plus {
+  fill: var(--mp1854-plus);
+}
+
+.mp1854-svg .mp1854-delta.is-minus,
+.mp1854-svg .mp1854-cell-value.is-minus {
+  fill: var(--mp1854-minus);
+}
+
+.mp1854-svg .mp1854-cell-value.is-wide {
+  font-size: 10px;
+}
+
+.mp1854-svg .mp1854-cell-value.is-zero {
+  fill: var(--mp1854-muted);
+  font-weight: 400;
+}
+
+.mp1854-cell {
+  fill: var(--mp1854-soft);
+  stroke: var(--mp1854-border);
+  stroke-width: 1;
+}
+
+.mp1854-cell.is-plus {
+  fill: color-mix(in srgb, var(--mp1854-plus) 18%, var(--mp1854-panel));
+  stroke: var(--mp1854-plus);
+}
+
+.mp1854-cell.is-minus {
+  fill: color-mix(in srgb, var(--mp1854-minus) 18%, var(--mp1854-panel));
+  stroke: var(--mp1854-minus);
+}
+
+.mp1854-cell.is-changed,
+.mp1854-cell.is-read {
+  stroke: var(--mp1854-cur);
+  stroke-width: 2.5;
+}
+
+.mp1854-pop {
+  fill: var(--mp1854-pop);
+  stroke: none;
+}
+
+.mp1854-pop.is-best {
+  fill: var(--mp1854-amber);
+}
+
+.mp1854-pop.is-current {
+  stroke: var(--mp1854-cur);
+  stroke-width: 2;
+}
+
+.mp1854-pop.is-true {
+  stroke: var(--mp1854-green);
+  stroke-width: 2.5;
+}
+
+.mp1854-pop.is-false {
+  stroke: var(--mp1854-red);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3; /* False is dashed, True is solid: a cue besides color */
+}
+
+.mp1854-svg .mp1854-pop-value {
+  fill: var(--mp1854-muted);
+}
+
+.mp1854-svg .mp1854-pop-value.is-best,
+.mp1854-svg .mp1854-max-label,
+.mp1854-svg .mp1854-year.is-best {
+  fill: var(--mp1854-amber);
+}
+
+.mp1854-svg .mp1854-max-label {
+  font-size: 12px;
+  text-anchor: start;
+}
+
+.mp1854-max {
+  stroke: var(--mp1854-amber);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.mp1854-axis,
+.mp1854-tick {
+  stroke: var(--mp1854-muted);
+  stroke-width: 1;
+}
+
+.mp1854-svg .mp1854-year {
+  fill: var(--mp1854-muted);
+  font-weight: 400;
+}
+
+.mp1854-svg .mp1854-year.is-best {
+  font-weight: 700;
+}
+
+.mp1854-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--mp1854-muted);
+  font-size: 11px;
+}
+
+.mp1854-legend .lg-life,
+.mp1854-legend .lg-death {
+  color: var(--mp1854-life);
+}
+
+.mp1854-legend .lg-plus {
+  color: var(--mp1854-plus);
+}
+
+.mp1854-legend .lg-minus {
+  color: var(--mp1854-minus);
+}
+
+.mp1854-legend .lg-max {
+  color: var(--mp1854-amber);
+}
+
+/* Current-line strip */
+.mp1854-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--mp1854-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--mp1854-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .mp1854-now {
+  background: var(--mp1854-line);
+}
+
+.mp1854-lineno {
+  color: var(--mp1854-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.mp1854-now .mp1854-effect {
+  color: var(--mp1854-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mp1854-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.mp1854-branch.is-true {
+  background: color-mix(in srgb, var(--mp1854-green) 20%, transparent);
+  color: var(--mp1854-green);
+}
+
+.mp1854-branch.is-false {
+  background: color-mix(in srgb, var(--mp1854-red) 18%, transparent);
+  color: var(--mp1854-red);
+}
+
+/* 1854 step notes are a few words. */
+body:has(#treeView:not(.hidden) .mp1854-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 1854 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .mp1854-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+@container mp1854 (max-width: 420px) {
+  .mp1854-head h2 {
+    font-size: 18px;
+  }
+}
