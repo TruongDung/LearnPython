@@ -230,6 +230,7 @@ test('416 caps long traces and previews cells while still solving the maximum of
 // ---------- Picture-first renderer (DP grid, bitset rows, DFS call path) ----------
 
 const RENDERER = fs.readFileSync(path.join(__dirname, '..', 'public', 'renderer-partition-equal-subset-416.js'), 'utf8');
+const NOTE_CAP = 28;
 const APPROACHES = [
   { builder: 'builder', code: 'code', render: 'renderEqualSubset416View', view: 'equalSubset416View', method: 1 },
   { builder: 'builder2', code: 'code2', render: 'renderEqualSubset416BitsetView', view: 'equalSubset416BitsetView', method: 2 },
@@ -282,7 +283,7 @@ test('416 renders every frame of every approach in both languages: executed line
           const html = ui.render(approach, step, steps, index);
           const view = step[approach.view];
           const line = step.codeLines[0];
-          assert.ok(step.note[language].length <= 28, `short note: ${step.note[language]}`);
+          assert.ok(step.note[language].length <= NOTE_CAP, `short note: ${step.note[language]}`);
           assert.doesNotMatch(html, /undefined|NaN|Infinity|object Object/, `${approach.builder} ${nums} #${index}`);
           assert.ok(html.includes(`data-method="${approach.method}" data-source-line="${line}"`));
           assert.doesNotMatch(html, /canPartition|range\(target|bits \|=|def dfs/, 'source is shown only in the shared #codePanel');
@@ -314,6 +315,34 @@ test('416 renders every frame of every approach in both languages: executed line
       }
     }
   }
+});
+
+test('416 keeps every step note within the cap for custom inputs on all three approaches (both languages)', () => {
+  let seed = 41628;
+  const rand = (max) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return 1 + seed % max; };
+  const edges = [
+    [1], [100], [1, 2], [2, 4, 7], [3, 5], [99, 1], [100, 100], [1, 1, 1, 1, 100],
+    [97, 89, 83, 79, 73, 71, 67, 61, 59, 53, 47, 43], Array(12).fill(100), [100, 1, 100, 1, 100, 1, 100, 1, 100, 1, 100, 1],
+    Array.from({ length: 100 }, (_, i) => i + 1), Array(200).fill(100), Array(199).fill(100).concat(1),
+    Array.from({ length: 200 }, (_, i) => 100 - (i % 100)),
+  ];
+  const randoms = Array.from({ length: 40 }, (_, k) => Array.from({ length: k < 20 ? 1 + k % 12 : 1 + rand(200) - 1 }, () => rand(k % 2 ? 100 : 10)));
+  const inputs = [...edges, ...randoms];
+  let checked = 0;
+  for (const approach of APPROACHES) {
+    for (const nums of inputs) {
+      if (approach.method === 3 && nums.length > 12) continue;
+      for (const step of problem[approach.builder](nums).steps) {
+        for (const language of ['vi', 'en']) {
+          const note = step.note[language];
+          assert.equal(typeof note, 'string');
+          assert.ok(note.length <= NOTE_CAP, `${approach.builder} [${nums.slice(0, 8)}${nums.length > 8 ? ',…' : ''}] ${language}: "${note}" (${note.length})`);
+          checked++;
+        }
+      }
+    }
+  }
+  assert.ok(checked > 1000);
 });
 
 // Samples the renderer's arrow paths (M, L and V commands only) into points about 1px apart.
