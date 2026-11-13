@@ -6590,74 +6590,374 @@ module.exports = {
   },
 };
 
-function buildSteps1970(input, params = {}) {
-  const rows = Number(params.rows || params.row || 2);
-  const cols = Number(params.cols || params.col || 2);
-  const cells = String(input).split(/[;|]/).map((part) => part.trim()).filter(Boolean)
-    .map((part) => part.split(",").map((value) => Number(value.trim()) - 1));
-  const total = rows * cols;
-  const top = total, bottom = total + 1;
-  const parent = Array.from({ length: total + 2 }, (_, i) => i);
-  const size = new Array(total + 2).fill(1);
-  const open = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const steps = [];
-  const id = (r, c) => r * cols + c;
-  const find = (x) => {
-    while (parent[x] !== x) {
-      parent[x] = parent[parent[x]];
-      x = parent[x];
+// ─── 1970: Last Day Where You Can Still Cross ───
+//
+// Reverse union-find: start from the last day (all water) and walk the days backward, turning one water cell back
+// into land per day. Each restored cell is unioned with its land neighbors and with the virtual TOP (row 0) and
+// BOTTOM (last row) nodes. The first day on which find(TOP) == find(BOTTOM) is the answer.
+// Traced one executed Python line per step. Picture lives in public/renderer-last-day-cross-1970.js.
+
+const bi1970 = (vi, en) => ({ vi, en });
+const MIN_SIDE_1970 = 2;
+const MAX_SIDE_1970 = 6;
+const MAX_CELLS_1970 = 24;
+const DEFAULT_INPUT_1970 = "3,3 | 1,2;2,1;3,3;2,2;1,1;1,3;2,3;3,2;3,1";
+
+const SOURCE_1970 = Object.freeze([
+  "from typing import List",
+  "",
+  "class Solution:",
+  "    def latestDayToCross(self, row: int, col: int, cells: List[List[int]]) -> int:",
+  "        top, bottom = row * col, row * col + 1",
+  "        parent = list(range(row * col + 2))",
+  "        land = [[False] * col for _ in range(row)]",
+  "",
+  "        def find(x: int) -> int:",
+  "            while parent[x] != x:",
+  "                parent[x] = parent[parent[x]]",
+  "                x = parent[x]",
+  "            return x",
+  "",
+  "        def union(a: int, b: int) -> None:",
+  "            parent[find(a)] = find(b)",
+  "",
+  "        for day in range(len(cells) - 1, -1, -1):",
+  "            r, c = cells[day][0] - 1, cells[day][1] - 1",
+  "            land[r][c] = True",
+  "            cell = r * col + c",
+  "            if r == 0:",
+  "                union(cell, top)",
+  "            if r == row - 1:",
+  "                union(cell, bottom)",
+  "            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):",
+  "                nr, nc = r + dr, c + dc",
+  "                if 0 <= nr < row and 0 <= nc < col and land[nr][nc]:",
+  "                    union(cell, nr * col + nc)",
+  "            if find(top) == find(bottom):",
+  "                return day",
+]);
+
+// Accepts "R,C | r,c;r,c;…" (cells split by ";" or newlines, or JSON [[r,c],…]), all 1-based. Legacy input without
+// "|" is just the cells; R and C then come from params.rows / params.cols (default 2 each).
+function parseInput1970(input, params = {}) {
+  const fail = (message) => {
+    throw new Error(`1970: ${message}`);
+  };
+  const p = params && typeof params === "object" ? params : {};
+  let sizeText = null;
+  let cellSource;
+  if (Array.isArray(input)) {
+    cellSource = input;
+  } else {
+    const text = typeof input === "string" && input.trim() ? input.trim() : DEFAULT_INPUT_1970;
+    const bar = text.indexOf("|");
+    if (bar >= 0) {
+      sizeText = text.slice(0, bar);
+      cellSource = text.slice(bar + 1).trim();
+    } else {
+      cellSource = text;
     }
-    return x;
+  }
+  let row;
+  let col;
+  if (sizeText !== null) {
+    const parts = sizeText.split(",").map((part) => part.trim());
+    if (parts.length !== 2) fail("start with R,C | then the cells.");
+    [row, col] = parts.map((part) => (part === "" ? NaN : Number(part)));
+  } else {
+    row = Number(p.rows || p.row || 2);
+    col = Number(p.cols || p.col || 2);
+  }
+  if (!Number.isInteger(row) || !Number.isInteger(col)) fail("R and C must be integers.");
+  if (row < MIN_SIDE_1970 || row > MAX_SIDE_1970 || col < MIN_SIDE_1970 || col > MAX_SIDE_1970) {
+    fail(`R and C must be ${MIN_SIDE_1970}–${MAX_SIDE_1970}.`);
+  }
+  if (row * col > MAX_CELLS_1970) fail(`use at most ${MAX_CELLS_1970} cells.`);
+
+  let rows;
+  if (Array.isArray(cellSource)) {
+    rows = cellSource;
+  } else if (cellSource.startsWith("[")) {
+    try {
+      rows = JSON.parse(cellSource);
+    } catch (_error) {
+      fail("enter cells like 1,1;1,2 or [[1,1],[1,2]].");
+    }
+  } else {
+    rows = cellSource.split(/[;\n]+/).map((part) => part.trim()).filter(Boolean)
+      .map((part) => part.split(",").map((value) => (value.trim() === "" ? NaN : Number(value.trim()))));
+  }
+  if (!Array.isArray(rows)) fail("enter cells like 1,1;1,2.");
+  const seen = new Set();
+  const cells = rows.map((cell) => {
+    if (!Array.isArray(cell) || cell.length !== 2 || cell.some((v) => !Number.isSafeInteger(v))) fail("each cell is two integers r,c.");
+    const [r, c] = cell;
+    if (r < 1 || r > row || c < 1 || c > col) fail(`cell ${r},${c} is outside the ${row}×${col} grid.`);
+    const key = `${r},${c}`;
+    if (seen.has(key)) fail(`cell ${key} is listed twice.`);
+    seen.add(key);
+    return [r, c];
+  });
+  if (cells.length !== row * col) fail(`list every one of the ${row * col} cells once.`);
+  return { row, col, cells };
+}
+
+function buildSteps1970(input, params = {}) {
+  const { row, col, cells } = parseInput1970(input, params);
+  const n = row * col;
+  const steps = [];
+  const dayOf = new Array(n).fill(0);
+  cells.forEach(([r, c], index) => {
+    dayOf[(r - 1) * col + (c - 1)] = index + 1;
+  });
+  const S = {
+    top: null, bottom: null, parent: null, land: new Array(n).fill(false),
+    day: null, r: null, c: null, cell: null, dr: null, dc: null, nr: null, nc: null,
+    a: null, b: null, x: null, inUnion: false, inFind: false, walk: [], cur: null,
   };
-  const union = (a, b) => {
-    let ra = find(a), rb = find(b);
-    if (ra === rb) return false;
-    if (size[ra] < size[rb]) [ra, rb] = [rb, ra];
-    parent[rb] = ra;
-    size[ra] += size[rb];
-    return true;
+  const dash = (value) => (value === null || value === undefined ? "—" : value);
+  const same = (text) => bi1970(text, text);
+  const rootOf = (i) => {
+    let k = i;
+    while (S.parent[k] !== k) k = S.parent[k];
+    return k;
   };
-  const connected = () => find(top) === find(bottom);
-  const gridCells = (current = null) => open.map((row, r) => row.map((isOpen, c) => ({
-    label: isOpen ? "O" : "X",
-    cls: current && current[0] === r && current[1] === c ? "current" : isOpen ? "visited" : "wall",
-  })));
-  function push(day, title, codeLines, current, vars, note, final = false) {
+  // Display only: a shortest land path (cell ids) from row 0 to the last row, BFS with ties broken by id order.
+  const shortestRoute = () => {
+    const prev = new Array(n).fill(-2);
+    const queue = [];
+    for (let c = 0; c < col; c++) {
+      if (S.land[c]) {
+        prev[c] = -1;
+        queue.push(c);
+      }
+    }
+    for (let head = 0; head < queue.length; head++) {
+      const id = queue[head];
+      if (Math.floor(id / col) === row - 1) {
+        const path = [];
+        for (let k = id; k !== -1; k = prev[k]) path.push(k);
+        return path.reverse();
+      }
+      const r = Math.floor(id / col);
+      const c = id % col;
+      const next = [];
+      if (r > 0) next.push(id - col);
+      if (c > 0) next.push(id - 1);
+      if (c < col - 1) next.push(id + 1);
+      if (r < row - 1) next.push(id + col);
+      for (const k of next) {
+        if (S.land[k] && prev[k] === -2) {
+          prev[k] = id;
+          queue.push(k);
+        }
+      }
+    }
+    return null;
+  };
+
+  const emit = ({ line, event, title, note, condition = null, nb = null, nbState = null, dir = null, linked = null, crossed = false, final = false, answer = null }) => {
+    const roots = S.parent ? S.land.map((isLand, id) => (isLand ? rootOf(id) : null)) : new Array(n).fill(null);
     steps.push({
       title,
-      arr: parent.slice(0, total),
-      sub: parent.slice(0, total).map((p, i) => `p${i}=${p}`),
-      highlight: current ? [id(current[0], current[1])] : [],
-      mark: [],
-      final,
-      codeLines,
-      vars: [{ name: "day", value: day }, { name: "connected", value: connected() }, ...vars],
       note,
-      bfsGrid: { rows, cols, cells: gridCells(current) },
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      final,
+      vars: [
+        { name: "top", value: dash(S.top) },
+        { name: "bottom", value: dash(S.bottom) },
+        { name: "day", value: dash(S.day) },
+        { name: "r", value: dash(S.r) },
+        { name: "c", value: dash(S.c) },
+        { name: "cell", value: dash(S.cell) },
+        { name: "dr", value: dash(S.dr) },
+        { name: "dc", value: dash(S.dc) },
+        { name: "nr", value: dash(S.nr) },
+        { name: "nc", value: dash(S.nc) },
+        { name: "a", value: S.inUnion ? dash(S.a) : "—" },
+        { name: "b", value: S.inUnion ? dash(S.b) : "—" },
+        { name: "x", value: S.inFind ? dash(S.x) : "—" },
+        { name: "parent", value: S.parent ? `[${S.parent.join(", ")}]` : "—" },
+      ],
+      cross1970View: JSON.parse(JSON.stringify({
+        version: 1,
+        problemId: 1970,
+        line,
+        event,
+        condition,
+        row,
+        col,
+        n,
+        cells,
+        dayOf,
+        curDay: S.day,
+        land: S.land,
+        parent: S.parent,
+        roots,
+        cur: S.cur,
+        nb,
+        nbState,
+        dir,
+        walk: S.inFind ? S.walk : [],
+        x: S.inFind ? S.x : null,
+        a: S.inUnion ? S.a : null,
+        b: S.inUnion ? S.b : null,
+        linked,
+        rootTop: S.parent ? rootOf(n) : null,
+        rootBottom: S.parent ? rootOf(n + 1) : null,
+        crossed,
+        route: crossed ? shortestRoute() : null,
+        answer,
+        final,
+      })),
     });
-  }
+  };
 
-  push(cells.length, { vi: "Bắt đầu từ ngày cuối: toàn nước", en: "Start from final day: all water" }, [3, 4], null, [{ name: "rows,cols", value: `${rows},${cols}` }], { vi: "Đi ngược thời gian: thêm lại đất, union với hàng xóm đất.", en: "Go backward in time: add land back and union adjacent land cells." });
-  for (let day = cells.length - 1; day >= 0; day--) {
-    const [r, c] = cells[day];
-    open[r][c] = true;
-    const cur = id(r, c);
-    if (r === 0) union(cur, top);
-    if (r === rows - 1) union(cur, bottom);
-    push(day, { vi: `Mở lại ô (${r},${c})`, en: `Open cell (${r},${c})` }, [5, 6, 7], [r, c], [{ name: "cell", value: `(${r},${c})` }], { vi: "Ô bị flood ở ngày này được thêm lại làm đất.", en: "The cell flooded on this day is added back as land." });
-    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nr = r + dr, nc = c + dc;
-      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || !open[nr][nc]) continue;
-      union(cur, id(nr, nc));
-      push(day, { vi: `Union với (${nr},${nc})`, en: `Union with (${nr},${nc})` }, [8, 9, 10], [nr, nc], [{ name: "neighbor", value: `(${nr},${nc})` }], { vi: "Kết nối hai ô đất kề nhau.", en: "Connect adjacent land cells." });
+  const find = (x0) => {
+    S.inFind = true;
+    S.x = x0;
+    S.walk = [x0];
+    emit({ line: 9, event: "find-call", title: same(`find(${x0})`), note: same(`find(${x0})`) });
+    for (;;) {
+      const p = S.parent[S.x];
+      const ok = p !== S.x;
+      emit({
+        line: 10,
+        event: "find-check",
+        condition: ok,
+        title: same(`while parent[${S.x}] != ${S.x}`),
+        note: ok ? bi1970(`${S.x} chưa là gốc.`, `${S.x} is not a root.`) : bi1970(`${S.x} là gốc.`, `${S.x} is the root.`),
+      });
+      if (!ok) break;
+      const gp = S.parent[p];
+      S.parent[S.x] = gp;
+      emit({ line: 11, event: "halve", title: same(`parent[${S.x}] = parent[${p}]`), note: bi1970(`Nén: cha ${S.x} = ${gp}.`, `Halve: parent ${S.x} = ${gp}.`) });
+      const old = S.x;
+      S.x = S.parent[S.x];
+      S.walk.push(S.x);
+      emit({ line: 12, event: "up", title: same(`x = parent[${old}]`), note: bi1970(`Lên ${S.x}.`, `Up to ${S.x}.`) });
     }
-    if (connected()) {
-      push(day, { vi: `Ngày cuối còn crossing = ${day}`, en: `Latest crossing day = ${day}` }, [11, 12], [r, c], [{ name: "answer", value: day }], { vi: "Khi đi ngược, lần đầu top nối bottom chính là ngày cuối vẫn băng qua được.", en: "In reverse time, the first top-bottom connection is the latest day crossing is possible." }, true);
-      return { original: cells, answer: day, steps };
+    const root = S.x;
+    emit({ line: 13, event: "find-return", title: same(`return ${root}`), note: bi1970(`Gốc = ${root}.`, `Root = ${root}.`) });
+    S.inFind = false;
+    S.x = null;
+    S.walk = [];
+    return root;
+  };
+
+  const union = (a, b) => {
+    S.inUnion = true;
+    S.a = a;
+    S.b = b;
+    emit({ line: 15, event: "union-call", title: same(`union(${a}, ${b})`), note: same(`union(${a}, ${b})`) });
+    emit({ line: 16, event: "link-start", title: same(`parent[find(${a})] = find(${b})`), note: bi1970("Tìm hai gốc.", "Find both roots.") });
+    // Python evaluates the right-hand side of an assignment first: find(b), then the target's find(a).
+    const rb = find(b);
+    const ra = find(a);
+    S.parent[ra] = rb;
+    emit({
+      line: 16,
+      event: "link",
+      linked: [ra, rb],
+      title: same(`parent[${ra}] = ${rb}`),
+      note: ra === rb ? bi1970(`Đã chung gốc ${rb}.`, `Same root ${rb}.`) : bi1970(`Gốc ${ra} → ${rb}.`, `Root ${ra} → ${rb}.`),
+    });
+    S.inUnion = false;
+    S.a = null;
+    S.b = null;
+  };
+
+  emit({ line: 1, event: "import", title: same("from typing import List"), note: bi1970("Kiểu List.", "Type hints.") });
+  emit({ line: 3, event: "class", title: same("class Solution"), note: bi1970("Định nghĩa lớp.", "Class defined.") });
+  emit({ line: 4, event: "call", title: same(`latestDayToCross(${row}, ${col}, cells)`), note: bi1970(`Lưới ${row}×${col}, ${n} ngày.`, `${row}×${col} grid, ${n} days.`) });
+  S.top = n;
+  S.bottom = n + 1;
+  emit({ line: 5, event: "top-bottom", title: same(`top, bottom = ${n}, ${n + 1}`), note: same(`TOP=${n}, BOTTOM=${n + 1}.`) });
+  S.parent = Array.from({ length: n + 2 }, (_, i) => i);
+  emit({ line: 6, event: "parent", title: same(`parent = list(range(${n + 2}))`), note: bi1970("Mỗi nút tự làm gốc.", "Each node is its own root.") });
+  emit({ line: 7, event: "land", title: same(`land = [[False] * ${col} for _ in range(${row})]`), note: bi1970("Ngày cuối: toàn nước.", "Last day: all water.") });
+  emit({ line: 9, event: "def-find", title: same("def find(x)"), note: bi1970("Định nghĩa find.", "find defined.") });
+  emit({ line: 15, event: "def-union", title: same("def union(a, b)"), note: bi1970("Định nghĩa union.", "union defined.") });
+
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (let day = n - 1; day >= 0; day--) {
+    S.day = day;
+    emit({ line: 18, event: "for-day", title: same(`day = ${day}`), note: bi1970(`Hoàn tác ngày ${day + 1}.`, `Undo day ${day + 1}.`) });
+    const r = cells[day][0] - 1;
+    const c = cells[day][1] - 1;
+    const id = r * col + c;
+    S.r = r;
+    S.c = c;
+    S.cur = id;
+    emit({ line: 19, event: "cell-rc", title: same(`r, c = ${r}, ${c}`), note: bi1970(`Ô (${r}, ${c}).`, `Cell (${r}, ${c}).`) });
+    S.land[id] = true;
+    emit({ line: 20, event: "to-land", title: same(`land[${r}][${c}] = True`), note: bi1970("Ô thành đất.", "Cell becomes land.") });
+    S.cell = id;
+    emit({ line: 21, event: "cell-id", title: same(`cell = ${r} * ${col} + ${c}`), note: bi1970(`Mã ô = ${id}.`, `Cell id = ${id}.`) });
+    const isTop = r === 0;
+    emit({ line: 22, event: "top-check", condition: isTop, title: same(`if ${r} == 0`), note: isTop ? bi1970("Hàng trên cùng.", "Top row.") : bi1970("Không ở hàng trên.", "Not in the top row.") });
+    if (isTop) {
+      emit({ line: 23, event: "join-top", title: same(`union(${id}, ${n})`), note: bi1970("Nối với TOP.", "Join TOP.") });
+      union(id, S.top);
+    }
+    const isBottom = r === row - 1;
+    emit({ line: 24, event: "bottom-check", condition: isBottom, title: same(`if ${r} == ${row - 1}`), note: isBottom ? bi1970("Hàng dưới cùng.", "Bottom row.") : bi1970("Không ở hàng dưới.", "Not in the bottom row.") });
+    if (isBottom) {
+      emit({ line: 25, event: "join-bottom", title: same(`union(${id}, ${n + 1})`), note: bi1970("Nối với BOTTOM.", "Join BOTTOM.") });
+      union(id, S.bottom);
+    }
+    for (const [dr, dc] of DIRS) {
+      S.dr = dr;
+      S.dc = dc;
+      emit({ line: 26, event: "for-dir", dir: [dr, dc], title: same(`dr, dc = ${dr}, ${dc}`), note: bi1970(`Hướng (${dr}, ${dc}).`, `Direction (${dr}, ${dc}).`) });
+      const nr = r + dr;
+      const nc = c + dc;
+      S.nr = nr;
+      S.nc = nc;
+      const inside = nr >= 0 && nr < row && nc >= 0 && nc < col;
+      const nb = inside ? nr * col + nc : null;
+      const nbState = !inside ? "out" : S.land[nb] ? "land" : "water";
+      emit({ line: 27, event: "neighbor", dir: [dr, dc], nb, nbState, title: same(`nr, nc = ${nr}, ${nc}`), note: bi1970(`Hàng xóm (${nr}, ${nc}).`, `Neighbor (${nr}, ${nc}).`) });
+      const ok = nbState === "land";
+      emit({
+        line: 28,
+        event: "nb-check",
+        condition: ok,
+        dir: [dr, dc],
+        nb,
+        nbState,
+        title: same(inside ? `if land[${nr}][${nc}]` : `if 0 <= ${nr} < ${row} and 0 <= ${nc} < ${col}`),
+        note: ok ? bi1970("Đất kề: nối.", "Land next door: join.")
+          : nbState === "out" ? bi1970("Ngoài lưới.", "Outside the grid.") : bi1970("Ô nước, bỏ qua.", "Water, skip."),
+      });
+      if (ok) {
+        emit({ line: 29, event: "join-nb", dir: [dr, dc], nb, nbState, title: same(`union(${id}, ${nb})`), note: bi1970(`Nối ${id} với ${nb}.`, `Join ${id} with ${nb}.`) });
+        union(id, nb);
+      }
+    }
+    emit({ line: 26, event: "for-dir-done", title: bi1970("Hết 4 hướng", "directions done"), note: bi1970("Hết 4 hướng.", "All 4 directions done.") });
+    emit({ line: 30, event: "cross-start", title: same(`find(${n}) == find(${n + 1})`), note: bi1970("TOP nối BOTTOM?", "TOP joined to BOTTOM?") });
+    const rootTop = find(S.top);
+    const rootBottom = find(S.bottom);
+    const crossed = rootTop === rootBottom;
+    emit({
+      line: 30,
+      event: "cross-check",
+      condition: crossed,
+      crossed,
+      title: same(`if ${rootTop} == ${rootBottom}`),
+      note: crossed ? bi1970(`Cùng gốc ${rootTop}: qua được!`, `Same root ${rootTop}: crossing!`) : bi1970(`Gốc ${rootTop} ≠ ${rootBottom}.`, `Roots ${rootTop} ≠ ${rootBottom}.`),
+    });
+    if (crossed) {
+      emit({ line: 31, event: "return", crossed: true, final: true, answer: day, title: same(`return ${day}`), note: bi1970(`Đáp án: ngày ${day}.`, `Answer: day ${day}.`) });
+      return { input, answer: day, steps };
     }
   }
-  push(0, { vi: "Không có ngày crossing", en: "No crossing day" }, [13], null, [{ name: "answer", value: 0 }], { vi: "Không tạo được kết nối trên-dưới.", en: "No top-bottom connection was created." }, true);
-  return { original: cells, answer: 0, steps };
+  // Unreachable for valid input (row, col >= 2 and every cell listed): the all-land grid of day 0 always crosses.
+  throw new Error("1970: no crossing day found.");
 }
 
 // ─── 2316: Count Unreachable Pairs of Nodes in an Undirected Graph ───
@@ -7994,22 +8294,30 @@ Object.assign(module.exports, {
     slug: "last-day-where-you-can-still-cross",
     category: UF_CAT,
     title: { vi: "Last Day Where You Can Still Cross", en: "Last Day Where You Can Still Cross" },
-    titleVi: { vi: "Ngày cuối vẫn băng qua được", en: "Latest day where crossing is possible" },
-    statement: { vi: "Các ô bị ngập theo từng ngày. Tìm ngày cuối còn đường đất từ hàng trên xuống hàng dưới. Nhập cells 1-based dạng r,c;r,c.", en: "Cells flood day by day. Find the latest day with a land path from top row to bottom row. Enter 1-based cells as r,c;r,c." },
-    defaultInput: "1,1;2,1;1,2;2,2",
+    titleVi: bi1970("Ngày cuối còn đi qua được (Union-Find ngược)", "Last day you can still cross (reverse Union-Find)"),
+    statement: bi1970(
+      "Lưới row × col ban đầu toàn đất; ngày i ô cells[i] bị ngập. Tìm ngày cuối cùng còn đi được từ hàng trên xuống hàng dưới chỉ trên đất, theo 4 hướng. Visualization: nhập R,C | r,c;… (1-based), R và C từ 2 đến 6, tối đa 24 ô, liệt kê mỗi ô đúng một lần.",
+      "The row × col grid starts as all land; on day i the cell cells[i] floods. Return the last day on which you can still walk on land from the top row to the bottom row, moving in 4 directions. Visualization: enter R,C | r,c;… (1-based), R and C 2–6, at most 24 cells, every cell listed once.",
+    ),
+    defaultInput: DEFAULT_INPUT_1970,
     inputKind: "string",
-    inputLabel: { vi: "cells (1-based, cách ;)", en: "cells (1-based, separated by ;)" },
-    extraParams: [
-      { key: "rows", label: { vi: "rows", en: "rows" }, default: 2 },
-      { key: "cols", label: { vi: "cols", en: "cols" }, default: 2 },
-    ],
+    inputLabel: bi1970("R,C | cells r,c;… (1-based, R,C ≤ 6, ≤ 24 ô)", "R,C | cells r,c;… (1-based, R,C ≤ 6, ≤ 24 cells)"),
+    debugMode: "line-by-line",
     approach: [
-      { vi: "Đi ngược từ ngày cuối, thêm lại từng ô đất.", en: "Work backward from the final day, adding land cells back." },
-      { vi: "Union ô đất mới với hàng xóm đất và virtual top/bottom.", en: "Union the new land cell with land neighbors and virtual top/bottom nodes." },
-      { vi: "Lần đầu top nối bottom là đáp án.", en: "The first time top connects to bottom is the answer." },
+      bi1970("Đi ngược thời gian từ ngày cuối: mỗi bước biến một ô nước trở lại thành đất.", "Go back in time from the last day: each step turns one water cell back into land."),
+      bi1970("Union ô đó với các ô đất kề và với nút ảo TOP (hàng 0) / BOTTOM (hàng cuối).", "Union it with its land neighbors and with the virtual TOP (row 0) / BOTTOM (last row) nodes."),
+      bi1970("Lần đầu find(TOP) == find(BOTTOM), giá trị day đó là đáp án.", "The first time find(TOP) == find(BOTTOM), that day is the answer."),
     ],
-    complexity: { time: "O(R·C·α(RC))", space: "O(R·C)", note: { vi: "Mỗi ô được thêm và union tối đa 4 lần.", en: "Each cell is added and unioned with at most 4 neighbors." } },
-    code: ["class Solution:", "    def latestDayToCross(self, row, col, cells):", "        parent = list(range(row * col + 2))", "        land = [[False] * col for _ in range(row)]", "        for day in range(len(cells) - 1, -1, -1):", "            r, c = cells[day][0] - 1, cells[day][1] - 1", "            land[r][c] = True", "            union(cell, top/bottom/neighbors)", "            if find(top) == find(bottom):", "                return day", "        return 0"],
+    complexity: {
+      time: "O(R·C·log(R·C))",
+      space: "O(R·C)",
+      note: bi1970("Nén nửa đường, không xếp hạng. Cách khác: chặt nhị phân ngày + BFS, cùng độ phức tạp.", "Path halving, no rank. Alternative: binary search on the day + BFS, same complexity."),
+    },
+    code: [...SOURCE_1970],
+    liveArgs: (input, params) => {
+      const parsed = parseInput1970(input, params);
+      return [parsed.row, parsed.col, parsed.cells];
+    },
     builder: buildSteps1970,
   },
   2316: {
@@ -8289,6 +8597,11 @@ Object.assign(module.exports, {
       return [data.n, data.edges];
     },
   },
+});
+
+Object.defineProperty(module.exports[1970], "__internals1970", {
+  value: { parseInput1970, SOURCE_1970, DEFAULT_INPUT_1970, MIN_SIDE_1970, MAX_SIDE_1970, MAX_CELLS_1970 },
+  enumerable: false,
 });
 
 

@@ -1,0 +1,555 @@
+/* LeetCode 1970 — Last Day Where You Can Still Cross. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.lc1970-viz {
+  --lc1970-bg: #0f1a25;
+  --lc1970-panel: #152434;
+  --lc1970-soft: #1e3144;
+  --lc1970-border: #36506a;
+  --lc1970-text: #eaf3fb;
+  --lc1970-muted: #9fb3c6;
+  /* Status colors: True / crossing (green), False (red), line numbers and the restored cell (amber). */
+  --lc1970-green: #4fd69c;
+  --lc1970-red: #ff8f8f;
+  --lc1970-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above and from each other. */
+  --lc1970-water: #2f5f9e;
+  --lc1970-top: #c58cff;
+  --lc1970-bottom: #2fd4e8;
+  --lc1970-c0: #b0b8c4;
+  --lc1970-c1: #9ccf5a;
+  --lc1970-c2: #a08060;
+  --lc1970-c3: #7d6cff;
+  --lc1970-link: #f2f6fa;
+  --lc1970-route: #ff5fd2;
+  --lc1970-on-cell: #0b1520;
+  --lc1970-on-water: #eaf3fb;
+  --lc1970-line: #2a4560;
+  container: lc1970 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--lc1970-border);
+  border-radius: 16px;
+  background: var(--lc1970-bg);
+  color: var(--lc1970-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .lc1970-viz {
+  --lc1970-bg: #f4f7fb;
+  --lc1970-panel: #ffffff;
+  --lc1970-soft: #e9eff7;
+  --lc1970-border: #c2d1e2;
+  --lc1970-text: #17283a;
+  --lc1970-muted: #55697e;
+  --lc1970-green: #08784f;
+  --lc1970-red: #b4232f;
+  --lc1970-amber: #9a6200;
+  --lc1970-water: #7fb0f0;
+  --lc1970-top: #c58cff;
+  --lc1970-bottom: #3cc8dc;
+  --lc1970-c0: #c9cfd6;
+  --lc1970-c1: #a6d66a;
+  --lc1970-c2: #d0a070;
+  --lc1970-c3: #6f62f5;
+  --lc1970-link: #24364a;
+  --lc1970-route: #e0309f;
+  --lc1970-on-cell: #10202f;
+  --lc1970-on-water: #10202f;
+  --lc1970-line: #fff3cf;
+}
+
+.lc1970-viz,
+.lc1970-viz * {
+  box-sizing: border-box;
+}
+
+.lc1970-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.lc1970-viz button {
+  border: 1px solid var(--lc1970-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--lc1970-panel);
+  color: var(--lc1970-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.lc1970-viz button:hover:not(:disabled) {
+  border-color: var(--lc1970-bottom);
+  background: var(--lc1970-soft);
+}
+
+.lc1970-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.lc1970-viz :focus-visible {
+  outline: 3px solid var(--lc1970-bottom);
+  outline-offset: 2px;
+}
+
+/* Header */
+.lc1970-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lc1970-head > div {
+  min-width: 0;
+}
+
+.lc1970-head small {
+  color: var(--lc1970-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.lc1970-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.lc1970-head h2 code {
+  color: var(--lc1970-amber);
+}
+
+.lc1970-viz.is-final .lc1970-head h2 code {
+  color: var(--lc1970-green);
+}
+
+.lc1970-status {
+  border: 1px solid var(--lc1970-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--lc1970-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lc1970-viz.is-crossed .lc1970-status {
+  border-color: var(--lc1970-green);
+  color: var(--lc1970-green);
+}
+
+.lc1970-presets,
+.lc1970-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.lc1970-card {
+  min-width: 0;
+  border: 1px solid var(--lc1970-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--lc1970-panel);
+}
+
+.lc1970-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.lc1970-card > header > b {
+  color: var(--lc1970-muted);
+  font-weight: 700;
+}
+
+/* Picture: drawn about as wide as the card; scales down only on narrow screens. */
+.lc1970-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.lc1970-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--lc1970-text);
+  text-anchor: middle;
+}
+
+.lc1970-svg .lc1970-caption {
+  fill: var(--lc1970-muted);
+  text-anchor: start;
+}
+
+/* Timeline */
+.lc1970-daybox {
+  stroke-width: 1.5;
+}
+
+.lc1970-daybox.is-water {
+  fill: color-mix(in srgb, var(--lc1970-water) 35%, transparent);
+  stroke: var(--lc1970-water);
+  stroke-dasharray: 3 2;
+}
+
+.lc1970-daybox.is-back {
+  fill: var(--lc1970-soft);
+  stroke: var(--lc1970-border);
+}
+
+.lc1970-daybox.is-cur {
+  fill: color-mix(in srgb, var(--lc1970-amber) 30%, transparent);
+  stroke: var(--lc1970-amber);
+  stroke-width: 2;
+}
+
+.lc1970-daybox.is-answer {
+  stroke: var(--lc1970-green);
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+}
+
+.lc1970-svg .lc1970-day-label.is-back {
+  fill: var(--lc1970-muted);
+}
+
+.lc1970-svg .lc1970-answer-mark {
+  fill: var(--lc1970-green);
+  font-size: 12px;
+}
+
+/* TOP / BOTTOM bars */
+.lc1970-bar {
+  stroke: none;
+}
+
+.lc1970-bar.is-top {
+  fill: var(--lc1970-top);
+}
+
+.lc1970-bar.is-bottom {
+  fill: var(--lc1970-bottom);
+}
+
+.lc1970-bar.is-walk {
+  stroke: var(--lc1970-text);
+  stroke-width: 2.5;
+}
+
+.lc1970-bar.is-x {
+  stroke: var(--lc1970-amber);
+  stroke-width: 3.5;
+}
+
+.lc1970-bar.is-crossed {
+  stroke: var(--lc1970-route);
+  stroke-width: 3;
+}
+
+.lc1970-svg .lc1970-bar-label {
+  fill: var(--lc1970-on-cell);
+}
+
+/* Grid cells */
+.lc1970-cell {
+  stroke-width: 1.5;
+}
+
+.lc1970-cell.is-water {
+  fill: var(--lc1970-water);
+  stroke: var(--lc1970-text);
+  stroke-opacity: 0.55;
+  stroke-dasharray: 4 3;
+}
+
+.lc1970-cell.is-top-comp {
+  fill: var(--lc1970-top);
+}
+
+.lc1970-cell.is-bottom-comp {
+  fill: var(--lc1970-bottom);
+}
+
+.lc1970-cell.is-comp-0 {
+  fill: var(--lc1970-c0);
+}
+
+.lc1970-cell.is-comp-1 {
+  fill: var(--lc1970-c1);
+}
+
+.lc1970-cell.is-comp-2 {
+  fill: var(--lc1970-c2);
+}
+
+.lc1970-cell.is-comp-3 {
+  fill: var(--lc1970-c3);
+}
+
+.lc1970-cell.is-land {
+  stroke: none;
+}
+
+.lc1970-cell.is-route {
+  stroke: var(--lc1970-route);
+  stroke-width: 4;
+  stroke-dasharray: none;
+  stroke-opacity: 1;
+}
+
+.lc1970-cell.is-walk {
+  stroke: var(--lc1970-text);
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+  stroke-opacity: 1;
+}
+
+.lc1970-cell.is-nb {
+  stroke: var(--lc1970-text);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
+  stroke-opacity: 1;
+}
+
+.lc1970-cell.is-cur {
+  stroke: var(--lc1970-amber);
+  stroke-width: 3.5;
+  stroke-dasharray: none;
+  stroke-opacity: 1;
+}
+
+.lc1970-cell.is-x {
+  stroke: var(--lc1970-amber);
+  stroke-width: 4.5;
+  stroke-dasharray: 2 2;
+  stroke-opacity: 1;
+}
+
+.lc1970-svg .lc1970-cell-id,
+.lc1970-svg .lc1970-cell-label {
+  fill: var(--lc1970-on-cell);
+  paint-order: stroke;
+  stroke: color-mix(in srgb, var(--lc1970-panel) 55%, transparent);
+  stroke-width: 2.5px;
+  stroke-linejoin: round;
+}
+
+.lc1970-svg .lc1970-cell-id {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.lc1970-svg .lc1970-cell-label {
+  font-size: 14px;
+}
+
+.lc1970-svg .lc1970-cell-id.is-water,
+.lc1970-svg .lc1970-cell-label.is-water {
+  fill: var(--lc1970-on-water);
+}
+
+.lc1970-svg .lc1970-cell-id.is-land,
+.lc1970-svg .lc1970-cell-label.is-land {
+  stroke: color-mix(in srgb, #ffffff 35%, transparent);
+}
+
+/* Parent arrows */
+.lc1970-link {
+  fill: none;
+  stroke: var(--lc1970-link);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.lc1970-link.is-walk {
+  stroke-width: 3;
+}
+
+.lc1970-link.is-new {
+  stroke: var(--lc1970-amber);
+  stroke-width: 3;
+}
+
+.lc1970-head {
+  fill: var(--lc1970-link);
+}
+
+.lc1970-head.is-new {
+  fill: var(--lc1970-amber);
+}
+
+.lc1970-head.is-walk {
+  fill: var(--lc1970-link);
+}
+
+/* Legend */
+.lc1970-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 6px;
+  color: var(--lc1970-muted);
+  font-size: 11px;
+}
+
+.lc1970-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lc1970-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.lc1970-legend .lg-water i {
+  background: var(--lc1970-water);
+  border: 1.5px dashed var(--lc1970-text);
+}
+
+.lc1970-legend .lg-land i {
+  background: linear-gradient(90deg, var(--lc1970-c0) 0 25%, var(--lc1970-c1) 25% 50%, var(--lc1970-c2) 50% 75%, var(--lc1970-c3) 75%);
+}
+
+.lc1970-legend .lg-top i {
+  background: var(--lc1970-top);
+}
+
+.lc1970-legend .lg-bottom i {
+  background: var(--lc1970-bottom);
+}
+
+.lc1970-legend .lg-link {
+  color: var(--lc1970-text);
+  font-weight: 700;
+}
+
+.lc1970-legend .lg-route i {
+  border: 3px solid var(--lc1970-route);
+}
+
+/* Current-line strip */
+.lc1970-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--lc1970-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--lc1970-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .lc1970-now {
+  background: var(--lc1970-line);
+}
+
+.lc1970-lineno {
+  color: var(--lc1970-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.lc1970-now .lc1970-effect {
+  color: var(--lc1970-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lc1970-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.lc1970-branch.is-true {
+  background: color-mix(in srgb, var(--lc1970-green) 20%, transparent);
+  color: var(--lc1970-green);
+}
+
+.lc1970-branch.is-false {
+  background: color-mix(in srgb, var(--lc1970-red) 18%, transparent);
+  color: var(--lc1970-red);
+}
+
+/* 1970 step notes are a few words. */
+body:has(#treeView:not(.hidden) .lc1970-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 1970 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Long lines (the signature, the neighbor check) wrap inside the panel instead of being cut off at its right edge. */
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line {
+  width: auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  --lc1970-hang: 4ch;
+  padding-left: var(--lc1970-hang);
+  text-indent: calc(-1 * var(--lc1970-hang));
+}
+
+/* Hanging indent: a wrapped line continues 4 columns past its own indent, never at column 0. Each indent level is one
+   leading .indent-guide span (4ch, emitted first by renderCodeLineHtml), so the guide count gives the indent. */
+/* The guides are inline-blocks, which would inherit the negative text-indent for their own (blank) content. */
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt .indent-guide {
+  text-indent: 0;
+}
+
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(1)) {
+  --lc1970-hang: 8ch;
+}
+
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(2)) {
+  --lc1970-hang: 12ch;
+}
+
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(3)) {
+  --lc1970-hang: 16ch;
+}
+
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(4)) {
+  --lc1970-hang: 20ch;
+}
+
+body:has(#treeView:not(.hidden) .lc1970-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(5)) {
+  --lc1970-hang: 24ch;
+}
+
+@container lc1970 (max-width: 420px) {
+  .lc1970-head h2 {
+    font-size: 18px;
+  }
+}
