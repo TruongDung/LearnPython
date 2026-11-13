@@ -1033,6 +1033,17 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracl
         except Exception:
             return "<unrepr>"
 
+    # A returned reversed(list) / iter(list) is shown as a list. Only the final result goes through this, after
+    # sys.settrace(None), so no iterator the user code still needs is consumed; line snapshots keep using safe_repr.
+    list_iterator_types = (type(iter([])), type(reversed([])))
+
+    def result_repr(value):
+        if isinstance(value, list_iterator_types):
+            value = list(value)
+        elif isinstance(value, list):
+            value = [list(v) if isinstance(v, list_iterator_types) else v for v in value]
+        return safe_repr(value)
+
     def tracer(frame, event, arg):
         try:
             code = frame.f_code
@@ -1128,6 +1139,8 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracl
                         operation_result = getattr(instance2, operation["name"])(*operation_args)
                         materialize_context["previous_result"] = operation_result
                         result.append(operation_result)
+                    # Setup calls that only seed state (e.g. 9025 warm-up records()) run but are not shown.
+                    result = result[int(design_config.get("resultSkip") or 0):]
                     if design_config.get("resultMode") == "last":
                         result = result[-1] if result else None
             else:
@@ -1143,7 +1156,7 @@ def __viz_run_trace(user_code, method_name, call_args, design_config=None, oracl
     finally:
         sys.settrace(None)
 
-    return {"trace": trace, "result": list_result(result) if isinstance(result, ListNode) else safe_repr(result), "stdout": stdout_buffer.getvalue()}
+    return {"trace": trace, "result": list_result(result) if isinstance(result, ListNode) else result_repr(result), "stdout": stdout_buffer.getvalue()}
 `;
 
 async function runLiveCode() {

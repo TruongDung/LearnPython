@@ -597,7 +597,8 @@ function buildSteps9025(input, approach) {
   return { input, answer, steps };
 }
 
-// Live editor: warm-up calls first (one records() per starting point), then the traced calls.
+// Live editor: warm-up calls first (one records() per starting point), then the traced calls. resultSkip hides the
+// warm-up results, so the live result lists one answer per real call, like the page's answer.
 function prepareLiveDesign9025(input) {
   const { scores, calls, k } = parse9025(input);
   const warm = scores.flatMap(([id, s]) => Array.from({ length: s }, () => id));
@@ -605,6 +606,7 @@ function prepareLiveDesign9025(input) {
     className: "YT",
     constructorArgs: [k],
     operations: [...warm, ...calls].map((id) => ({ name: "records", args: [id] })),
+    resultSkip: warm.length,
   };
 }
 
@@ -663,9 +665,12 @@ module.exports = {
       note: bi9025("SortedList gỡ/thêm O(log n); cắt k mục cuối O(k).", "SortedList remove/add in O(log n); slicing the last k is O(k)."),
     },
     complexity3: {
-      time: "O(1) cập nhật + O(k log k) đọc / call",
+      time: "O(1) + O(n log n) / call",
       space: "O(n)",
-      note: bi9025("Nhảy xô O(1); đọc top k đi qua ≤ k xô, sắp id trong từng xô.", "Hopping buckets is O(1); reading the top k visits ≤ k buckets and sorts ids inside each."),
+      note: bi9025(
+        "Nhảy xô O(1). Đọc top k: sorted() sắp cả xô được duyệt, nên tới O(n log n) khi nhiều video hòa điểm.",
+        "Hopping buckets is O(1). Reading the top k: sorted() sorts each visited bucket in full, so up to O(n log n) when many videos tie.",
+      ),
     },
     code: [...SOURCE_9025],
     codeLabel: approachLabels9025[1],

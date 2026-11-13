@@ -516,6 +516,32 @@ body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt {
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  --yt9025-hang: 4ch;
+  padding-left: var(--yt9025-hang);
+  text-indent: calc(-1 * var(--yt9025-hang));
+}
+
+/* Hanging indent: a wrapped line continues 4 columns past its own indent, never at column 0. Each indent level is one
+   leading .indent-guide span (4ch, emitted first by renderCodeLineHtml), so the guide count gives the indent. */
+/* The guides are inline-blocks, which would inherit the negative text-indent for their own (blank) content. */
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt .indent-guide {
+  text-indent: 0;
+}
+
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(1)) {
+  --yt9025-hang: 8ch;
+}
+
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(2)) {
+  --yt9025-hang: 12ch;
+}
+
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(3)) {
+  --yt9025-hang: 16ch;
+}
+
+body:has(#treeView:not(.hidden) .yt9025-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(4)) {
+  --yt9025-hang: 20ch;
 }
 
 @container yt9025 (max-width: 420px) {

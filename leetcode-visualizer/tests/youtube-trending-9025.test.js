@@ -133,6 +133,7 @@ test('9025 id is a number in the interview category with three approaches and on
     className: 'YT',
     constructorArgs: [2],
     operations: ['1', '1', '1', '2', '2', '2', '3', '3', '3', '3', '1'].map((id) => ({ name: 'records', args: [id] })),
+    resultSkip: 10,
   });
   assert.equal(problem.liveArgs, undefined, 'the live editor uses prepareLiveDesign');
 });
@@ -227,6 +228,61 @@ test('9025 displayed Python (real heapq and sortedcontainers) returns the builde
   assert.equal(result.status, 0, result.stderr);
   const expected = APPROACHES.flatMap((approach) => inputs.map((input) => build(input, approach).answer));
   assert.deepEqual(JSON.parse(result.stdout), expected);
+});
+
+test('9025 live editor (real TRACER_PY) shows list results for real calls only, without consuming live iterators', (t) => {
+  const localPython = path.join(__dirname, '..', '..', '.venv', 'Scripts', 'python.exe');
+  const python = process.env.PYTHON || (fs.existsSync(localPython) ? localPython : 'python');
+  const wheel = path.join(__dirname, '..', 'public', 'vendor', 'sortedcontainers-2.4.0-py2.py3-none-any.whl');
+  const source = fs.readFileSync(require.resolve('../public/live-editor.js'), 'utf8');
+  const tracer = vm.runInNewContext(source.match(/const TRACER_PY = (`[\s\S]*?`);/)[1]);
+  const inputs = [internals.SCREENSHOT_INPUT_9025, problem.defaultInput, '1 |  | a', '3 | x:1, y:1, z:1 | z, y, x'];
+  const runs = APPROACHES.flatMap((approach) => inputs.map((input) => ({ code: codeOf(approach).join('\n'), design: problem.prepareLiveDesign(input) })));
+  // A design whose first call returns an iterator that the second call still reads: the display must not drain it first.
+  const keep = [
+    'class Keep:',
+    '    def make(self):',
+    '        self.it = reversed([1, 2, 3])',
+    '        return self.it',
+    '    def drain(self):',
+    '        it = iter([7, 8])',
+    '        return list(self.it) + [next(it)]',
+  ].join('\n');
+  const program = `${tracer}
+import json, sys
+payload = json.load(sys.stdin)
+sys.path.insert(0, payload['wheel'])
+out = [__viz_run_trace(run['code'], 'YT', [], run['design'])['result'] for run in payload['runs']]
+keep = __viz_run_trace(payload['keep'], 'Keep', [], {'className': 'Keep', 'constructorArgs': [], 'operations': [{'name': 'make', 'args': []}, {'name': 'drain', 'args': []}]})
+plain = __viz_run_trace('class Solution:\\n    def f(self, n):\\n        return reversed(list(range(n)))', 'f', [3])
+print(json.dumps({'out': out, 'keep': keep, 'plain': plain['result']}))
+`;
+  const result = spawnSync(python, ['-c', program], { input: JSON.stringify({ wheel, runs, keep }), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (result.error) {
+    t.skip(`no python to run: ${result.error.message}`);
+    return;
+  }
+  assert.equal(result.status, 0, result.stderr);
+  const { out, keep: kept, plain } = JSON.parse(result.stdout);
+  assert.deepEqual(out, APPROACHES.flatMap((approach) => inputs.map((input) => build(input, approach).answer)));
+  assert.deepEqual(out[0], [['3', '1']], 'screenshot preset, approach 1: one real call, shown as a list');
+  assert.doesNotMatch(JSON.stringify(out), /iterator|object at/);
+  assert.deepEqual(kept.result, [[], [3, 2, 1, 7]], 'drain() still read the iterator make() returned');
+  const local = kept.trace.find((entry) => entry.vars.it !== undefined);
+  assert.match(local.vars.it, /^<list_iterator object/, 'line snapshots never expand (consume) a local iterator');
+  assert.deepEqual(plain, [2, 1, 0]);
+});
+
+test('9025 complexity text is language-neutral and matches the code', () => {
+  for (const n of ['', '2', '3']) {
+    const cx = problem[`complexity${n}`];
+    for (const key of ['time', 'space']) assert.match(cx[key], /^[ -~]+$/, `complexity${n}.${key} has no language-specific text`);
+    assert.ok(cx.note.vi && cx.note.en && cx.note.vi !== cx.note.en, `complexity${n}.note is localized`);
+  }
+  assert.equal(problem.complexity3.time, 'O(1) + O(n log n) / call');
+  assert.match(problem.code3.join('\n'), /sorted\(node\.ids, reverse=True\)/, 'the read sorts a whole bucket');
+  assert.match(problem.complexity3.note.en, /O\(n log n\)/);
+  assert.match(problem.complexity3.note.vi, /O\(n log n\)/);
 });
 
 test('9025 renders every frame in both languages with the executed line and one picture per state', () => {
@@ -411,7 +467,7 @@ test('9025 rejects inputs outside the visualizer limits', () => {
 
 test('9025 assets are wired with light/dark tokens and no code-panel height cap', () => {
   const index = readFrontendIndex();
-  assert.match(index, /youtube-trending-9025\.css\?v=youtube-trending-9025-v1" data-problem-ids="9025"/);
+  assert.match(index, /youtube-trending-9025\.css\?v=youtube-trending-9025-v2" data-problem-ids="9025"/);
   assert.match(index, /renderer-youtube-trending-9025\.js\?v=youtube-trending-9025-v1" data-problem-ids="9025"/);
   assert.match(readFrontendJavaScript(), /step\.yt9025View\), surface: "treeView", render: \(step\) => \{\s*renderYouTubeTrending9025View\(step\)/);
   assert.match(CSS, /\.yt9025-viz \{[^}]*--yt9025-bg:/s);
@@ -419,5 +475,12 @@ test('9025 assets are wired with light/dark tokens and no code-panel height cap'
   assert.match(CSS, /\.yt9025-viz\) #codePanel \{[^}]*max-height: none;/s);
   assert.match(CSS, /\.yt9025-viz\) #codePanel \.code-line \{[^}]*white-space: pre-wrap;/s);
   assert.match(CSS, /\.yt9025-viz\) #codePanel \.code-line \.txt \{[^}]*white-space: pre-wrap;[^}]*overflow-wrap: anywhere;/s);
+  // Hanging indent: wrapped text continues 4 columns past the line's own indent (one 4ch .indent-guide per level).
+  assert.match(CSS, /\.yt9025-viz\) #codePanel \.code-line \.txt \{[^}]*--yt9025-hang: 4ch;[^}]*padding-left: var\(--yt9025-hang\);[^}]*text-indent: calc\(-1 \* var\(--yt9025-hang\)\);/s);
+  assert.match(CSS, /\.yt9025-viz\) #codePanel \.code-line \.txt \.indent-guide \{\s*text-indent: 0;/);
+  const maxIndent = Math.max(...APPROACHES.flatMap((a) => codeOf(a).map((line) => line.match(/^ */)[0].length)));
+  for (let level = 1; level <= maxIndent / 4; level++) {
+    assert.match(CSS, new RegExp(`\\.txt:has\\(> \\.indent-guide:nth-child\\(${level}\\)\\) \\{\\s*--yt9025-hang: ${4 * level + 4}ch;`), `indent level ${level}`);
+  }
   assert.equal(SUPPORTED[9024], undefined, '9024 stays retired (see tests/lis-300.test.js)');
 });
