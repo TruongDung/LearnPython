@@ -1,0 +1,483 @@
+/* LeetCode 426 — BST to sorted circular DLL. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.dl426-viz {
+  --dl426-bg: #0f1a25;
+  --dl426-panel: #152434;
+  --dl426-soft: #1e3144;
+  --dl426-border: #36506a;
+  --dl426-text: #eaf3fb;
+  --dl426-muted: #9fb3c6;
+  --dl426-blue: #6cb8ff;
+  --dl426-green: #4fd69c;
+  --dl426-amber: #f5c451;
+  --dl426-red: #ff8f8f;
+  --dl426-violet: #c6abff;
+  --dl426-done: #1d4a3a;
+  --dl426-line: #2a4560;
+  container: dl426 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--dl426-border);
+  border-radius: 16px;
+  background: var(--dl426-bg);
+  color: var(--dl426-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .dl426-viz {
+  --dl426-bg: #f4f7fb;
+  --dl426-panel: #ffffff;
+  --dl426-soft: #e9eff7;
+  --dl426-border: #c2d1e2;
+  --dl426-text: #17283a;
+  --dl426-muted: #55697e;
+  --dl426-blue: #1663b8;
+  --dl426-green: #08784f;
+  --dl426-amber: #9a6200;
+  --dl426-red: #b4232f;
+  --dl426-violet: #6c3fb8;
+  --dl426-done: #d3f1e3;
+  --dl426-line: #fff3cf;
+}
+
+.dl426-viz,
+.dl426-viz * {
+  box-sizing: border-box;
+}
+
+.dl426-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.dl426-viz button {
+  border: 1px solid var(--dl426-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--dl426-panel);
+  color: var(--dl426-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.dl426-viz button:hover:not(:disabled) {
+  border-color: var(--dl426-violet);
+  background: var(--dl426-soft);
+}
+
+.dl426-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dl426-viz :focus-visible {
+  outline: 3px solid var(--dl426-violet);
+  outline-offset: 2px;
+}
+
+/* Header */
+.dl426-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dl426-head small {
+  color: var(--dl426-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.dl426-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.dl426-head h2 code {
+  color: var(--dl426-blue);
+}
+
+.dl426-status {
+  border: 1px solid var(--dl426-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--dl426-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dl426-viz.is-closed .dl426-status {
+  border-color: var(--dl426-green);
+  color: var(--dl426-green);
+}
+
+.dl426-presets,
+.dl426-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.dl426-card {
+  min-width: 0;
+  border: 1px solid var(--dl426-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--dl426-panel);
+}
+
+.dl426-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.dl426-card > header > b {
+  color: var(--dl426-muted);
+  font-weight: 700;
+}
+
+/* Picture: scales down to the card width, so the whole tree and list stay in view. */
+.dl426-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.dl426-svg text {
+  font: 700 14px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--dl426-text);
+  text-anchor: middle;
+}
+
+.dl426-edge {
+  stroke: var(--dl426-border);
+  stroke-width: 2;
+}
+
+.dl426-edge.is-null {
+  stroke-dasharray: 4 3;
+}
+
+.dl426-null circle {
+  fill: transparent;
+  stroke: var(--dl426-red);
+  stroke-dasharray: 3 3;
+  stroke-width: 1.5;
+}
+
+.dl426-svg .dl426-null text {
+  fill: var(--dl426-red);
+  font-size: 11px;
+}
+
+.dl426-guide {
+  stroke: var(--dl426-amber);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+  opacity: 0.8;
+}
+
+.dl426-tnode circle {
+  fill: var(--dl426-soft);
+  stroke: var(--dl426-border);
+  stroke-width: 2;
+}
+
+.dl426-tnode.is-done circle {
+  fill: var(--dl426-done);
+  stroke: var(--dl426-green);
+}
+
+.dl426-tnode.is-stack circle {
+  stroke: var(--dl426-violet);
+  stroke-width: 3;
+}
+
+.dl426-tnode.is-current circle {
+  stroke: var(--dl426-amber);
+  stroke-width: 4;
+}
+
+.dl426-lnode rect {
+  fill: var(--dl426-soft);
+  stroke: var(--dl426-blue);
+  stroke-width: 2;
+}
+
+.dl426-lnode.is-done rect {
+  fill: var(--dl426-done);
+  stroke: var(--dl426-green);
+}
+
+.dl426-lnode.is-pending rect {
+  fill: transparent;
+  stroke: var(--dl426-border);
+  stroke-dasharray: 4 3;
+}
+
+.dl426-svg .dl426-lnode.is-pending > text {
+  fill: var(--dl426-muted);
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.dl426-lnode.is-current rect {
+  stroke: var(--dl426-amber);
+  stroke-width: 3;
+}
+
+.dl426-lnode.is-done.is-current rect,
+.dl426-lnode.is-tagged rect {
+  animation: dl426-pop 320ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dl426-svg .dl426-tags {
+  font-size: 11px;
+}
+
+.dl426-svg .tag-head {
+  fill: var(--dl426-violet);
+}
+
+.dl426-svg .tag-prev {
+  fill: var(--dl426-amber);
+}
+
+.dl426-ptr {
+  fill: none;
+  stroke-width: 2;
+}
+
+.dl426-ptr.is-right {
+  stroke: var(--dl426-blue);
+}
+
+.dl426-ptr.is-left {
+  stroke: var(--dl426-green);
+}
+
+.dl426-ptr.is-close {
+  stroke-dasharray: 6 3;
+}
+
+.dl426-ptr.is-written {
+  stroke: var(--dl426-amber);
+  stroke-width: 3.5;
+  stroke-dasharray: none;
+  animation: dl426-draw 420ms ease-out;
+}
+
+.dl426-tip-right path {
+  fill: var(--dl426-blue);
+}
+
+.dl426-tip-left path {
+  fill: var(--dl426-green);
+}
+
+.dl426-tip-written path {
+  fill: var(--dl426-amber);
+}
+
+.dl426-empty {
+  padding: 18px;
+  color: var(--dl426-muted);
+  font: 700 15px ui-monospace, SFMono-Regular, Consolas, monospace;
+  text-align: center;
+}
+
+.dl426-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+  color: var(--dl426-muted);
+  font-size: 11px;
+}
+
+.dl426-legend .lg-next {
+  color: var(--dl426-blue);
+}
+
+.dl426-legend .lg-prev,
+.dl426-legend .lg-done {
+  color: var(--dl426-green);
+}
+
+.dl426-legend .lg-written {
+  color: var(--dl426-amber);
+}
+
+.dl426-legend .lg-stack {
+  color: var(--dl426-violet);
+}
+
+/* Current-line strip */
+.dl426-stack {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.dl426-stack code {
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: var(--dl426-soft);
+  color: var(--dl426-violet);
+  font-size: 11px;
+}
+
+.dl426-stack i {
+  color: var(--dl426-muted);
+  font-style: normal;
+  font-size: 10px;
+}
+
+.dl426-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--dl426-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--dl426-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .dl426-now {
+  background: var(--dl426-line);
+}
+
+.dl426-lineno {
+  color: var(--dl426-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.dl426-now .dl426-effect {
+  color: var(--dl426-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dl426-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.dl426-branch.is-true {
+  background: color-mix(in srgb, var(--dl426-green) 20%, transparent);
+  color: var(--dl426-green);
+}
+
+.dl426-branch.is-false {
+  background: color-mix(in srgb, var(--dl426-red) 18%, transparent);
+  color: var(--dl426-red);
+}
+
+.dl426-locals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dl426-locals span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  border: 1px solid var(--dl426-border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  background: var(--dl426-soft);
+  font-size: 12px;
+}
+
+.dl426-locals code {
+  color: var(--dl426-muted);
+  font-size: 11px;
+}
+
+.dl426-locals .chip-node {
+  border-color: var(--dl426-amber);
+}
+
+.dl426-locals .chip-node b,
+.dl426-locals .chip-prev b {
+  color: var(--dl426-amber);
+}
+
+.dl426-locals .chip-head b {
+  color: var(--dl426-violet);
+}
+
+/* 426 step notes are a few words. */
+body:has(#treeView:not(.hidden) .dl426-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 426 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off.
+   Horizontal scrolling (overflow-x: auto from .code-panel) is unchanged. */
+body:has(#treeView:not(.hidden) .dl426-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+@keyframes dl426-pop {
+  from {
+    transform: scale(0.7);
+    opacity: 0.3;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes dl426-draw {
+  from {
+    opacity: 0.1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@container dl426 (max-width: 420px) {
+  .dl426-head h2 {
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl426-viz *,
+  .dl426-viz *::before,
+  .dl426-viz *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

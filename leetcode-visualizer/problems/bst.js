@@ -751,288 +751,169 @@ function buildSteps1382(input) {
 }
 
 // ─── 426: Convert BST to Sorted Doubly Linked List ───
+// One step per executed Python line. Each step carries bstDll426View, drawn by
+// public/renderer-bst-dll-426.js: the original tree (x = inorder rank), the list row
+// under it, the left/right pointers written so far, head/prev, and the call stack.
 function buildSteps426(input) {
   const root = parseBST(input);
   const steps = [];
+  const order = [];
+  const depthOf = new Map();
+  const parentOf = new Map();
+  (function walk(node, depth, parent) {
+    if (!node) return;
+    walk(node.left, depth + 1, node);
+    depthOf.set(node.id, depth);
+    parentOf.set(node.id, parent ? parent.id : null);
+    order.push(node);
+    walk(node.right, depth + 1, node);
+  })(root, 0, null);
+  const tree = order.map((node) => ({
+    id: node.id,
+    val: node.val,
+    depth: depthOf.get(node.id),
+    parent: parentOf.get(node.id),
+    left: node.left ? node.left.id : null,
+    right: node.right ? node.right.id : null,
+  }));
+  const valOf = new Map(order.map((node) => [node.id, node.val]));
+  const name = (id) => (id === null || id === undefined ? "None" : String(valOf.get(id)));
+
   let head = null;
   let prev = null;
-  const linked = [];
-  const nextEdges = [];
-  const prevEdges = [];
-  const callStack = [];
+  const stack = [];
+  const visited = [];
+  const links = { right: {}, left: {} };
+  const listText = () => (visited.length ? visited.map(name).join(" ↔ ") : "—");
+  const bi = (vi, en) => ({ vi, en });
 
-  const nodeName = (node) => node ? String(node.val) : "None";
-  const listText = () => linked.length ? linked.map((node) => node.val).join(" ↔ ") : "empty";
-  const addAnnotation = (annotations, node, label) => {
-    if (!node) return;
-    annotations[node.id] = annotations[node.id]
-      ? `${annotations[node.id]} | ${label}`
-      : label;
-  };
-  const treeStep = (opts) => {
-    const annotations = {};
-    addAnnotation(annotations, opts.current, "current");
-    addAnnotation(annotations, head, "head");
-    addAnnotation(annotations, prev, "prev");
-    const step = snapshot(root, {
-      title: opts.title,
-      hlSet: new Set(opts.current ? [opts.current.id] : []),
-      wordSet: new Set(linked.map((node) => node.id)),
-      annotations,
-      codeLines: [opts.codeLine],
-      vars: [
-        { name: "node", value: nodeName(opts.current) },
-        { name: "head", value: nodeName(head) },
-        { name: "prev", value: nodeName(prev) },
-        { name: "call stack", value: callStack.length ? callStack.map((node) => node.val).join(" → ") : "empty" },
-        { name: "linked", value: listText() },
-        ...(opts.vars || []),
-      ],
-      note: opts.note,
-    });
-    step.final = Boolean(opts.final);
-    steps.push(step);
-  };
-  const listStep = (opts) => {
-    const shown = [...linked];
-    if (opts.current && !shown.some((node) => node.id === opts.current.id)) shown.push(opts.current);
-    const orderIndex = new Map(shown.map((node, index) => [node.id, index]));
-    const isClosingEdge = (from, to) => (
-      (shown.length === 1 && from.id === to.id)
-      || Math.abs(orderIndex.get(from.id) - orderIndex.get(to.id)) > 1
-    );
-    const annotations = {};
-    addAnnotation(annotations, head, "head");
-    addAnnotation(annotations, prev, "prev");
-    addAnnotation(annotations, opts.current, "current");
-    if (opts.tail) addAnnotation(annotations, opts.tail, "tail");
-
+  const emit = ({ line, event, title, note, current = null, nullSlot = null, condition = null, write = null, final = false }) => {
+    const view = JSON.parse(JSON.stringify({
+      version: 1,
+      problemId: 426,
+      line,
+      event,
+      condition,
+      tree,
+      current,
+      nullSlot,
+      stack,
+      visited,
+      head,
+      prev,
+      links,
+      write,
+      final,
+    }));
     steps.push({
-      title: opts.title,
+      title,
+      note,
       arr: [],
-      graph: {
-        nodes: shown.map((node) => ({ id: node.id, label: String(node.val), row: "main" })),
-        edges: [
-          ...nextEdges.map(([from, to]) => ({
-            u: from.id,
-            v: to.id,
-            w: isClosingEdge(from, to) ? "tail.next → head" : "next",
-            kind: "next",
-            circular: isClosingEdge(from, to),
-          })),
-          ...prevEdges.map(([from, to]) => ({
-            u: from.id,
-            v: to.id,
-            w: isClosingEdge(from, to) ? "head.prev → tail" : "prev",
-            kind: "prev",
-            circular: isClosingEdge(from, to),
-          })),
-        ],
-        layout: "linear",
-        order: shown.map((node) => node.id),
-        caption: opts.caption || `sorted DLL: ${listText()}`,
-        annotations,
-        hlNodes: (opts.highlight || []).filter(Boolean).map((node) => node.id),
-        hlEdges: [],
-        visitedNodes: linked
-          .filter((node) => !opts.highlight || !opts.highlight.includes(node))
-          .map((node) => node.id),
-      },
       highlight: [],
       mark: [],
-      codeLines: [opts.codeLine],
+      codeLines: [line],
       vars: [
-        { name: "head", value: nodeName(head) },
-        { name: "prev", value: nodeName(prev) },
-        { name: "node", value: nodeName(opts.current) },
+        { name: "node", value: nullSlot ? "None" : name(current) },
+        { name: "prev", value: name(prev) },
+        { name: "head", value: name(head) },
         { name: "list", value: listText() },
-        ...(opts.vars || []),
       ],
-      note: opts.note,
-      final: Boolean(opts.final),
+      final,
+      bstDll426View: view,
     });
   };
 
-  treeStep({
-    title: { vi: "Kiểm tra cây rỗng", en: "Check for an empty tree" },
-    current: root,
-    codeLine: 3,
-    vars: [{ name: "root is None", value: root === null }],
-    note: root
-      ? { vi: "root khác None nên tiếp tục chuyển đổi tại chỗ.", en: "root is not None, so continue with the in-place conversion." }
-      : { vi: "Cây rỗng nên hàm sẽ trả về None.", en: "The tree is empty, so the function will return None." },
+  const rootName = root ? String(root.val) : "None";
+  emit({ line: 1, event: "class", title: bi("Lớp Solution", "class Solution"), note: bi("Định nghĩa lớp.", "Class defined.") });
+  emit({ line: 2, event: "call", current: root ? root.id : null, title: bi("Gọi treeToDoublyList", "Call treeToDoublyList"), note: bi(`root = ${rootName}`, `root = ${rootName}`) });
+  emit({
+    line: 3,
+    event: "check-root",
+    current: root ? root.id : null,
+    condition: !root,
+    title: bi("if not root", "if not root"),
+    note: root ? bi("Có cây → tiếp tục.", "Tree exists → go on.") : bi("Cây rỗng.", "Empty tree."),
   });
   if (!root) {
-    treeStep({
-      title: { vi: "Trả về None", en: "Return None" },
-      current: null,
-      codeLine: 4,
-      note: { vi: "Không có node nào để nối.", en: "There are no nodes to link." },
-      final: true,
-    });
+    emit({ line: 4, event: "return-none", title: bi("return None", "return None"), note: bi("Không có node → None.", "No nodes → None."), final: true });
     return { input, answer: null, steps };
   }
 
-  treeStep({
-    title: { vi: "Khởi tạo head", en: "Initialize head" },
-    current: root,
-    codeLine: 6,
-    note: { vi: "head sẽ trỏ tới node nhỏ nhất sau inorder.", en: "head will point to the smallest node after inorder traversal." },
-  });
-  treeStep({
-    title: { vi: "Khởi tạo prev", en: "Initialize prev" },
-    current: root,
-    codeLine: 7,
-    note: { vi: "prev giữ node vừa được thêm gần nhất vào danh sách.", en: "prev stores the node most recently appended to the list." },
-  });
-  treeStep({
-    title: { vi: "Định nghĩa inorder", en: "Define inorder" },
-    current: root,
-    codeLine: 9,
-    note: { vi: "Inorder duyệt left → node → right nên các node xuất hiện theo thứ tự tăng dần.", en: "Inorder visits left → node → right, producing ascending values." },
-  });
-  treeStep({
-    title: { vi: "Cho phép cập nhật head và prev", en: "Allow head and prev updates" },
-    current: root,
-    codeLine: 10,
-    note: { vi: "nonlocal cho hàm đệ quy cập nhật hai pointer bên ngoài.", en: "nonlocal lets the recursive function update the two outer pointers." },
-  });
+  emit({ line: 6, event: "init-head", write: { field: "head", from: null, to: null }, title: bi("head = None", "head = None"), note: bi("head: node nhỏ nhất (sau).", "head: smallest node (later).") });
+  emit({ line: 7, event: "init-prev", write: { field: "prev", from: null, to: null }, title: bi("prev = None", "prev = None"), note: bi("prev: node vừa nối.", "prev: last linked node.") });
+  emit({ line: 9, event: "def-inorder", title: bi("def inorder", "def inorder"), note: bi("Trái → node → phải.", "Left → node → right.") });
+  emit({ line: 10, event: "nonlocal", title: bi("nonlocal head, prev", "nonlocal head, prev"), note: bi("Ghi được head, prev ngoài.", "Can write outer head, prev.") });
+  emit({ line: 23, event: "start", current: root.id, title: bi(`inorder(${rootName})`, `inorder(${rootName})`), note: bi(`Bắt đầu từ root ${rootName}.`, `Start at root ${rootName}.`) });
 
-  function inorder(node) {
-    treeStep({
-      title: node
-        ? { vi: `Kiểm tra node ${node.val}`, en: `Check node ${node.val}` }
-        : { vi: "Gặp None", en: "Reached None" },
-      current: node,
-      codeLine: 11,
-      vars: [{ name: "node is None", value: node === null }],
-      note: node
-        ? { vi: `Node ${node.val} tồn tại; tiếp tục đi sang cây con trái.`, en: `Node ${node.val} exists; continue into its left subtree.` }
-        : { vi: "Đã đi quá node lá; đây là base case.", en: "Traversal moved past a leaf; this is the base case." },
+  function inorder(node, parent, side) {
+    stack.push(node ? node.id : null);
+    const nullSlot = node ? null : { parent: parent.id, side };
+    const id = node ? node.id : null;
+    const v = node ? String(node.val) : "None";
+    emit({
+      line: 11,
+      event: node ? "check-node" : "check-none",
+      current: id,
+      nullSlot,
+      condition: !node,
+      title: bi("if not node", "if not node"),
+      note: node ? bi(`${v} có → đi tiếp.`, `${v} exists → go on.`) : bi("None → dừng.", "None → stop."),
     });
     if (!node) {
-      treeStep({
-        title: { vi: "Quay lại caller", en: "Return to the caller" },
-        current: null,
-        codeLine: 12,
-        note: { vi: "None không được thêm vào danh sách.", en: "None is not added to the list." },
-      });
+      emit({ line: 12, event: "return-none-child", nullSlot, title: bi("return", "return"), note: bi("Quay lại hàm gọi.", "Back to caller.") });
+      stack.pop();
       return;
     }
 
-    callStack.push(node);
-    treeStep({
-      title: { vi: `Đi trái từ ${node.val}`, en: `Go left from ${node.val}` },
-      current: node.left,
-      codeLine: 14,
-      vars: [{ name: "next call", value: nodeName(node.left) }],
-      note: { vi: `Xử lý toàn bộ cây con trái của ${node.val} trước.`, en: `Process the entire left subtree of ${node.val} first.` },
+    emit({
+      line: 14,
+      event: "go-left",
+      current: id,
+      title: bi(`inorder(${v}.left)`, `inorder(${v}.left)`),
+      note: node.left ? bi(`Sang trái: ${node.left.val}.`, `Go left: ${node.left.val}.`) : bi("Trái là None.", "Left is None."),
     });
-    inorder(node.left);
+    inorder(node.left, node, "left");
 
-    if (!linked.some((item) => item.id === node.id)) linked.push(node);
-    listStep({
-      title: { vi: `Kiểm tra prev trước node ${node.val}`, en: `Check prev before node ${node.val}` },
-      current: node,
-      highlight: [prev, node],
-      codeLine: 15,
-      vars: [{ name: "prev exists", value: prev !== null }],
-      note: prev
-        ? { vi: `prev là ${prev.val}; cần nối ${prev.val} ↔ ${node.val}.`, en: `prev is ${prev.val}; link ${prev.val} ↔ ${node.val}.` }
-        : { vi: `${node.val} là node đầu tiên theo inorder nên sẽ trở thành head.`, en: `${node.val} is the first inorder node, so it becomes head.` },
+    visited.push(id);
+    emit({
+      line: 15,
+      event: "check-prev",
+      current: id,
+      condition: prev !== null,
+      title: bi(`Thăm ${v}`, `Visit ${v}`),
+      note: prev !== null ? bi(`prev = ${name(prev)} → nối.`, `prev = ${name(prev)} → link.`) : bi("Chưa có prev → node đầu.", "No prev → first node."),
     });
-
-    if (prev) {
-      nextEdges.push([prev, node]);
-      listStep({
-        title: { vi: `Nối next: ${prev.val} → ${node.val}`, en: `Link next: ${prev.val} → ${node.val}` },
-        current: node,
-        highlight: [prev, node],
-        codeLine: 16,
-        vars: [{ name: "prev.right", value: node.val }],
-        note: { vi: `Pointer right của ${prev.val} giờ trỏ tới ${node.val}.`, en: `${prev.val}.right now points to ${node.val}.` },
-      });
-      prevEdges.push([node, prev]);
-      listStep({
-        title: { vi: `Nối prev: ${node.val} → ${prev.val}`, en: `Link prev: ${node.val} → ${prev.val}` },
-        current: node,
-        highlight: [prev, node],
-        codeLine: 17,
-        vars: [{ name: "node.left", value: prev.val }],
-        note: { vi: `Pointer left của ${node.val} trỏ ngược về ${prev.val}; cặp liên kết hai chiều đã hoàn tất.`, en: `${node.val}.left points back to ${prev.val}; the bidirectional pair is complete.` },
-      });
+    if (prev !== null) {
+      links.right[prev] = id;
+      emit({ line: 16, event: "link-right", current: id, write: { field: "right", from: prev, to: id }, title: bi(`${name(prev)}.right = ${v}`, `${name(prev)}.right = ${v}`), note: bi(`${name(prev)} → ${v} (next).`, `${name(prev)} → ${v} (next).`) });
+      links.left[id] = prev;
+      emit({ line: 17, event: "link-left", current: id, write: { field: "left", from: id, to: prev }, title: bi(`${v}.left = ${name(prev)}`, `${v}.left = ${name(prev)}`), note: bi(`${v} → ${name(prev)} (prev).`, `${v} → ${name(prev)} (prev).`) });
     } else {
-      head = node;
-      listStep({
-        title: { vi: `Đặt head = ${node.val}`, en: `Set head = ${node.val}` },
-        current: node,
-        highlight: [node],
-        codeLine: 19,
-        note: { vi: `${node.val} là giá trị nhỏ nhất trong BST.`, en: `${node.val} is the smallest value in the BST.` },
-      });
+      emit({ line: 18, event: "else", current: id, title: bi("else", "else"), note: bi("Nhánh else.", "Take the else branch.") });
+      head = id;
+      emit({ line: 19, event: "set-head", current: id, write: { field: "head", from: null, to: id }, title: bi(`head = ${v}`, `head = ${v}`), note: bi(`head = ${v} (nhỏ nhất).`, `head = ${v} (smallest).`) });
     }
-
-    prev = node;
-    listStep({
-      title: { vi: `Cập nhật prev = ${node.val}`, en: `Update prev = ${node.val}` },
-      current: node,
-      highlight: [node],
-      codeLine: 20,
-      note: { vi: `Node kế tiếp theo inorder sẽ được nối sau ${node.val}.`, en: `The next inorder node will be linked after ${node.val}.` },
+    prev = id;
+    emit({ line: 20, event: "set-prev", current: id, write: { field: "prev", from: null, to: id }, title: bi(`prev = ${v}`, `prev = ${v}`), note: bi(`prev = ${v}.`, `prev = ${v}.`) });
+    emit({
+      line: 21,
+      event: "go-right",
+      current: id,
+      title: bi(`inorder(${v}.right)`, `inorder(${v}.right)`),
+      note: node.right ? bi(`Sang phải: ${node.right.val}.`, `Go right: ${node.right.val}.`) : bi("Phải là None.", "Right is None."),
     });
-
-    treeStep({
-      title: { vi: `Đi phải từ ${node.val}`, en: `Go right from ${node.val}` },
-      current: node.right,
-      codeLine: 21,
-      vars: [{ name: "next call", value: nodeName(node.right) }],
-      note: { vi: `Sau khi visit ${node.val}, tiếp tục với cây con phải.`, en: `After visiting ${node.val}, continue into its right subtree.` },
-    });
-    inorder(node.right);
-    callStack.pop();
+    inorder(node.right, node, "right");
+    stack.pop();
   }
+  inorder(root, null, null);
 
-  treeStep({
-    title: { vi: "Bắt đầu inorder từ root", en: "Start inorder at root" },
-    current: root,
-    codeLine: 23,
-    note: { vi: `Bắt đầu DFS tại root ${root.val}.`, en: `Start DFS at root ${root.val}.` },
-  });
-  inorder(root);
-
-  const tail = prev;
-  prevEdges.push([head, tail]);
-  listStep({
-    title: { vi: `Nối head.left → tail`, en: `Link head.left → tail` },
-    current: head,
-    tail,
-    highlight: [head, tail],
-    codeLine: 24,
-    vars: [{ name: "head.left", value: tail.val }],
-    note: { vi: `Pointer prev của head ${head.val} trỏ tới tail ${tail.val}.`, en: `The prev pointer of head ${head.val} points to tail ${tail.val}.` },
-  });
-  nextEdges.push([tail, head]);
-  listStep({
-    title: { vi: `Nối tail.right → head`, en: `Link tail.right → head` },
-    current: tail,
-    tail,
-    highlight: [head, tail],
-    codeLine: 25,
-    vars: [{ name: "tail.right", value: head.val }],
-    caption: `circular sorted DLL: ${listText()} ↔ back to ${head.val}`,
-    note: { vi: `Pointer next của tail ${tail.val} quay lại head ${head.val}; danh sách đã thành vòng.`, en: `The next pointer of tail ${tail.val} returns to head ${head.val}; the list is now circular.` },
-  });
-  listStep({
-    title: { vi: `Trả về head ${head.val}`, en: `Return head ${head.val}` },
-    current: head,
-    tail,
-    highlight: [head],
-    codeLine: 26,
-    caption: `head ${head.val} · ${listText()} · circular`,
-    vars: [{ name: "result", value: `${listText()} ↔ ${head.val}` }],
-    note: { vi: `Danh sách tăng dần, hai chiều và tuần hoàn; head là ${head.val}.`, en: `The list is sorted, doubly linked, and circular; head is ${head.val}.` },
-    final: true,
-  });
+  const h = name(head);
+  const t = name(prev);
+  links.left[head] = prev;
+  emit({ line: 24, event: "close-left", current: head, write: { field: "left", from: head, to: prev }, title: bi(`head.left = ${t}`, `head.left = ${t}`), note: bi(`${h} → ${t}: nối vòng.`, `${h} → ${t}: close the loop.`) });
+  links.right[prev] = head;
+  emit({ line: 25, event: "close-right", current: prev, write: { field: "right", from: prev, to: head }, title: bi(`prev.right = ${h}`, `prev.right = ${h}`), note: bi(`${t} → ${h}: vòng kín.`, `${t} → ${h}: loop closed.`) });
+  emit({ line: 26, event: "return-head", current: head, title: bi(`return ${h}`, `return ${h}`), note: bi(`Trả về head = ${h}.`, `Return head = ${h}.`), final: true });
 
   return { input, answer: `DLL: ${listText()} (circular)`, steps };
 }
@@ -3719,7 +3600,8 @@ module.exports = {
     title: { vi: "Convert BST to Sorted Doubly Linked List", en: "Convert BST to Sorted Doubly Linked List" },
     titleVi: { vi: "BST → Doubly Linked List vòng", en: "BST to circular DLL" },
     statement: { vi: "Chuyển BST thành circular sorted doubly linked list (tại chỗ). node.left = prev, node.right = next. Nối head ↔ tail. Nhập level-order.", en: "Convert BST to circular sorted doubly linked list (in-place). node.left = prev, node.right = next. Connect head ↔ tail. Enter as level-order." },
-    defaultInput: "4,2,5,1,3",
+    defaultInput: "6,3,9,1,4,8,10,null,2,null,5",
+    debugMode: "line-by-line",
     inputKind: "string",
     inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [],

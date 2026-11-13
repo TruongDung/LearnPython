@@ -1,0 +1,221 @@
+﻿{
+  "default": {
+    "steps": 94,
+    "lines": "1,2,3,6,7,9,10,11,12,14,15,16,17,18,19,20,21,23,24,25,26",
+    "mismatches": [],
+    "overlaps": 0,
+    "clipped": 0,
+    "notFit": 0,
+    "maxNote": 28,
+    "inViewSource": 0
+  },
+  "short": {
+    "steps": 58,
+    "lines": "1,2,3,6,7,9,10,11,12,14,15,16,17,18,19,20,21,23,24,25,26",
+    "mismatches": [],
+    "overlaps": 0,
+    "clipped": 0,
+    "notFit": 0,
+    "maxNote": 28,
+    "inViewSource": 0
+  },
+  "single": {
+    "steps": 22,
+    "lines": "1,2,3,6,7,9,10,11,12,14,15,18,19,20,21,23,24,25,26",
+    "mismatches": [],
+    "overlaps": 0,
+    "clipped": 0,
+    "notFit": 0,
+    "maxNote": 28,
+    "inViewSource": 0
+  },
+  "empty": {
+    "steps": 4,
+    "lines": "1,2,3,4",
+    "mismatches": [],
+    "overlaps": 0,
+    "clipped": 0,
+    "notFit": 0,
+    "maxNote": 16,
+    "inViewSource": 0
+  },
+  "code-dark": {
+    "maxHeight": "none",
+    "position": "static",
+    "scrollH": 491,
+    "clientH": 491,
+    "vScroll": false,
+    "lines": 26,
+    "clipped": 0
+  },
+  "contrast-dark": {
+    "bg": "rgb(15, 26, 37)",
+    "text": "rgb(234, 243, 251)"
+  },
+  "code-light": {
+    "maxHeight": "none",
+    "position": "static",
+    "scrollH": 491,
+    "clientH": 491,
+    "vScroll": false,
+    "lines": 26,
+    "clipped": 0
+  },
+  "contrast-light": {
+    "bg": "rgb(244, 247, 251)",
+    "text": "rgb(23, 40, 58)"
+  },
+  "others": {
+    "98": {
+      "steps": 13,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "99": {
+      "steps": 51,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "108": {
+      "steps": 27,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "109": {
+      "steps": 67,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "146": {
+      "steps": 116,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "173": {
+      "steps": 40,
+      "dl426": false,
+      "maxHeight": "650px",
+      "errors": 0
+    },
+    "230": {
+      "steps": 2,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "235": {
+      "steps": 4,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "270": {
+      "steps": 15,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "272": {
+      "steps": 35,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "285": {
+      "steps": 15,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "410": {
+      "steps": 134,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "432": {
+      "steps": 320,
+      "dl426": false,
+      "maxHeight": "none",
+      "errors": 0
+    },
+    "450": {
+      "steps": 10,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "501": {
+      "steps": 2,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "510": {
+      "steps": 6,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "514": {
+      "steps": 64,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "530": {
+      "steps": 2,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "538": {
+      "steps": 39,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "653": {
+      "steps": 11,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "700": {
+      "steps": 6,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "707": {
+      "steps": 70,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "783": {
+      "steps": 2,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "938": {
+      "steps": 13,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    },
+    "1382": {
+      "steps": 25,
+      "dl426": false,
+      "maxHeight": "420px",
+      "errors": 0
+    }
+  },
+  "errors": []
+}
