@@ -1,0 +1,111 @@
+﻿Command: node --test (cwd .worktrees\viz-1854-1094\leetcode-visualizer, base 85b0a34)
+tests 3115, pass 3062, fail 53 (brief expected 49)
+Extra 4 vs min-groups-2406 baseline (likely CRLF line endings in fresh checkout): 1108, 1678, 541, 557
+
+Failing tests:
+at tests\bfs-shortest-path-9006-visual.test.js:127:1
+9006 keeps six essential watches stable and agrees with Python after each instruction
+at tests\cat-mouse-1728-pictures.test.js:9:1
+1728 main and move-helper line snapshots match CPython, with exact queue and table projections
+at tests\course-schedule-207.test.js:11:1
+207 uses the requested typed Kahn implementation
+at tests\course-schedule-207.test.js:47:1
+207 line-by-line frames point to executable lines in the updated snippet
+at tests\defanging-ip-1108.test.js:39:1
+1108 displayed Python and repository solution match the visualizer
+at tests\distance-cycle-2204-pictures.test.js:18:1
+2204 every highlighted line, loop exhaustion and bound local matches CPython
+at tests\equal-value-components-2440.test.js:63:1
+2440 all executed lines, locals, and six fixed watches match CPython
+at tests\find-path-1971.test.js:10:1
+1971 matches every completed Python statement, exact adjacency, visited, worklist and recursive frame locals
+at tests\flood-batch-2026.test.js:37:1
+WASM Python records each completed statement and helper frame like native CPython, including heap and union-find mutations
+at tests\goal-parser-1678.test.js:46:1
+1678 displayed Python and repository solution agree with examples and repeated tokens
+at tests\k-divisible-components-2872.test.js:166:32
+2872 approach 1 matches CPython events and locals after every line
+at tests\k-divisible-components-2872.test.js:166:32
+2872 approach 2 matches CPython events and locals after every line
+at tests\k-divisible-components-2872.test.js:286:1
+2872 recursive calls, returns, frame locals and line timing match CPython
+at tests\k-smallest-matrix-9008.test.js:62:1
+9008 watches and exact heap layout match CPython after every source line
+at tests\knapsack-tag-normalization.test.js:14:1
+0/1 Knapsack uses one canonical key across categories and tags
+at tests\largest-color-value-1857.test.js:137:1
+1857 renderer and no-scroll styles are registered and cache-busted
+at tests\lis-300.test.js:184:1
+300 code view keeps both scroll directions for long approach 5 lines
+at tests\lis-300.test.js:194:1
+300 opens the editor full-screen without wrapping for approaches 1 through 7
+at tests\map-of-highest-peak-1765.test.js:143:1
+1765 renderer and styles are registered for lazy loading
+at tests\maximum-probability-1514-pictures.test.js:78:1
+1514 rejects malformed graphs and bundles its Python helper
+at tests\maximum-product-628.test.js:102:1
+628 preserves the viewport and viz panel height between steps
+at tests\maximum-sum-bst-1373.test.js:184:1
+1373 includes scoped responsive styles and refreshed assets
+at tests\minimum-cost-grid-1368.test.js:51:1
+1368 registers five solutions, complexities and the recommended default
+at tests\minimum-subgraph-2203-pictures.test.js:66:1
+2203 validates input, permits parallel edges and prepares live arguments
+at tests\minimum-weighted-subgraph-2203.test.js:78:1
+displayed Python implementations return the sample answers
+at tests\n-queens-51.test.js:20:1
+51 matches every completed CPython statement, actual local, board, set and recursive frame across the full eight-queen trace
+at tests\network-delay-743-pictures.test.js:79:1
+743 validates network input and exposes the three live-debug arguments
+at tests\next-word-9005.test.js:51:1
+9005 every source line, local variable and cached winner matches CPython
+at tests\next-word-9005.test.js:175:1
+9005 snippet runs train then predict through the real live design tracer
+at tests\number-of-distinct-islands-694.test.js:88:1
+694 styles keep the grid and shape board responsive
+at tests\obstacle-grid-9007.test.js:78:1
+9007 snapshots and six stable watches match CPython after each displayed instruction
+at tests\one-path-3963.test.js:33:1
+3963 matches every completed Python statement, grid mutation and actual local variable
+at tests\ones-and-zeroes-474-pictures.test.js:56:1
+474 source and locals match CPython after each executable line
+at tests\pacific-atlantic-417.test.js:134:1
+417 renderer and no-scroll styles are registered for lazy loading
+at tests\picture-study-updates.test.js:161:1
+378 and 977 trace the actual Python state after each executable line
+at tests\picture-study-updates.test.js:178:1
+all picture renderers work in day/night languages without changing trace state
+at tests\possible-recipes-2115.test.js:14:1
+every highlighted Python line, deque, set, dictionary mutation and return matches native CPython
+at tests\quick-problem-jump.test.js:10:1
+index loads only the shell assets synchronously and keeps visualization chunks inert
+at tests\range-sum-mutable-307.test.js:107:1
+307 styles are responsive and theme-aware with concise interview metadata
+at tests\reverse-string-ii-541.test.js:50:1
+541 displayed Python and repository solution match boundaries and original length limit
+at tests\reverse-words-iii-557.test.js:39:1
+557 displayed and repository Python preserve spaces and support the original length limit
+at tests\safe-walk-3286.test.js:107:1
+3286 validates input/health and prepares both arguments for live editing
+at tests\shortest-bridge-934.test.js:173:1
+934 renderer and no-scroll styles are registered for lazy loading
+at tests\skyline-218.test.js:175:1
+218 matches CPython after every line, including heapq tuple ties, stale height and for-loop exhaustion
+at tests\sudoku-solver-37.test.js:31:1
+37 matches every executed CPython statement, frame local, board mutation and live row/column/box set
+at tests\supersequences-3435-pictures.test.js:15:1
+3435 every executed source line and bound local matches CPython, including both call scopes
+at tests\tic-tac-toe-1275.test.js:58:1
+1275 board state and actual local watches agree with Python after each displayed statement
+at tests\top-k-frequent-347.test.js:65:1
+347 matches CPython after each line, including equal-frequency tuple ties and loop exhaustion
+at tests\tree-pictures-1973-2003.test.js:44:1
+2003 exact CPython trace includes failed index lookup, child-list construction, blocked continue, mex and answer updates
+at tests\valid-number-65.test.js:73:1
+65 complete physical line events, locals, branches and returns agree with native Python
+at tests\walls-and-gates-286.test.js:139:1
+286 renderer and no-scroll styles are registered for lazy loading
+at tests\weakest-rows-1337.test.js:42:1
+1337 row counts, sorting, final selection and watches match CPython instructions
+at tests\wonderful-substrings-1915.test.js:131:1
+standalone 1915 solution stays identical to the visualized source
