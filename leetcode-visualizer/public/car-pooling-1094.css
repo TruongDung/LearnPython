@@ -1,0 +1,442 @@
+/* LeetCode 1094 — Car Pooling. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.cp1094-viz {
+  --cp1094-bg: #0f1a25;
+  --cp1094-panel: #152434;
+  --cp1094-soft: #1e3144;
+  --cp1094-border: #36506a;
+  --cp1094-text: #eaf3fb;
+  --cp1094-muted: #9fb3c6;
+  /* Status colors: fits (green), over capacity (red), the capacity line (amber). */
+  --cp1094-green: #4fd69c;
+  --cp1094-red: #ff8f8f;
+  --cp1094-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above. */
+  --cp1094-trip: #8fb3c9;
+  --cp1094-on-trip: #0b1520;
+  --cp1094-plus: #6cb8ff;
+  --cp1094-minus: #e88ad8;
+  --cp1094-cur: #c6abff;
+  --cp1094-load: #5b7fa8;
+  --cp1094-line: #2a4560;
+  container: cp1094 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--cp1094-border);
+  border-radius: 16px;
+  background: var(--cp1094-bg);
+  color: var(--cp1094-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .cp1094-viz {
+  --cp1094-bg: #f4f7fb;
+  --cp1094-panel: #ffffff;
+  --cp1094-soft: #e9eff7;
+  --cp1094-border: #c2d1e2;
+  --cp1094-text: #17283a;
+  --cp1094-muted: #55697e;
+  --cp1094-green: #08784f;
+  --cp1094-red: #b4232f;
+  --cp1094-amber: #9a6200;
+  --cp1094-trip: #4f6f86;
+  --cp1094-on-trip: #ffffff;
+  --cp1094-plus: #1663b8;
+  --cp1094-minus: #a8389a;
+  --cp1094-cur: #6c3fb8;
+  --cp1094-load: #8fa9c6;
+  --cp1094-line: #fff3cf;
+}
+
+.cp1094-viz,
+.cp1094-viz * {
+  box-sizing: border-box;
+}
+
+.cp1094-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.cp1094-viz button {
+  border: 1px solid var(--cp1094-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--cp1094-panel);
+  color: var(--cp1094-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.cp1094-viz button:hover:not(:disabled) {
+  border-color: var(--cp1094-cur);
+  background: var(--cp1094-soft);
+}
+
+.cp1094-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cp1094-viz :focus-visible {
+  outline: 3px solid var(--cp1094-cur);
+  outline-offset: 2px;
+}
+
+/* Header */
+.cp1094-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cp1094-head small {
+  color: var(--cp1094-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.cp1094-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.cp1094-head h2 code {
+  color: var(--cp1094-amber);
+}
+
+.cp1094-status {
+  border: 1px solid var(--cp1094-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--cp1094-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cp1094-viz.is-ok .cp1094-status,
+.cp1094-viz.is-ok .cp1094-head h2 code {
+  border-color: var(--cp1094-green);
+  color: var(--cp1094-green);
+}
+
+.cp1094-viz.is-over .cp1094-status,
+.cp1094-viz.is-over .cp1094-head h2 code {
+  border-color: var(--cp1094-red);
+  color: var(--cp1094-red);
+}
+
+.cp1094-presets,
+.cp1094-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.cp1094-card {
+  min-width: 0;
+  border: 1px solid var(--cp1094-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--cp1094-panel);
+}
+
+.cp1094-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.cp1094-card > header > b {
+  color: var(--cp1094-muted);
+  font-weight: 700;
+}
+
+/* Picture: drawn about as wide as the card; scales down only on narrow screens. */
+.cp1094-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.cp1094-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--cp1094-text);
+  text-anchor: middle;
+}
+
+.cp1094-svg .cp1094-row-label {
+  fill: var(--cp1094-muted);
+  text-anchor: end;
+}
+
+.cp1094-svg .cp1094-row-label.is-current {
+  fill: var(--cp1094-cur);
+}
+
+.cp1094-band.is-current {
+  fill: color-mix(in srgb, var(--cp1094-cur) 16%, transparent);
+  stroke: color-mix(in srgb, var(--cp1094-cur) 55%, transparent);
+  stroke-width: 1;
+}
+
+.cp1094-band.is-over {
+  fill: color-mix(in srgb, var(--cp1094-red) 16%, transparent);
+  stroke: var(--cp1094-red);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.cp1094-trip {
+  fill: var(--cp1094-trip);
+  stroke: none;
+}
+
+.cp1094-trip.is-off {
+  fill-opacity: 0.35;
+}
+
+.cp1094-trip.is-riding {
+  stroke: var(--cp1094-cur);
+  stroke-width: 2;
+}
+
+.cp1094-trip.is-current {
+  fill: var(--cp1094-cur);
+  stroke: var(--cp1094-cur);
+  stroke-width: 2;
+}
+
+.cp1094-svg .cp1094-trip-num {
+  fill: var(--cp1094-on-trip);
+}
+
+/* A faded bar is light on dark (or dark on light), so its number uses the normal text color. */
+.cp1094-svg .cp1094-trip-num.is-off {
+  fill: var(--cp1094-text);
+}
+
+.cp1094-drop {
+  fill: var(--cp1094-panel);
+  stroke: var(--cp1094-trip);
+  stroke-width: 1.5;
+}
+
+.cp1094-drop.is-current {
+  stroke: var(--cp1094-cur);
+  stroke-width: 2;
+}
+
+.cp1094-svg .cp1094-delta {
+  font-size: 12px;
+}
+
+.cp1094-svg .cp1094-delta.is-plus,
+.cp1094-svg .cp1094-cell-value.is-plus {
+  fill: var(--cp1094-plus);
+}
+
+.cp1094-svg .cp1094-delta.is-minus,
+.cp1094-svg .cp1094-cell-value.is-minus {
+  fill: var(--cp1094-minus);
+}
+
+.cp1094-svg .cp1094-cell-value.is-zero {
+  fill: var(--cp1094-muted);
+  font-weight: 400;
+}
+
+.cp1094-cell,
+.cp1094-curr {
+  fill: var(--cp1094-soft);
+  stroke: var(--cp1094-border);
+  stroke-width: 1;
+}
+
+.cp1094-cell.is-plus {
+  fill: color-mix(in srgb, var(--cp1094-plus) 18%, var(--cp1094-panel));
+  stroke: var(--cp1094-plus);
+}
+
+.cp1094-cell.is-minus {
+  fill: color-mix(in srgb, var(--cp1094-minus) 18%, var(--cp1094-panel));
+  stroke: var(--cp1094-minus);
+}
+
+.cp1094-cell.is-changed,
+.cp1094-cell.is-read,
+.cp1094-curr.is-read {
+  stroke: var(--cp1094-cur);
+  stroke-width: 2.5;
+}
+
+.cp1094-curr.is-over {
+  fill: color-mix(in srgb, var(--cp1094-red) 18%, var(--cp1094-panel));
+  stroke: var(--cp1094-red);
+  stroke-dasharray: 4 3;
+}
+
+.cp1094-svg .cp1094-curr-value.is-over {
+  fill: var(--cp1094-red);
+}
+
+.cp1094-load {
+  fill: var(--cp1094-load);
+  stroke: none;
+}
+
+.cp1094-load.is-over {
+  fill: var(--cp1094-red);
+}
+
+.cp1094-load.is-current {
+  stroke: var(--cp1094-cur);
+  stroke-width: 2;
+}
+
+.cp1094-load.is-check-ok {
+  stroke: var(--cp1094-green);
+  stroke-width: 2.5;
+}
+
+.cp1094-load.is-check-over {
+  stroke: var(--cp1094-red);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3; /* over is dashed, fits is solid: a cue besides color */
+}
+
+.cp1094-cap {
+  stroke: var(--cp1094-amber);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.cp1094-svg .cp1094-cap-label {
+  fill: var(--cp1094-amber);
+  font-size: 12px;
+  text-anchor: start;
+}
+
+.cp1094-axis,
+.cp1094-tick {
+  stroke: var(--cp1094-muted);
+  stroke-width: 1;
+}
+
+.cp1094-svg .cp1094-stop {
+  fill: var(--cp1094-muted);
+  font-weight: 400;
+}
+
+.cp1094-svg .cp1094-stop.is-current {
+  fill: var(--cp1094-cur);
+  font-weight: 700;
+}
+
+.cp1094-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--cp1094-muted);
+  font-size: 11px;
+}
+
+.cp1094-legend .lg-trip,
+.cp1094-legend .lg-drop {
+  color: var(--cp1094-trip);
+}
+
+.cp1094-legend .lg-plus {
+  color: var(--cp1094-plus);
+}
+
+.cp1094-legend .lg-minus {
+  color: var(--cp1094-minus);
+}
+
+.cp1094-legend .lg-cap {
+  color: var(--cp1094-amber);
+}
+
+.cp1094-legend .lg-over {
+  color: var(--cp1094-red);
+}
+
+/* Current-line strip */
+.cp1094-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--cp1094-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--cp1094-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .cp1094-now {
+  background: var(--cp1094-line);
+}
+
+.cp1094-lineno {
+  color: var(--cp1094-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.cp1094-now .cp1094-effect {
+  color: var(--cp1094-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cp1094-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.cp1094-branch.is-ok {
+  background: color-mix(in srgb, var(--cp1094-green) 20%, transparent);
+  color: var(--cp1094-green);
+}
+
+.cp1094-branch.is-over {
+  background: color-mix(in srgb, var(--cp1094-red) 18%, transparent);
+  color: var(--cp1094-red);
+}
+
+/* 1094 step notes are a few words. */
+body:has(#treeView:not(.hidden) .cp1094-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 1094 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .cp1094-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+@container cp1094 (max-width: 420px) {
+  .cp1094-head h2 {
+    font-size: 18px;
+  }
+}
