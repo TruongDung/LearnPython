@@ -8048,238 +8048,359 @@ module.exports = Object.assign(module.exports, {
 
 // ─── 3161: Block Placement Queries ──────────────────────────────────────────
 //
-// We simulate the REVERSE-scan approach step by step:
-//   - Sentinel obstacles 0 and N are always present.
-//   - All type-1 queries are added to the sorted obstacle set up front.
-//   - Then queries are scanned in REVERSE:
-//       * type-1 → "remove" the obstacle (it hasn't been placed yet in forward
-//                  time) and recompute the gap between its two neighbours.
-//       * type-2 → answer using fenwick.get(prev_obstacle) >= sz OR x−prev >= sz
-//
-// The Fenwick tree stores MAX gap in any prefix [0..i].
+// Offline reverse scan: place every type-1 obstacle first, store each gap (b − a) at its right end b in a
+// Fenwick tree (BIT) of prefix maxima, then walk the queries backwards. A type-1 query removes its obstacle
+// and stores the merged gap; a type-2 query fits if max(BIT up to the last obstacle a, x − a) >= sz.
+// Traced one executed Python line per step. Picture lives in public/renderer-block-placement-3161.js.
 
-function parseQueries3161(raw, label = "queries") {
-  const text = String(raw ?? "").trim();
-  if (!text) throw new Error(`${label} is required`);
-  const rows = text.includes("[")
-    ? (JSON.parse(text))
-    : text.split(/[;\n]/).filter((r) => r.trim()).map((r) => r.split(",").map(Number));
-  if (!Array.isArray(rows) || rows.some((r) => !Array.isArray(r) || r.length < 2 || r.some((v) => !Number.isInteger(v)))) {
-    throw new Error(`${label} must be rows of integers like [[1,2],[2,3,1]] or 1,2;2,3,1`);
+const MAX_Q_3161 = 8;
+const MAX_X_3161 = 15;
+const DEFAULT_QUERIES_3161 = "1,7;2,7,6;1,2;2,7,5;2,7,6";
+
+const SOURCE_3161 = Object.freeze([
+  "from bisect import bisect_right, insort",
+  "from typing import List",
+  "",
+  "class BIT:",
+  "    def __init__(self, n: int):",
+  "        self.t = [0] * (n + 1)",
+  "",
+  "    def update(self, i: int, v: int) -> None:",
+  "        while i < len(self.t):",
+  "            self.t[i] = max(self.t[i], v)",
+  "            i += i & -i",
+  "",
+  "    def query(self, i: int) -> int:",
+  "        best = 0",
+  "        while i > 0:",
+  "            best = max(best, self.t[i])",
+  "            i -= i & -i",
+  "        return best",
+  "",
+  "class Solution:",
+  "    def getResults(self, queries: List[List[int]]) -> List[bool]:",
+  "        n = max(q[1] for q in queries) + 1",
+  "        obs = [0, n]",
+  "        for q in queries:",
+  "            if q[0] == 1:",
+  "                insort(obs, q[1])",
+  "        bit = BIT(n)",
+  "        for a, b in zip(obs, obs[1:]):",
+  "            bit.update(b, b - a)",
+  "        ans = []",
+  "        for q in reversed(queries):",
+  "            k = bisect_right(obs, q[1])",
+  "            if q[0] == 1:",
+  "                a, b = obs[k - 2], obs[k]",
+  "                obs.pop(k - 1)",
+  "                bit.update(b, b - a)",
+  "                continue",
+  "            a = obs[k - 1]",
+  "            ans.append(max(bit.query(a), q[1] - a) >= q[2])",
+  "        return ans[::-1]",
+]);
+
+const bi3161 = (vi, en) => ({ vi, en });
+
+// Accepts "1,7;2,7,6" (rows split by ";" or newlines) or JSON [[1,7],[2,7,6]]. Legacy forms that still send the
+// old unused n box (e.g. [1] or "1") plus params.queries fall back to params.queries.
+function parseQueries3161(input, params = {}) {
+  const fail = (message) => {
+    throw new Error(`3161: ${message}`);
+  };
+  const legacyN = (Array.isArray(input) && input.length > 0 && input.every((v) => typeof v === "number"))
+    || (typeof input === "string" && /^\s*\[?\s*\d+\s*\]?\s*$/.test(input));
+  const legacyQueries = params && typeof params.queries === "string" && params.queries.trim() ? params.queries : null;
+  let source = input;
+  if (input === undefined || input === null) source = legacyQueries ?? DEFAULT_QUERIES_3161;
+  else if (legacyN && legacyQueries) source = legacyQueries;
+
+  let rows;
+  if (Array.isArray(source)) {
+    rows = source;
+  } else if (typeof source === "string") {
+    const text = source.trim();
+    if (!text) fail("enter queries like 1,7;2,7,6.");
+    if (text.startsWith("[")) {
+      try {
+        rows = JSON.parse(text);
+      } catch (_error) {
+        fail("enter queries like 1,7;2,7,6 or [[1,7],[2,7,6]].");
+      }
+    } else {
+      rows = text.split(/[;\n]+/).map((row) => row.trim()).filter(Boolean)
+        .map((row) => row.split(",").map((part) => (part.trim() === "" ? NaN : Number(part.trim()))));
+    }
+  } else {
+    fail("enter queries like 1,7;2,7,6.");
   }
-  rows.forEach((r, idx) => {
-    if (r[0] !== 1 && r[0] !== 2) throw new Error(`query ${idx}: type must be 1 or 2`);
-    if (r[0] === 2 && r.length < 3) throw new Error(`query ${idx}: type-2 needs [2, x, sz]`);
-    if (r.some((v) => v < 0)) throw new Error(`query ${idx}: all values must be non-negative`);
+  if (!Array.isArray(rows) || rows.length < 1) fail("enter at least one query.");
+  if (rows.length > MAX_Q_3161) fail(`use at most ${MAX_Q_3161} queries.`);
+  const placed = new Set();
+  return rows.map((row) => {
+    if (!Array.isArray(row) || row.some((v) => !Number.isSafeInteger(v))) fail("every value must be an integer.");
+    const [type, x, sz] = row;
+    if (type !== 1 && type !== 2) fail("type must be 1 or 2.");
+    if (type === 1 && row.length !== 2) fail("type 1 is 1,x.");
+    if (type === 2 && row.length !== 3) fail("type 2 is 2,x,sz.");
+    if (x < 1 || x > MAX_X_3161) fail(`x must be 1–${MAX_X_3161}.`);
+    if (type === 2 && (sz < 1 || sz > MAX_X_3161)) fail(`sz must be 1–${MAX_X_3161}.`);
+    if (type === 1) {
+      if (placed.has(x)) fail(`obstacle ${x} is placed twice.`);
+      placed.add(x);
+    }
+    return row.slice();
   });
-  return rows.map((r) => r.map(Number));
 }
 
 function buildSteps3161(input, params = {}) {
-  const queries = parseQueries3161(params.queries ?? "1,2;2,3,3;2,3,1;2,2,2", "queries");
-  if (queries.length > 16) throw new Error("Use at most 16 queries for readable visualization.");
-
-  const N = Math.max(50000, queries.reduce((m, q) => Math.max(m, q[1], q[0] === 2 ? q[1] + q[2] : 0), 0) + 1);
+  const queries = parseQueries3161(input, params);
+  const m = queries.length;
   const steps = [];
+  const S = {
+    n: null, obs: null, q: null, qi: null, k: null, a: null, b: null, t: null,
+    i: null, v: null, best: null, ans: null, frame: null, path: [], ghosts: [], merging: false, x: null, sz: null,
+  };
+  const dash = (value) => (value === null || value === undefined ? "—" : value);
+  const list = (values) => `[${values.join(", ")}]`;
+  const bools = (values) => `[${values.map((v) => (v ? "True" : "False")).join(", ")}]`;
+  const same = (text) => bi3161(text, text);
 
-  // ── Fenwick max-tree ──────────────────────────────────────────────────────
-  const fenwick = new Array(N + 2).fill(0);
-  function fenwickMaximize(i, val) {
-    for (; i <= N; i += i & -i) fenwick[i] = Math.max(fenwick[i], val);
-  }
-  function fenwickGet(i) {
-    let res = 0;
-    for (; i > 0; i -= i & -i) res = Math.max(res, fenwick[i]);
-    return res;
-  }
-
-  // ── Sorted obstacle set ───────────────────────────────────────────────────
-  const obstacleSet = new Set([0, N]);
-  let sortedObs = () => [...obstacleSet].sort((a, b) => a - b);
-
-  // Phase 0 — collect all type-1 x values and insert into obstacleSet
-  queries.forEach((q) => { if (q[0] === 1) obstacleSet.add(q[1]); });
-
-  const initialObs = sortedObs();
-  const gapText = (obs) => {
-    const a = obs || sortedObs();
-    return a.length < 2 ? "[]"
-      : a.slice(1).map((v, i) => `${a[i]}–${v}:${v - a[i]}`).join(" ");
+  const emit = ({ line, event, title, note, condition = null, added = null, removed = null, raised = null, best = null, tail = null, fit = null, final = false }) => {
+    const inUpdate = S.frame === "update";
+    const inQuery = S.frame === "query";
+    const node = S.frame && S.i !== null && S.i >= 1 && S.i <= S.n ? S.i : null;
+    steps.push({
+      title,
+      note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [line],
+      vars: [
+        { name: "q", value: S.q ? list(S.q) : "—" },
+        { name: "n", value: dash(S.n) },
+        { name: "obs", value: S.obs ? list(S.obs) : "—" },
+        { name: "k", value: dash(S.k) },
+        { name: "a", value: dash(S.a) },
+        { name: "b", value: dash(S.b) },
+        { name: "bit.t", value: S.t ? list(S.t) : "—" },
+        { name: "i", value: S.frame ? dash(S.i) : "—" },
+        { name: "v", value: inUpdate ? dash(S.v) : "—" },
+        { name: "best", value: inQuery ? dash(S.best) : "—" },
+        { name: "ans", value: S.ans ? bools(S.ans) : "—" },
+      ],
+      final,
+      blockPlace3161View: JSON.parse(JSON.stringify({
+        version: 1,
+        problemId: 3161,
+        line,
+        event,
+        condition,
+        queries,
+        n: S.n,
+        qi: S.qi,
+        q: S.q,
+        obs: S.obs,
+        ghosts: S.ghosts,
+        added,
+        removed,
+        k: S.k,
+        a: S.a,
+        b: S.b,
+        bit: S.t,
+        frame: S.frame,
+        i: S.frame ? S.i : null,
+        node,
+        path: S.frame ? S.path : [],
+        raised,
+        merging: S.merging,
+        x: S.x,
+        sz: S.sz,
+        best,
+        tail,
+        fit,
+        ans: S.ans || [],
+        answer: final ? S.ans.slice().reverse() : null,
+        final,
+      })),
+    });
   };
 
-  // ── Intro ─────────────────────────────────────────────────────────────────
-  function snap(o) {
-    const obs = sortedObs();
-    steps.push({
-      title: o.title, note: o.note, codeLines: o.codeLines,
-      arr: [], highlight: [], mark: [], vars: o.vars || [], final: o.final || false,
-      blockQueriesView: {
-        phase: o.phase,
-        n: N,
-        obstacles: [...obs],
-        fenwick: fenwick.slice(0, Math.min(N + 1, 20)),
-        queries,
-        queryIndex: o.queryIndex ?? -1,
-        currentQuery: o.currentQuery ?? null,
-        prevObs: o.prevObs ?? null,
-        nextObs: o.nextObs ?? null,
-        gapUpdated: o.gapUpdated ?? null,
-        queryAnswer: o.queryAnswer ?? null,
-        answers: [...(o.answers || [])],
-        fenwickQuery: o.fenwickQuery ?? null,
-        fenwickResult: o.fenwickResult ?? null,
-      },
-    });
-  }
-
-  snap({
-    title: { vi: `${queries.length} truy vấn trên trục số [0, ${N}]`, en: `${queries.length} queries on number line [0, ${N}]` },
-    note: {
-      vi: `Có 2 loại truy vấn: 1=[thêm chướng ngại vật tại x], 2=[kiểm tra có thể đặt block kích thước sz trong [0,x] không?]. Thuật toán: duyệt NGƯỢC + Fenwick max-tree lưu gap lớn nhất theo prefix.`,
-      en: `Two query types: 1=[add obstacle at x], 2=[can a block of size sz fit in [0,x]?]. Algorithm: process in REVERSE + Fenwick max-tree storing the max gap in each prefix.`,
-    },
-    codeLines: [19, 20], phase: "init",
-    vars: [
-      { name: "N (sentinel)", value: N },
-      { name: "queries", value: queries.length },
-      { name: "type-1 count", value: queries.filter((q) => q[0] === 1).length },
-      { name: "type-2 count", value: queries.filter((q) => q[0] === 2).length },
-    ],
-    answers: [],
-  });
-
-  snap({
-    title: { vi: "Pre-insert tất cả chướng ngại vật từ truy vấn type-1", en: "Pre-insert all obstacles from type-1 queries" },
-    note: {
-      vi: `Nhóm lại tất cả chướng ngại vật type-1 để biết trạng thái ban đầu. Sau đó sẽ XÓA từng cái khi duyệt ngược (= chưa được thêm vào ở thời điểm đó). Obstacles: [${initialObs.join(", ")}].`,
-      en: `Collect all type-1 obstacles upfront as the initial state. We will REMOVE each one as we process in reverse (= not yet placed at that point). Obstacles: [${initialObs.join(", ")}].`,
-    },
-    codeLines: [22, 23, 24, 25], phase: "preinsert",
-    vars: [{ name: "obstacles", value: `[${initialObs.join(", ")}]` }, { name: "sentinels", value: `0, ${N}` }],
-    answers: [],
-  });
-
-  // Phase 1 — build initial Fenwick from consecutive gaps
-  for (let i = 0; i < initialObs.length - 1; i++) {
-    const x1 = initialObs[i], x2 = initialObs[i + 1];
-    fenwickMaximize(x2, x2 - x1);
-  }
-
-  snap({
-    title: { vi: "Xây Fenwick max-tree từ các gap ban đầu", en: "Build Fenwick max-tree from initial gaps" },
-    note: {
-      vi: `Fenwick[i] = max gap trong prefix [0..i]. Với mỗi cặp (obs[j], obs[j+1]), gọi maximize(obs[j+1], gap). fenwick.get(x) = max gap trong [0..x].`,
-      en: `Fenwick[i] = max gap in prefix [0..i]. For each pair (obs[j], obs[j+1]) call maximize(obs[j+1], gap). fenwick.get(x) = max gap in [0..x].`,
-    },
-    codeLines: [26, 27], phase: "build",
-    vars: [{ name: "initial gaps", value: gapText(initialObs) }],
-    answers: [],
-  });
-
-  // Phase 2 — process queries in reverse
-  const answers = [];
-  const revOrder = [...queries.keys()].reverse();
-
-  snap({
-    title: { vi: "Bắt đầu duyệt truy vấn theo thứ tự NGƯỢC", en: "Start processing queries in REVERSE order" },
-    note: {
-      vi: "Duyệt ngược để biến type-1 thành thao tác XÓA (phục hồi trạng thái trước khi obstacle được thêm). Type-2 được trả lời dựa trên trạng thái lúc đó.",
-      en: "Reverse processing turns type-1 into REMOVE operations (restoring the state before the obstacle was placed). Type-2 queries are answered based on the state at that point.",
-    },
-    codeLines: [29], phase: "reverse-start",
-    vars: [{ name: "process order", value: `i = ${queries.length - 1} → 0` }],
-    answers: [],
-  });
-
-  for (const i of revOrder) {
-    const q = queries[i];
-    const type = q[0], x = q[1];
-    const obs = sortedObs();
-
-    if (type === 1) {
-      // Find neighbours (x is in the set now; remove it after this step)
-      const idx = obs.indexOf(x);
-      const prev = obs[idx - 1] ?? 0;
-      const next = obs[idx + 1] ?? N;
-
-      snap({
-        title: { vi: `i=${i}: Truy vấn 1 [thêm x=${x}] — NGƯỢC = XÓA x=${x}`, en: `i=${i}: Query 1 [add x=${x}] — REVERSED = REMOVE x=${x}` },
-        note: {
-          vi: `Duyệt ngược nghĩa là tại thời điểm này obstacle x=${x} chưa tồn tại. Xóa nó khỏi sorted set và cập nhật gap giữa prev=${prev} và next=${next}: gap = ${next - prev}. Gọi fenwick.maximize(${next}, ${next - prev}).`,
-          en: `In reverse, obstacle x=${x} doesn't exist yet. Remove it from the sorted set and update the gap between prev=${prev} and next=${next}: gap = ${next - prev}. Call fenwick.maximize(${next}, ${next - prev}).`,
-        },
-        codeLines: [30, 31, 32, 33, 34, 35],
-        phase: "type1",
-        queryIndex: i, currentQuery: [...q],
-        prevObs: prev, nextObs: next,
-        gapUpdated: next - prev,
-        vars: [
-          { name: "i", value: i },
-          { name: "type", value: 1 },
-          { name: "x", value: x },
-          { name: "prev obs", value: prev },
-          { name: "next obs", value: next },
-          { name: "new gap", value: next - prev },
-        ],
-        answers: [...answers].reverse(),
+  const update = (i0, v0) => {
+    S.frame = "update";
+    S.i = i0;
+    S.v = v0;
+    S.path = [];
+    emit({ line: 8, event: "upd-call", title: same(`update(${i0}, ${v0})`), note: same(`update(${i0}, ${v0})`) });
+    for (;;) {
+      const ok = S.i < S.t.length;
+      emit({
+        line: 9,
+        event: "upd-check",
+        condition: ok,
+        title: same(`while ${S.i} < ${S.t.length}`),
+        note: ok ? bi3161(`Nút ${S.i} ≤ ${S.n}.`, `Node ${S.i} ≤ ${S.n}.`) : bi3161("Ra khỏi cây.", "Past the end."),
       });
-
-      obstacleSet.delete(x);
-      fenwickMaximize(next, next - prev);
-
-    } else {
-      // Type 2: check if block of size sz fits in [0, x]
-      const sz = q[2];
-      const obs2 = sortedObs();
-      const prevIdx = obs2.filter((v) => v <= x).length - 1;
-      const prev = obs2[prevIdx];
-      const directGap = x - prev;
-      const fenwickVal = fenwickGet(prev);
-      const answer = fenwickVal >= sz || directGap >= sz;
-      answers.unshift(answer);
-
-      snap({
-        title: { vi: `i=${i}: Truy vấn 2 [x=${x}, sz=${sz}] → ${answer ? "true" : "false"}`, en: `i=${i}: Query 2 [x=${x}, sz=${sz}] → ${answer ? "true" : "false"}` },
-        note: {
-          vi: `prev_obs ≤ x: prev=${prev}. Gap trực tiếp: x−prev = ${directGap}. Max gap trong [0..${prev}] = fenwick.get(${prev}) = ${fenwickVal}. Trả lời: (${fenwickVal} ≥ ${sz}) OR (${directGap} ≥ ${sz}) = ${answer}.`,
-          en: `Largest obstacle ≤ x: prev=${prev}. Direct gap: x−prev = ${directGap}. Max gap in [0..${prev}] = fenwick.get(${prev}) = ${fenwickVal}. Answer: (${fenwickVal} ≥ ${sz}) OR (${directGap} ≥ ${sz}) = ${answer}.`,
-        },
-        codeLines: [36, 37, 38, 39, 40],
-        phase: "type2",
-        queryIndex: i, currentQuery: [...q],
-        prevObs: prev, nextObs: null,
-        gapUpdated: null,
-        queryAnswer: answer,
-        fenwickQuery: prev,
-        fenwickResult: fenwickVal,
-        vars: [
-          { name: "i", value: i },
-          { name: "type", value: 2 },
-          { name: "x", value: x },
-          { name: "sz", value: sz },
-          { name: "prev obs", value: prev },
-          { name: "x − prev", value: directGap },
-          { name: `fenwick.get(${prev})`, value: fenwickVal },
-          { name: "answer", value: String(answer) },
-        ],
-        answers: [...answers].reverse().length ? [...answers] : [],
+      if (!ok) break;
+      const old = S.t[S.i];
+      const up = v0 > old;
+      if (up) S.t[S.i] = v0;
+      S.path.push(S.i);
+      emit({
+        line: 10,
+        event: "upd-max",
+        raised: up ? S.i : null,
+        title: same(`t[${S.i}] = max(${old}, ${v0})`),
+        note: up ? same(`t[${S.i}] = ${v0}.`) : bi3161(`t[${S.i}] giữ ${old}.`, `t[${S.i}] stays ${old}.`),
       });
+      const prev = S.i;
+      S.i += prev & -prev;
+      emit({ line: 11, event: "upd-step", title: same(`i = ${prev} + ${prev & -prev}`), note: bi3161(`Lên nút ${S.i}.`, `Up to node ${S.i}.`) });
     }
-  }
+    S.frame = null;
+    S.i = null;
+    S.v = null;
+    S.path = [];
+  };
 
-  const finalAnswers = [...answers];
-  snap({
-    title: { vi: `Kết quả: [${finalAnswers.map((v) => String(v)).join(", ")}]`, en: `Result: [${finalAnswers.map((v) => String(v)).join(", ")}]` },
-    note: {
-      vi: "Các câu trả lời type-2 đã được thu thập theo thứ tự ngược và đảo lại thành đúng thứ tự đề.",
-      en: "Type-2 answers were collected in reverse order and flipped back to the original order.",
-    },
-    codeLines: [41], phase: "done", final: true,
-    vars: [{ name: "answer", value: `[${finalAnswers.map((v) => String(v)).join(", ")}]` }],
-    answers: finalAnswers,
+  const query = (i0) => {
+    S.frame = "query";
+    S.i = i0;
+    S.best = null;
+    S.path = [];
+    emit({ line: 13, event: "qry-call", title: same(`query(${i0})`), note: same(`query(${i0})`) });
+    S.best = 0;
+    emit({ line: 14, event: "best0", title: same("best = 0"), note: same("best = 0.") });
+    for (;;) {
+      const ok = S.i > 0;
+      emit({
+        line: 15,
+        event: "qry-check",
+        condition: ok,
+        title: same(`while ${S.i} > 0`),
+        note: ok ? bi3161(`Nút ${S.i} > 0.`, `Node ${S.i} > 0.`) : bi3161("Tới gốc.", "Reached 0."),
+      });
+      if (!ok) break;
+      const old = S.best;
+      S.best = Math.max(S.best, S.t[S.i]);
+      S.path.push(S.i);
+      emit({ line: 16, event: "qry-max", title: same(`best = max(${old}, ${S.t[S.i]})`), note: same(`best = ${S.best}.`) });
+      const prev = S.i;
+      S.i -= prev & -prev;
+      emit({ line: 17, event: "qry-step", title: same(`i = ${prev} - ${prev & -prev}`), note: bi3161(`Xuống nút ${S.i}.`, `Down to node ${S.i}.`) });
+    }
+    const result = S.best;
+    emit({ line: 18, event: "qry-return", best: result, title: same(`return ${result}`), note: bi3161(`Trả ${result}.`, `Return ${result}.`) });
+    S.frame = null;
+    S.i = null;
+    S.best = null;
+    S.path = [];
+    return result;
+  };
+
+  emit({ line: 1, event: "import-bisect", title: same("from bisect import bisect_right, insort"), note: bi3161("Nhập bisect.", "Import bisect.") });
+  emit({ line: 2, event: "import-list", title: same("from typing import List"), note: bi3161("Kiểu List.", "Type hints.") });
+  emit({ line: 4, event: "class-bit", title: same("class BIT"), note: bi3161("Định nghĩa BIT.", "BIT class defined.") });
+  emit({ line: 20, event: "class-sol", title: same("class Solution"), note: bi3161("Định nghĩa lớp.", "Class defined.") });
+  emit({ line: 21, event: "call", title: same("getResults(queries)"), note: bi3161(`${m} truy vấn.`, `${m} queries.`) });
+  S.n = Math.max(...queries.map((row) => row[1])) + 1;
+  emit({ line: 22, event: "n", title: same(`n = ${S.n - 1} + 1`), note: bi3161(`Trục 0…${S.n}.`, `Axis 0…${S.n}.`) });
+  S.obs = [0, S.n];
+  emit({ line: 23, event: "obs", title: same(`obs = [0, ${S.n}]`), note: bi3161(`Mốc 0 và ${S.n}.`, `Sentinels 0 and ${S.n}.`) });
+
+  queries.forEach((row, qi) => {
+    S.q = row.slice();
+    S.qi = qi;
+    emit({ line: 24, event: "for-q", title: same(`q = ${list(row)}`), note: same(`q = ${list(row)}`) });
+    const t1 = row[0] === 1;
+    emit({
+      line: 25,
+      event: "type-check",
+      condition: t1,
+      title: same(`if ${row[0]} == 1`),
+      note: t1 ? bi3161("Loại 1: vật cản.", "Type 1: obstacle.") : bi3161("Loại 2: bỏ qua.", "Type 2: skip."),
+    });
+    if (t1) {
+      const at = S.obs.findIndex((p) => p > row[1]);
+      S.obs.splice(at, 0, row[1]);
+      emit({ line: 26, event: "insort", added: row[1], title: same(`insort(obs, ${row[1]})`), note: bi3161(`Đặt vật cản ${row[1]}.`, `Place obstacle ${row[1]}.`) });
+    }
   });
+  S.qi = null;
+  emit({ line: 24, event: "for-q-done", title: bi3161("Hết queries", "queries done"), note: bi3161("Hết truy vấn.", "All queries read.") });
 
-  return { input, answer: finalAnswers, steps };
+  emit({ line: 27, event: "bit-new", title: same(`bit = BIT(${S.n})`), note: bi3161(`BIT cỡ ${S.n}.`, `BIT of size ${S.n}.`) });
+  emit({ line: 5, event: "init-call", title: same(`BIT.__init__(${S.n})`), note: bi3161("Tạo BIT.", "Build BIT.") });
+  S.t = new Array(S.n + 1).fill(0);
+  emit({ line: 6, event: "init-t", title: same(`self.t = [0] * ${S.n + 1}`), note: bi3161("Mọi nút = 0.", "All nodes = 0.") });
+
+  const pairs = S.obs.slice(1).map((b, index) => [S.obs[index], b]);
+  pairs.forEach(([a, b]) => {
+    S.a = a;
+    S.b = b;
+    emit({ line: 28, event: "for-gap", title: same(`a, b = ${a}, ${b}`), note: bi3161(`Khe ${a}→${b}.`, `Gap ${a}→${b}.`) });
+    emit({ line: 29, event: "build-update", title: same(`bit.update(${b}, ${b - a})`), note: bi3161(`Ghi khe ${b - a} tại ${b}.`, `Store gap ${b - a} at ${b}.`) });
+    update(b, b - a);
+  });
+  emit({ line: 28, event: "for-gap-done", title: bi3161("Hết zip", "zip done"), note: bi3161("Hết khe.", "All gaps stored.") });
+  S.ans = [];
+  emit({ line: 30, event: "ans", title: same("ans = []"), note: bi3161("ans rỗng.", "Empty ans.") });
+
+  for (let qi = m - 1; qi >= 0; qi--) {
+    const row = queries[qi];
+    S.q = row.slice();
+    S.qi = qi;
+    emit({ line: 31, event: "for-rev", title: same(`q = ${list(row)}`), note: bi3161(`Ngược: q = ${list(row)}`, `Back: q = ${list(row)}`) });
+    S.k = S.obs.filter((p) => p <= row[1]).length;
+    emit({ line: 32, event: "bisect", title: same(`k = bisect_right(obs, ${row[1]})`), note: same(`k = ${S.k}.`) });
+    const t1 = row[0] === 1;
+    emit({
+      line: 33,
+      event: "kind-check",
+      condition: t1,
+      title: same(`if ${row[0]} == 1`),
+      note: t1 ? bi3161(`Gỡ vật cản ${row[1]}.`, `Undo obstacle ${row[1]}.`) : bi3161("Hỏi đặt khối.", "Block query."),
+    });
+    if (t1) {
+      S.a = S.obs[S.k - 2];
+      S.b = S.obs[S.k];
+      emit({ line: 34, event: "neighbors", title: same(`a, b = ${S.a}, ${S.b}`), note: bi3161(`Hàng xóm ${S.a}, ${S.b}.`, `Neighbors ${S.a}, ${S.b}.`) });
+      S.obs.splice(S.k - 1, 1);
+      emit({ line: 35, event: "remove", removed: row[1], title: same(`obs.pop(${S.k - 1})`), note: bi3161(`Bỏ ${row[1]}.`, `Remove ${row[1]}.`) });
+      S.ghosts.push(row[1]);
+      S.merging = true;
+      emit({ line: 36, event: "merge-update", title: same(`bit.update(${S.b}, ${S.b - S.a})`), note: bi3161(`Gộp khe ${S.b - S.a}.`, `Merged gap ${S.b - S.a}.`) });
+      update(S.b, S.b - S.a);
+      S.merging = false;
+      emit({ line: 37, event: "continue", title: same("continue"), note: bi3161("Truy vấn kế.", "Next query.") });
+      continue;
+    }
+    S.a = S.obs[S.k - 1];
+    S.x = row[1];
+    S.sz = row[2];
+    emit({ line: 38, event: "prev", title: same(`a = obs[${S.k - 1}]`), note: bi3161(`Vật cản trước: ${S.a}.`, `Last obstacle: ${S.a}.`) });
+    const tail = S.x - S.a;
+    emit({ line: 39, event: "ask", tail, title: same(`bit.query(${S.a})`), note: bi3161(`Khe lớn nhất ≤ ${S.a}?`, `Max gap up to ${S.a}?`) });
+    const best = query(S.a);
+    const fit = Math.max(best, tail) >= S.sz;
+    S.ans.push(fit);
+    const verdict = `max(${best}, ${tail}) ≥ ${S.sz}: ${fit ? "✓" : "✗"}`;
+    emit({ line: 39, event: "append", best, tail, fit, title: same(`ans.append(max(${best}, ${tail}) >= ${S.sz})`), note: same(verdict) });
+    S.x = null;
+    S.sz = null;
+  }
+  S.qi = null;
+  emit({ line: 31, event: "for-rev-done", title: bi3161("Hết reversed", "reversed done"), note: bi3161("Hết duyệt ngược.", "Reverse scan done.") });
+  const answer = S.ans.slice().reverse();
+  emit({
+    line: 40,
+    event: "return",
+    final: true,
+    title: same(`return ${bools(answer)}`),
+    note: bi3161(`Kết quả: ${answer.length} đáp án.`, `Answer: ${answer.length} results.`),
+  });
+  return { input, answer, steps };
 }
 
 Object.assign(module.exports, {
@@ -8294,83 +8415,35 @@ Object.assign(module.exports, {
       { key: "sorted-set", vi: "Sorted Set", en: "Sorted Set" },
     ],
     title: { vi: "Block Placement Queries", en: "Block Placement Queries" },
-    titleVi: { vi: "Truy vấn đặt block (Sorted Set + Fenwick max-tree)", en: "Block placement queries (Sorted Set + Fenwick max-tree)" },
-    statement: {
-      vi: "Cho dãy truy vấn trên trục số nguyên không âm. Truy vấn type 1 [1,x]: thêm chướng ngại vật tại x. Truy vấn type 2 [2,x,sz]: trả lời TRUE nếu có thể đặt block kích thước sz hoàn toàn trong [0,x] mà không chạm chướng ngại vật (được phép chạm). Điểm 0 luôn có chướng ngại vật ảo.",
-      en: "Given queries on the non-negative integer line. Type 1 [1,x]: add an obstacle at x. Type 2 [2,x,sz]: return TRUE if a block of size sz can be placed entirely in [0,x] without overlapping any obstacle (touching is allowed). There is always a virtual obstacle at 0.",
-    },
-    defaultInput: [1],
-    inputKind: "positive",
-    singleInput: true,
-    inputLabel: { vi: "n (không dùng trực tiếp, dùng extraParams)", en: "n (unused; configure queries below)" },
-    extraParams: [
-      {
-        key: "queries", type: "string",
-        label: { vi: "queries: type,x[,sz]; ... hoặc JSON [[1,2],[2,3,1],...]", en: "queries: type,x[,sz]; ... or JSON [[1,2],[2,3,1],...]" },
-        default: "1,2;2,3,3;2,3,1;2,2,2",
-      },
-    ],
+    titleVi: bi3161("Đặt khối giữa các vật cản (BIT max khe)", "Place blocks between obstacles (max-gap BIT)"),
+    statement: bi3161(
+      "Truy vấn [1, x] đặt vật cản tại x; [2, x, sz] hỏi có đặt được khối dài sz nằm trong [0, x] mà không cắt vật cản nào (được chạm). Visualization: tối đa 8 truy vấn, x và sz từ 1 đến 15, các x loại 1 khác nhau.",
+      "Query [1, x] builds an obstacle at x; [2, x, sz] asks whether a block of length sz fits inside [0, x] without crossing an obstacle (touching is fine). Visualization: up to 8 queries, x and sz 1–15, distinct type-1 x.",
+    ),
+    defaultInput: DEFAULT_QUERIES_3161,
+    inputKind: "string",
+    inputLabel: bi3161("queries · 1,x hoặc 2,x,sz; … (≤ 8, x ≤ 15)", "queries · 1,x or 2,x,sz; … (≤ 8, x ≤ 15)"),
+    debugMode: "line-by-line",
     approach: [
-      { vi: "Sentinel 0 và N luôn là chướng ngại vật. Pre-insert tất cả type-1 vào sorted set.", en: "Sentinels 0 and N are always obstacles. Pre-insert all type-1 positions into a sorted set." },
-      { vi: "Xây Fenwick max-tree: fenwick[i] lưu max gap của prefix [0..i]. Gọi maximize(obs_next, obs_next − obs_prev) cho mỗi cặp liên tiếp.", en: "Build a Fenwick max-tree: fenwick[i] stores the max gap in prefix [0..i]. Call maximize(obs_next, obs_next − obs_prev) for every consecutive pair." },
-      { vi: "Duyệt NGƯỢC: type-1 trở thành XÓA obstacle (và cập nhật gap giữa 2 hàng xóm), type-2 trả lời bằng fenwick.get(prev_obs) >= sz OR x − prev_obs >= sz.", en: "Process in REVERSE: type-1 becomes REMOVE (update gap between neighbours), type-2 answers with fenwick.get(prev_obs) >= sz OR x − prev_obs >= sz." },
-      { vi: "Đảo ngược mảng đáp án để lấy đúng thứ tự.", en: "Reverse the answer array to restore original query order." },
+      bi3161("Đặt trước mọi vật cản; lưu mỗi khe b − a tại đầu phải b trong BIT max.", "Place every obstacle first; store each gap b − a at its right end b in a max BIT."),
+      bi3161("Duyệt ngược: truy vấn loại 1 gỡ vật cản, gộp hai khe kề nhau.", "Scan backwards: a type-1 query removes its obstacle and merges the two gaps beside it."),
+      bi3161("Khối vừa nếu max(BIT tới vật cản cuối a, x − a) ≥ sz.", "A block fits if max(BIT up to the last obstacle a, x − a) ≥ sz."),
     ],
     complexity: {
-      time: "O(n log n)",
-      space: "O(n)",
-      note: { vi: "Mỗi truy vấn thực hiện O(log N) trên Fenwick tree và bisect trên sorted set.", en: "Each query does O(log N) on the Fenwick tree and a bisect on the sorted set." },
+      time: "O(q log q)",
+      space: "O(q)",
+      note: bi3161("Cách khác: segment tree max khe, cùng độ phức tạp.", "Alternative: a max-gap segment tree, same complexity."),
     },
-    code: [
-      "class FenwickTree:",
-      "    def __init__(self, n):",
-      "        self.vals = [0] * (n + 1)",
-      "    def maximize(self, i, val):",
-      "        while i < len(self.vals):",
-      "            self.vals[i] = max(self.vals[i], val)",
-      "            i += i & -i",
-      "    def get(self, i):",
-      "        res = 0",
-      "        while i > 0:",
-      "            res = max(res, self.vals[i])",
-      "            i -= i & -i",
-      "        return res",
-      "",
-      "from sortedcontainers import SortedList",
-      "from itertools import pairwise",
-      "",
-      "class Solution:",
-      "    def getResults(self, queries):",
-      "        N = min(50000, len(queries) * 3)",
-      "        tree = FenwickTree(N + 1)",
-      "        obstacles = SortedList([0, N])",
-      "        for q in queries:",
-      "            if q[0] == 1:",
-      "                obstacles.add(q[1])",
-      "        for x1, x2 in pairwise(obstacles):",
-      "            tree.maximize(x2, x2 - x1)",
-      "        ans = []",
-      "        for q in reversed(queries):",
-      "            if q[0] == 1:",
-      "                x = q[1]",
-      "                i = obstacles.index(x)",
-      "                nxt, prv = obstacles[i+1], obstacles[i-1]",
-      "                obstacles.remove(x)",
-      "                tree.maximize(nxt, nxt - prv)",
-      "            else:",
-      "                x, sz = q[1], q[2]",
-      "                i = obstacles.bisect_right(x)",
-      "                prv = obstacles[i - 1]",
-      "                ans.append(tree.get(prv) >= sz or x - prv >= sz)",
-      "        return ans[::-1]",
-    ],
-    liveArgs(input, params = {}) {
-      return [parseQueries3161(params.queries ?? "1,2;2,3,1;2,3,2", "queries")];
-    },
+    code: [...SOURCE_3161],
+    liveArgs: (input, params) => [parseQueries3161(input, params)],
     builder: buildSteps3161,
   },
 });
 
+Object.defineProperty(module.exports[3161], "__internals3161", {
+  value: { parseQueries3161, SOURCE_3161, DEFAULT_QUERIES_3161, MAX_Q_3161, MAX_X_3161 },
+  enumerable: false,
+});
 // ─── 528: Random Pick with Weight ───────────────────────────────────────────
 //
 // Turn the weights into a prefix-sum array, which slices the range 1..total

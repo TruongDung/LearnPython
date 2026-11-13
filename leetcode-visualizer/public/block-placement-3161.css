@@ -1,0 +1,547 @@
+/* LeetCode 3161 — Block Placement Queries. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.bp3161-viz {
+  --bp3161-bg: #0f1a25;
+  --bp3161-panel: #152434;
+  --bp3161-soft: #1e3144;
+  --bp3161-border: #36506a;
+  --bp3161-text: #eaf3fb;
+  --bp3161-muted: #9fb3c6;
+  /* Status colors: fits / True (green), no fit / False (red), line numbers and the current node (amber). */
+  --bp3161-green: #4fd69c;
+  --bp3161-red: #ff8f8f;
+  --bp3161-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above. */
+  --bp3161-post: #eef3f8;
+  --bp3161-gap: #3d8bff;
+  --bp3161-prefix: #8c6cff;
+  --bp3161-tail: #e070d0;
+  --bp3161-node: #a0b4c8;
+  --bp3161-path: #b8e986;
+  --bp3161-block: #7fe0ff;
+  --bp3161-on-bar: #0b1520;
+  --bp3161-line: #2a4560;
+  container: bp3161 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--bp3161-border);
+  border-radius: 16px;
+  background: var(--bp3161-bg);
+  color: var(--bp3161-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .bp3161-viz {
+  --bp3161-bg: #f4f7fb;
+  --bp3161-panel: #ffffff;
+  --bp3161-soft: #e9eff7;
+  --bp3161-border: #c2d1e2;
+  --bp3161-text: #17283a;
+  --bp3161-muted: #55697e;
+  --bp3161-green: #08784f;
+  --bp3161-red: #b4232f;
+  --bp3161-amber: #9a6200;
+  --bp3161-post: #1c2b3a;
+  --bp3161-gap: #2f7dff;
+  --bp3161-prefix: #7b5cff;
+  --bp3161-tail: #c0309f;
+  --bp3161-node: #6b8196;
+  --bp3161-path: #4d8a14;
+  --bp3161-block: #0096c7;
+  --bp3161-on-bar: #ffffff;
+  --bp3161-line: #fff3cf;
+}
+
+.bp3161-viz,
+.bp3161-viz * {
+  box-sizing: border-box;
+}
+
+.bp3161-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.bp3161-viz button {
+  border: 1px solid var(--bp3161-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--bp3161-panel);
+  color: var(--bp3161-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.bp3161-viz button:hover:not(:disabled) {
+  border-color: var(--bp3161-gap);
+  background: var(--bp3161-soft);
+}
+
+.bp3161-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.bp3161-viz :focus-visible {
+  outline: 3px solid var(--bp3161-gap);
+  outline-offset: 2px;
+}
+
+/* Header */
+.bp3161-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bp3161-head > div {
+  min-width: 0;
+}
+
+.bp3161-head small {
+  color: var(--bp3161-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.bp3161-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.bp3161-head h2 code {
+  color: var(--bp3161-amber);
+}
+
+.bp3161-viz.is-final .bp3161-head h2 code {
+  color: var(--bp3161-green);
+}
+
+.bp3161-status {
+  border: 1px solid var(--bp3161-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--bp3161-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bp3161-viz.is-final .bp3161-status {
+  border-color: var(--bp3161-green);
+  color: var(--bp3161-green);
+}
+
+.bp3161-presets,
+.bp3161-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.bp3161-card {
+  min-width: 0;
+  border: 1px solid var(--bp3161-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--bp3161-panel);
+}
+
+.bp3161-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.bp3161-card > header > b {
+  color: var(--bp3161-muted);
+  font-weight: 700;
+}
+
+/* Query chips */
+.bp3161-query-card {
+  display: grid;
+  gap: 8px;
+}
+
+.bp3161-queries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.bp3161-q {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1.5px solid var(--bp3161-border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.bp3161-q.is-t1 {
+  border-color: var(--bp3161-post);
+}
+
+.bp3161-q.is-t2 {
+  border-color: var(--bp3161-block);
+  border-style: dashed;
+}
+
+.bp3161-q.is-cur {
+  background: color-mix(in srgb, var(--bp3161-amber) 22%, transparent);
+  border-color: var(--bp3161-amber);
+  border-style: solid;
+}
+
+.bp3161-mark.is-true,
+.bp3161-verdict.is-true {
+  color: var(--bp3161-green);
+}
+
+.bp3161-mark.is-false,
+.bp3161-verdict.is-false {
+  color: var(--bp3161-red);
+}
+
+.bp3161-reverse {
+  color: var(--bp3161-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bp3161-fit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.bp3161-fit > b {
+  color: var(--bp3161-muted);
+}
+
+.bp3161-mini {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 2px 8px;
+  background: var(--bp3161-soft);
+}
+
+.bp3161-mini small {
+  color: var(--bp3161-muted);
+  font-size: 11px;
+}
+
+.bp3161-mini b {
+  font: 700 15px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.bp3161-ge {
+  color: var(--bp3161-muted);
+  font-weight: 700;
+}
+
+.bp3161-fit .bp3161-verdict {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Picture: drawn about as wide as the card; scales down only on narrow screens. */
+.bp3161-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.bp3161-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--bp3161-text);
+  text-anchor: middle;
+}
+
+.bp3161-svg .bp3161-row-label {
+  fill: var(--bp3161-muted);
+  text-anchor: end;
+}
+
+.bp3161-svg .bp3161-tick {
+  fill: var(--bp3161-muted);
+}
+
+.bp3161-svg .bp3161-tick.is-x {
+  fill: var(--bp3161-prefix);
+}
+
+.bp3161-prefix {
+  fill: color-mix(in srgb, var(--bp3161-prefix) 22%, transparent);
+  stroke: var(--bp3161-prefix);
+  stroke-width: 1;
+}
+
+.bp3161-gap {
+  fill: var(--bp3161-gap);
+  opacity: 0.75;
+}
+
+.bp3161-gap.is-cur {
+  opacity: 1;
+  stroke: var(--bp3161-amber);
+  stroke-width: 2;
+}
+
+.bp3161-gap.is-merged {
+  stroke-dasharray: 5 3;
+}
+
+.bp3161-gap.is-best {
+  opacity: 1;
+  stroke: var(--bp3161-text);
+  stroke-width: 2;
+}
+
+.bp3161-svg .bp3161-gap-label {
+  fill: var(--bp3161-on-bar);
+}
+
+.bp3161-post {
+  fill: var(--bp3161-post);
+}
+
+.bp3161-post.is-sentinel {
+  fill: var(--bp3161-muted);
+}
+
+.bp3161-post.is-a,
+.bp3161-post.is-b,
+.bp3161-post.is-new {
+  fill: var(--bp3161-amber);
+}
+
+.bp3161-post.is-ghost {
+  fill: none;
+  stroke: var(--bp3161-post);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+  opacity: 0.55;
+}
+
+.bp3161-post.is-ghost.is-removed {
+  stroke: var(--bp3161-amber);
+  opacity: 0.9;
+}
+
+.bp3161-tail {
+  fill: var(--bp3161-tail);
+  opacity: 0.85;
+}
+
+.bp3161-tail.is-best {
+  opacity: 1;
+  stroke: var(--bp3161-text);
+  stroke-width: 2;
+}
+
+.bp3161-svg .bp3161-tail-label {
+  fill: var(--bp3161-on-bar);
+}
+
+.bp3161-svg .bp3161-tail-label.is-zero {
+  fill: var(--bp3161-tail);
+}
+
+.bp3161-block {
+  fill: color-mix(in srgb, var(--bp3161-block) 30%, transparent);
+  stroke: var(--bp3161-block);
+  stroke-width: 2;
+}
+
+.bp3161-block.is-fit {
+  fill: color-mix(in srgb, var(--bp3161-green) 30%, transparent);
+  stroke: var(--bp3161-green);
+}
+
+.bp3161-block.is-nofit {
+  fill: color-mix(in srgb, var(--bp3161-red) 30%, transparent);
+  stroke: var(--bp3161-red);
+}
+
+.bp3161-block.is-cut {
+  stroke-dasharray: 5 3;
+  opacity: 0.8;
+}
+
+.bp3161-svg .bp3161-block-label.is-fit {
+  fill: var(--bp3161-green);
+}
+
+.bp3161-svg .bp3161-block-label.is-nofit {
+  fill: var(--bp3161-red);
+}
+
+.bp3161-node {
+  fill: var(--bp3161-node);
+  stroke: none;
+}
+
+.bp3161-node.is-zero {
+  fill: var(--bp3161-soft);
+  stroke: var(--bp3161-border);
+  stroke-width: 1;
+}
+
+.bp3161-node.is-path {
+  fill: var(--bp3161-path);
+}
+
+.bp3161-node.is-cur {
+  stroke: var(--bp3161-amber);
+  stroke-width: 2.5;
+}
+
+.bp3161-node.is-raised {
+  stroke: var(--bp3161-amber);
+  stroke-width: 3.5;
+}
+
+.bp3161-svg .bp3161-node-label {
+  fill: var(--bp3161-on-bar);
+}
+
+.bp3161-svg .bp3161-node-label.is-zero {
+  fill: var(--bp3161-muted);
+}
+
+.bp3161-svg .bp3161-node-label.is-path {
+  fill: var(--bp3161-on-bar);
+}
+
+.bp3161-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--bp3161-muted);
+  font-size: 11px;
+}
+
+.bp3161-legend .lg-post {
+  color: var(--bp3161-post);
+}
+
+.bp3161-legend .lg-gap {
+  color: var(--bp3161-gap);
+}
+
+.bp3161-legend .lg-node {
+  color: var(--bp3161-node);
+}
+
+.bp3161-legend .lg-path {
+  color: var(--bp3161-path);
+}
+
+.bp3161-legend .lg-block {
+  color: var(--bp3161-block);
+}
+
+/* Current-line strip */
+.bp3161-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--bp3161-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--bp3161-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .bp3161-now {
+  background: var(--bp3161-line);
+}
+
+.bp3161-lineno {
+  color: var(--bp3161-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.bp3161-now .bp3161-effect {
+  color: var(--bp3161-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bp3161-branch,
+.bp3161-now .bp3161-verdict {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.bp3161-branch.is-true,
+.bp3161-now .bp3161-verdict.is-true {
+  background: color-mix(in srgb, var(--bp3161-green) 20%, transparent);
+  color: var(--bp3161-green);
+}
+
+.bp3161-branch.is-false,
+.bp3161-now .bp3161-verdict.is-false {
+  background: color-mix(in srgb, var(--bp3161-red) 18%, transparent);
+  color: var(--bp3161-red);
+}
+
+/* 3161 step notes are a few words. */
+body:has(#treeView:not(.hidden) .bp3161-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 3161 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .bp3161-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Long lines (the signature and the append line) wrap inside the panel instead of being cut off at its right edge. */
+body:has(#treeView:not(.hidden) .bp3161-viz) #codePanel .code-line {
+  width: auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+body:has(#treeView:not(.hidden) .bp3161-viz) #codePanel .code-line .txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@container bp3161 (max-width: 420px) {
+  .bp3161-head h2 {
+    font-size: 18px;
+  }
+}
