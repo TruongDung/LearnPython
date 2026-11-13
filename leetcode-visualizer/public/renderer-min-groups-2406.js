@@ -111,8 +111,9 @@ const MG2406_PAD_R = 12;
 const MG2406_TOP = 8;
 const MG2406_ROW = 30;
 const MG2406_BAR_H = 18;
+const MG2406_END_INSET = 6;
 
-function mg2406Picture(state) {
+function mg2406Picture(state, copy) {
   if (!state.intervals.length) return "";
   const lo = Math.min(...state.intervals.map((item) => item.left));
   const hi = Math.max(...state.intervals.map((item) => item.right));
@@ -156,9 +157,10 @@ function mg2406Picture(state) {
   if (current && current.group === null) {
     parts.push(`<rect class="mg2406-bar is-current" data-current="${current.id}" x="${x(current.left) + 1}" y="${barY(MG2406_TOP)}" width="${(current.right - current.left + 1) * unit - 2}" height="${MG2406_BAR_H}" rx="5"/>`);
   }
-  // ends[0] at the moment it is compared: a mark on the right edge of that group's last cell.
+  // ends[0] at the moment it is compared: a mark inside that group's last cell, MG2406_END_INSET px left of its
+  // right edge, so it never sits under the sweep line when ends[0] + 1 == left.
   if (checking) {
-    const ex = x(top.end + 1);
+    const ex = x(top.end + 1) - MG2406_END_INSET;
     parts.push(`<line class="mg2406-endmark ${state.condition ? "is-free" : "is-busy"}" data-endmark="${top.group}" x1="${ex}" y1="${laneY(top.group) + 1}" x2="${ex}" y2="${laneY(top.group) + MG2406_ROW - 1}"/>`);
   }
   // Sweep line at left of the current interval.
@@ -174,7 +176,7 @@ function mg2406Picture(state) {
     if ((v - lo) % every === 0) parts.push(`<text class="mg2406-tick-label" x="${x(v) + unit / 2}" y="${axisY + 17}">${v}</text>`);
   }
   parts.push(`<line class="mg2406-tick" x1="${x(hi + 1)}" y1="${axisY}" x2="${x(hi + 1)}" y2="${axisY + 4}"/>`);
-  const label = `${lanes} groups`;
+  const label = `${lanes} ${copy.groups}`;
   return `<svg class="mg2406-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${mg2406Escape(label)}">${parts.join("")}</svg>`;
 }
 
@@ -295,7 +297,7 @@ function renderMinGroups2406View(step) {
   host.innerHTML = `<article class="mg2406-viz${state.final ? " is-final" : ""}" data-problem-id="2406" data-source-line="${state.line}" role="region" aria-label="LeetCode 2406 · line ${state.line}">`
     + `<header class="mg2406-head"><div><small>LEETCODE 2406 · MIN GROUPS</small><h2><code>${mg2406Escape(heading)}</code></h2></div><span class="mg2406-status">${mg2406Escape(status)}</span></header>`
     + `<nav class="mg2406-presets" aria-label="${mg2406Escape(copy.examples)}">${presets}</nav>`
-    + `<section class="mg2406-card mg2406-picture-card" aria-label="${mg2406Escape(copy.picture)}"><header><b>${mg2406Escape(copy.picture)}</b></header>${mg2406Chips(state, copy)}${mg2406Picture(state)}${legend}</section>`
+    + `<section class="mg2406-card mg2406-picture-card" aria-label="${mg2406Escape(copy.picture)}"><header><b>${mg2406Escape(copy.picture)}</b></header>${mg2406Chips(state, copy)}${mg2406Picture(state, copy)}${legend}</section>`
     + `<div class="mg2406-row"><section class="mg2406-card mg2406-heap-card" aria-label="${mg2406Escape(copy.heap)}">${mg2406Heap(state, copy)}</section>`
     + `<section class="mg2406-card mg2406-code-card" aria-label="${mg2406Escape(copy.code)}">${mg2406Code(state, copy)}</section></div>`
     + `<footer class="mg2406-foot">${jumps}</footer></article>`;

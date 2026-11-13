@@ -163,16 +163,38 @@ function svgBoxes(html) {
     const x = anchor === 'end' ? +m[2] - w : +m[2] - w / 2;
     boxes.push({ name: `${m[1]}:${m[4]}`, x, y: +m[3] - h + 2, w, h });
   }
-  return { width, height, boxes };
+  // Vertical line marks, widened by their stroke (sweep 2px, ends[0] mark 4px with round caps).
+  const marks = [];
+  for (const m of html.matchAll(/<line class="(mg2406-sweep|mg2406-endmark)[^"]*"[^>]* x1="([\d.]+)" y1="([\d.]+)" x2="[\d.]+" y2="([\d.]+)"/g)) {
+    const half = m[1] === 'mg2406-sweep' ? 1 : 2;
+    const cap = m[1] === 'mg2406-sweep' ? 0 : 2;
+    marks.push({ name: `${m[1]}@${m[2]}`, x: +m[2] - half, y: +m[3] - cap, w: half * 2, h: +m[4] - +m[3] + cap * 2 });
+  }
+  return { width, height, boxes, marks };
 }
 
-test('2406 picture: bars and labels never overlap and stay inside the viewBox', () => {
+test('2406 picture: bars, labels and line marks never overlap and stay inside the viewBox', () => {
   const ui = renderer('en');
   const inputs = [...ui.cases.map((preset) => preset[0]), ...randomInputs(60), '[[1,40]]', JSON.stringify(Array.from({ length: 10 }, () => [999961, 1000000]))];
+  let adjacentChecks = 0;
   for (const input of inputs) {
     const { steps } = problem.builder(input);
     steps.forEach((step, index) => {
-      const { width, height, boxes } = svgBoxes(ui.render(step, steps, index));
+      const { width, height, boxes, marks } = svgBoxes(ui.render(step, steps, index));
+      const view = step.minGroups2406View;
+      if (view.event === 'check' && view.heap.length) {
+        assert.equal(marks.filter((m) => m.name.startsWith('mg2406-endmark')).length, 1, `${input} #${index}: one ends[0] mark`);
+        const current = view.intervals.find((item) => item.id === view.current);
+        if (view.heap[0].end + 1 === current.left) adjacentChecks++;
+      }
+      // Line marks must not touch each other or any text; boxes are inflated by 1px so they also stay visibly apart.
+      const texts = boxes.filter((b) => !b.name.startsWith('bar@'));
+      const near = (a, b) => a.x < b.x + b.w + 1 && b.x < a.x + a.w + 1 && a.y < b.y + b.h + 1 && b.y < a.y + a.h + 1;
+      for (let i = 0; i < marks.length; i++) {
+        for (const t of texts) assert.ok(!near(marks[i], t), `${input} #${index}: ${marks[i].name} overlaps ${t.name}`);
+        for (let j = i + 1; j < marks.length; j++) assert.ok(!near(marks[i], marks[j]), `${input} #${index}: ${marks[i].name} overlaps ${marks[j].name}`);
+        assert.ok(marks[i].x >= 0 && marks[i].y >= 0 && marks[i].x + marks[i].w <= width && marks[i].y + marks[i].h <= height, `${input} #${index}: ${marks[i].name} clipped`);
+      }
       for (const b of boxes) assert.ok(b.x >= 0 && b.y >= 0 && b.x + b.w <= width && b.y + b.h <= height, `${input} #${index}: ${b.name} clipped`);
       for (let i = 0; i < boxes.length; i++) {
         for (let j = i + 1; j < boxes.length; j++) {
@@ -184,6 +206,31 @@ test('2406 picture: bars and labels never overlap and stay inside the viewBox', 
       }
     });
   }
+  assert.ok(adjacentChecks > 0, 'covers checks where ends[0] + 1 == left (mark next to the sweep line)');
+});
+
+test('2406 group colors differ from the free/busy status colors in both themes; busy also has a dashed outline', () => {
+  const hex = (block, name) => (block.match(new RegExp(`--mg2406-${name}: (#[0-9a-f]{6});`, 'i')) || [])[1];
+  const rgb = (value) => [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
+  const distance = (a, b) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i]));
+  const dark = CSS.match(/^\.mg2406-viz \{[^}]*\}/m)[0];
+  const light = CSS.match(/\[data-theme="light"\] \.mg2406-viz \{[^}]*\}/)[0];
+  for (const block of [dark, light]) {
+    for (let g = 0; g < 10; g++) {
+      for (const status of ['green', 'red']) {
+        assert.ok(distance(hex(block, `g${g}`), hex(block, status)) > 60, `g${g} vs ${status}`);
+      }
+    }
+  }
+  assert.match(CSS, /\.mg2406-lane\.is-busy \{[^}]*stroke-dasharray/s);
+  assert.doesNotMatch(CSS.match(/\.mg2406-lane\.is-free \{[^}]*\}/s)[0], /stroke-dasharray/);
+});
+
+test('2406 picture aria-label follows the page language', () => {
+  const step = problem.builder(problem.defaultInput).steps.at(-1);
+  const groups = step.minGroups2406View.groups;
+  assert.ok(renderer('vi').render(step, [step], 0).includes(`role="img" aria-label="${groups} nhóm"`));
+  assert.ok(renderer('en').render(step, [step], 0).includes(`role="img" aria-label="${groups} groups"`));
 });
 
 test('2406 shows locals once: in the shared Variables panel, not in the line strip', () => {
@@ -206,8 +253,8 @@ test('2406 is listed under Heap and its assets are wired with light/dark tokens 
   assert.equal(problem.category.key, 'heap');
   assert.equal(problem.debugMode, 'line-by-line');
   const index = readFrontendIndex();
-  assert.match(index, /min-groups-2406\.css\?v=min-groups-2406-v1" data-problem-ids="2406"/);
-  assert.match(index, /renderer-min-groups-2406\.js\?v=min-groups-2406-v1" data-problem-ids="2406"/);
+  assert.match(index, /min-groups-2406\.css\?v=min-groups-2406-v2" data-problem-ids="2406"/);
+  assert.match(index, /renderer-min-groups-2406\.js\?v=min-groups-2406-v2" data-problem-ids="2406"/);
   assert.match(readFrontendJavaScript(), /step\.minGroups2406View\), surface: "treeView", render: \(step\) => \{\s*renderMinGroups2406View\(step\)/);
   assert.match(CSS, /\.mg2406-viz \{[^}]*--mg2406-bg:/s);
   assert.match(CSS, /\[data-theme="light"\] \.mg2406-viz \{[^}]*--mg2406-bg:/s);

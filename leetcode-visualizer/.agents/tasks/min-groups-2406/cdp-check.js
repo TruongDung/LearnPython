@@ -21,6 +21,13 @@ const GEOMETRY_PROBE = `(() => {
   const hit = (a, b) => a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 && a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5;
   const items = [...svg.querySelectorAll('rect.mg2406-bar, text')].map((el) => box(el, el.getAttribute('class') + ':' + (el.textContent || el.dataset.interval || el.dataset.current)));
   for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) if (hit(items[i], items[j])) out.overlaps.push([items[i].name, items[j].name]);
+  // Line marks (sweep, ends[0]) widened by their computed stroke: must stay apart from each other and from text.
+  const marks = [...svg.querySelectorAll('line.mg2406-sweep, line.mg2406-endmark')].map((el) => { const b = el.getBBox(); const sw = parseFloat(getComputedStyle(el).strokeWidth) || 1;
+    const cap = getComputedStyle(el).strokeLinecap === 'round' ? sw / 2 : 0; return { name: el.getAttribute('class'), x: b.x - sw / 2 - 1, y: b.y - cap, w: b.width + sw + 2, h: b.height + cap * 2 }; });
+  const texts = [...svg.querySelectorAll('text')].map((el) => box(el, 'text:' + el.textContent));
+  for (let i = 0; i < marks.length; i++) { for (const t of texts) if (hit(marks[i], t)) out.overlaps.push([marks[i].name, t.name]);
+    for (let j = i + 1; j < marks.length; j++) if (hit(marks[i], marks[j])) out.overlaps.push([marks[i].name, marks[j].name]); }
+  out.endmarks = marks.filter((m) => m.name.includes('endmark')).length;
   [...svg.querySelectorAll('rect, line, text')].forEach((el) => { const b = el.getBBox();
     if (b.x < vb.x - 0.5 || b.y < vb.y - 0.5 || b.x + b.width > vb.x + vb.width + 0.5 || b.y + b.height > vb.y + vb.height + 0.5) out.clipped.push(el.outerHTML.slice(0, 70)); });
   const rect = (el, name) => { const r = el.getBoundingClientRect(); return { name, x: r.left, y: r.top, w: r.width, h: r.height }; };
