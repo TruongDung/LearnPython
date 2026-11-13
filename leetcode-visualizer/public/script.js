@@ -1262,6 +1262,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.carPool1094View), surface: "treeView", render: (step) => {
       renderCarPooling1094View(step);
     } },
+    { predicate: (step) => Boolean(step.nonDec3420View), surface: "treeView", render: (step) => {
+      renderNonDecreasing3420View(step);
+    } },
     { predicate: (step) => Boolean(step.freedomTrail514View), surface: "treeView", render: (step) => {
       renderFreedomTrail514View(step);
     } },

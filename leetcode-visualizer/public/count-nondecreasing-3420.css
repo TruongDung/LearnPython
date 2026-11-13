@@ -1,0 +1,502 @@
+/* LeetCode 3420 — Count Non-Decreasing Subarrays After K Operations. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.nd3420-viz {
+  --nd3420-bg: #0f1a25;
+  --nd3420-panel: #152434;
+  --nd3420-soft: #1e3144;
+  --nd3420-border: #36506a;
+  --nd3420-text: #eaf3fb;
+  --nd3420-muted: #9fb3c6;
+  /* Status colors: fits the budget (green), over budget (red), the k limit and line numbers (amber). */
+  --nd3420-green: #4fd69c;
+  --nd3420-red: #ff8f8f;
+  --nd3420-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above. */
+  --nd3420-bar: #8fb3c9;
+  --nd3420-out: #4a5f74;
+  --nd3420-fill: #3d8bff;
+  --nd3420-level: #e070d0;
+  --nd3420-cur: #b196ff;
+  --nd3420-j: #9ff0ff;
+  --nd3420-on-bar: #0b1520;
+  --nd3420-line: #2a4560;
+  container: nd3420 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--nd3420-border);
+  border-radius: 16px;
+  background: var(--nd3420-bg);
+  color: var(--nd3420-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .nd3420-viz {
+  --nd3420-bg: #f4f7fb;
+  --nd3420-panel: #ffffff;
+  --nd3420-soft: #e9eff7;
+  --nd3420-border: #c2d1e2;
+  --nd3420-text: #17283a;
+  --nd3420-muted: #55697e;
+  --nd3420-green: #08784f;
+  --nd3420-red: #b4232f;
+  --nd3420-amber: #9a6200;
+  --nd3420-bar: #4f6f86;
+  --nd3420-out: #b7c4d2;
+  --nd3420-fill: #2f7dff;
+  --nd3420-level: #c0309f;
+  --nd3420-cur: #6c3fb8;
+  --nd3420-j: #008a9e;
+  --nd3420-on-bar: #ffffff;
+  --nd3420-line: #fff3cf;
+}
+
+.nd3420-viz,
+.nd3420-viz * {
+  box-sizing: border-box;
+}
+
+.nd3420-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.nd3420-viz button {
+  border: 1px solid var(--nd3420-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--nd3420-panel);
+  color: var(--nd3420-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.nd3420-viz button:hover:not(:disabled) {
+  border-color: var(--nd3420-cur);
+  background: var(--nd3420-soft);
+}
+
+.nd3420-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.nd3420-viz :focus-visible {
+  outline: 3px solid var(--nd3420-cur);
+  outline-offset: 2px;
+}
+
+/* Header */
+.nd3420-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.nd3420-head > div {
+  min-width: 0;
+}
+
+.nd3420-head small {
+  color: var(--nd3420-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.nd3420-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.nd3420-head h2 code {
+  color: var(--nd3420-amber);
+}
+
+.nd3420-viz.is-final .nd3420-head h2 code {
+  color: var(--nd3420-green);
+}
+
+.nd3420-status {
+  border: 1px solid var(--nd3420-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--nd3420-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.nd3420-viz.is-final .nd3420-status {
+  border-color: var(--nd3420-green);
+  color: var(--nd3420-green);
+}
+
+.nd3420-presets,
+.nd3420-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.nd3420-card {
+  min-width: 0;
+  border: 1px solid var(--nd3420-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--nd3420-panel);
+}
+
+.nd3420-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.nd3420-card > header > b {
+  color: var(--nd3420-muted);
+  font-weight: 700;
+}
+
+/* Picture: drawn about as wide as the card; scales down only on narrow screens. */
+.nd3420-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.nd3420-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--nd3420-text);
+  text-anchor: middle;
+}
+
+.nd3420-svg .nd3420-row-label {
+  fill: var(--nd3420-muted);
+  text-anchor: end;
+}
+
+.nd3420-bar {
+  stroke: none;
+}
+
+.nd3420-bar.is-in {
+  fill: var(--nd3420-bar);
+}
+
+.nd3420-bar.is-out {
+  fill: var(--nd3420-out);
+}
+
+.nd3420-bar.is-i {
+  fill: var(--nd3420-cur);
+}
+
+/* The fill-up: hatched-looking translucent block with a dashed top edge. Its area is the cost. */
+.nd3420-fill {
+  fill: color-mix(in srgb, var(--nd3420-fill) 55%, transparent);
+  stroke: var(--nd3420-fill);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.nd3420-level {
+  stroke: var(--nd3420-level);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.nd3420-level.is-pending {
+  stroke-dasharray: 5 3;
+}
+
+.nd3420-level.is-popped {
+  opacity: 0.45;
+  stroke-dasharray: 2 3;
+}
+
+.nd3420-axis {
+  stroke: var(--nd3420-muted);
+  stroke-width: 1;
+}
+
+.nd3420-cell {
+  fill: var(--nd3420-soft);
+  stroke: var(--nd3420-border);
+  stroke-width: 1;
+}
+
+.nd3420-cell.is-out {
+  opacity: 0.55;
+}
+
+.nd3420-cell.is-in {
+  stroke: var(--nd3420-bar);
+}
+
+.nd3420-cell.is-i {
+  fill: var(--nd3420-cur);
+  stroke: var(--nd3420-cur);
+  opacity: 1;
+}
+
+.nd3420-cell.is-j {
+  stroke: var(--nd3420-j);
+  stroke-width: 2.5;
+}
+
+.nd3420-svg .nd3420-cell-value.is-i {
+  fill: var(--nd3420-on-bar);
+}
+
+.nd3420-window {
+  fill: color-mix(in srgb, var(--nd3420-cur) 45%, transparent);
+  stroke: none;
+}
+
+.nd3420-svg .nd3420-ij.is-i {
+  fill: var(--nd3420-cur);
+}
+
+.nd3420-svg .nd3420-ij.is-j {
+  fill: var(--nd3420-j);
+}
+
+.nd3420-chip {
+  fill: color-mix(in srgb, var(--nd3420-level) 20%, var(--nd3420-panel));
+  stroke: var(--nd3420-level);
+  stroke-width: 1.5;
+}
+
+.nd3420-chip.is-front {
+  fill: var(--nd3420-level);
+}
+
+.nd3420-svg .nd3420-chip-label.is-front {
+  fill: var(--nd3420-on-bar);
+}
+
+.nd3420-chip.is-back {
+  stroke: var(--nd3420-j);
+  stroke-width: 2.5;
+}
+
+.nd3420-chip.is-pending {
+  fill: var(--nd3420-panel);
+  stroke-dasharray: 4 3;
+}
+
+.nd3420-chip.is-popped,
+.nd3420-chip.is-empty {
+  opacity: 0.5;
+  stroke-dasharray: 2 3;
+}
+
+.nd3420-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--nd3420-muted);
+  font-size: 11px;
+}
+
+.nd3420-legend .lg-bar {
+  color: var(--nd3420-bar);
+}
+
+.nd3420-legend .lg-fill {
+  color: var(--nd3420-fill);
+}
+
+.nd3420-legend .lg-level {
+  color: var(--nd3420-level);
+}
+
+.nd3420-legend .lg-win {
+  color: var(--nd3420-cur);
+}
+
+/* Budget meter and counter */
+.nd3420-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.nd3420-meter {
+  flex: 1 1 220px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.nd3420-meter > b,
+.nd3420-count > b {
+  color: var(--nd3420-muted);
+  font-weight: 700;
+}
+
+.nd3420-track {
+  position: relative;
+  height: 14px;
+  border: 1px solid var(--nd3420-border);
+  border-radius: 7px;
+  background: var(--nd3420-soft);
+}
+
+.nd3420-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 6px;
+  background: var(--nd3420-green);
+}
+
+.nd3420-meter.is-over .nd3420-meter-fill {
+  background: repeating-linear-gradient(135deg, var(--nd3420-red) 0 6px, color-mix(in srgb, var(--nd3420-red) 60%, transparent) 6px 10px);
+}
+
+.nd3420-k-tick {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 0;
+  margin-left: -1px;
+  border-left: 3px solid var(--nd3420-amber);
+}
+
+.nd3420-k-tick.is-off-scale {
+  border-left-style: dotted;
+}
+
+.nd3420-meter-label {
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.nd3420-meter.is-ok .nd3420-meter-label {
+  color: var(--nd3420-green);
+}
+
+.nd3420-meter.is-over .nd3420-meter-label {
+  color: var(--nd3420-red);
+}
+
+.nd3420-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.nd3420-count strong {
+  font: 700 26px ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: var(--nd3420-text);
+}
+
+.nd3420-added {
+  border-radius: 999px;
+  padding: 0 8px;
+  background: color-mix(in srgb, var(--nd3420-green) 20%, transparent);
+  color: var(--nd3420-green);
+  font-weight: 700;
+}
+
+/* Current-line strip */
+.nd3420-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--nd3420-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--nd3420-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .nd3420-now {
+  background: var(--nd3420-line);
+}
+
+.nd3420-lineno {
+  color: var(--nd3420-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.nd3420-now .nd3420-effect {
+  color: var(--nd3420-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nd3420-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.nd3420-branch.is-ok {
+  background: color-mix(in srgb, var(--nd3420-green) 20%, transparent);
+  color: var(--nd3420-green);
+}
+
+.nd3420-branch.is-over {
+  background: color-mix(in srgb, var(--nd3420-red) 18%, transparent);
+  color: var(--nd3420-red);
+}
+
+.nd3420-branch.is-neutral {
+  background: color-mix(in srgb, var(--nd3420-level) 18%, transparent);
+  color: var(--nd3420-text);
+}
+
+/* 3420 step notes are a few words. */
+body:has(#treeView:not(.hidden) .nd3420-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 3420 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .nd3420-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Long lines (the 74-char signature) wrap inside the panel instead of being cut off at its right edge. */
+body:has(#treeView:not(.hidden) .nd3420-viz) #codePanel .code-line {
+  width: auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+body:has(#treeView:not(.hidden) .nd3420-viz) #codePanel .code-line .txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@container nd3420 (max-width: 420px) {
+  .nd3420-head h2 {
+    font-size: 18px;
+  }
+}
