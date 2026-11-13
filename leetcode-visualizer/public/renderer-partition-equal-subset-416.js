@@ -1,110 +1,426 @@
-function renderEqualSubset416DfsView(step) {
-  const v=step.equalSubset416DfsView;if(!v)return;
-  const t=(vi,en)=>lang==='vi'?vi:en, n=v.current, esc=escapeHtml;
-  const truth=value=>value===null||value===undefined?'…':value?'✓ True':'× False';
-  const chosen=new Set(v.partition?.a||n?.taken||[]);
-  const chip=(i,cls='')=>`<span class="pe416-input ${cls}" data-index="${i}"><small>[${i}]</small><b>${v.nums[i]}</b></span>`;
-  const inputs=v.nums.map((_,i)=>chip(i,`${chosen.has(i)?'witness':n&&i<n.i?'dfs-skipped':''} ${n?.i===i?'active':''}`)).join('');
-  const total=v.total===null?'?':v.total, target=v.target===null?'?':v.target;
-  const remain=n?.remain??v.target, sum=n&&v.target!==null?v.target-n.remain:0;
-  const meter=v.target===null||v.final?'':`<div class="pe416-dfs-meter"><header><span>${t('Đã chọn','Chosen')} <b>Σ ${sum}</b></span><span>remain <b data-dfs-remain="${remain}">${remain}</b></span></header><div role="img" aria-label="${sum} / ${v.target}"><i style="width:${Math.max(0,Math.min(100,100*sum/v.target))}%"></i></div><small>${v.target} − ${sum} = ${remain}</small></div>`;
-  let diagram='';
-  if(n){
-    const terminal=n.remain===0||n.remain<0||n.i===v.nums.length;
-    const box=(x,y,i,r,result,cls)=>`<g class="pe416-dfs-node ${cls}" transform="translate(${x},${y})"><rect width="130" height="65" rx="10"/><text class="pe416-dfs-call" x="65" y="24" text-anchor="middle">dfs(${i}, ${r})</text><text class="pe416-dfs-value ${result===true?'yes':result===false?'no':''}" x="65" y="48" text-anchor="middle">${truth(result)}</text></g>`;
-    const decision=!terminal?`<path class="pe416-dfs-edge ${v.event==='take'?'active':''}" d="M150 76L75 128"/><path class="pe416-dfs-edge skip ${v.event==='skip'?'active':''}" d="M150 76L225 128"/><text class="pe416-dfs-label take" x="58" y="94" text-anchor="middle">${t('Chọn','Take')} ${v.nums[n.i]}</text><text class="pe416-dfs-label take" x="40" y="113" text-anchor="middle">${n.remain} − ${v.nums[n.i]}</text><text class="pe416-dfs-label" x="247" y="94" text-anchor="middle">${t('Bỏ','Skip')} ${v.nums[n.i]}</text><text class="pe416-dfs-label" x="260" y="113" text-anchor="middle">${n.remain}</text>${box(5,130,n.i+1,n.remain-v.nums[n.i],n.take,v.event==='take'?'take active':'take')}${box(165,130,n.i+1,n.remain,n.skip,v.event==='skip'?'skip active':'skip')}`:'';
-    const verdict=terminal?`<div class="pe416-dfs-terminal ${n.remain===0?'yes':'no'}">${n.remain===0?'🎯 remain = 0':n.remain<0?'remain &lt; 0':`i = ${v.nums.length}`} <strong>→ ${truth(n.result)}</strong></div>`:'';
-    diagram=`<section class="pe416-dfs-branches" data-dfs-call="${n.id}" data-dfs-take="${n.take}" data-dfs-skip="${n.skip}"><svg viewBox="0 0 300 ${terminal?82:205}" role="img" aria-label="${esc(`dfs(${n.i}, ${n.remain}) · ${t('Chọn hoặc bỏ','Take or skip')}`)}">${box(85,8,n.i,n.remain,n.result,'current')}${decision}</svg>${verdict}${!terminal?`<div class="pe416-dfs-or"><span class="${n.take===true?'yes':''}">take: ${truth(n.take)}</span><b>or</b><span class="${n.skip===true?'yes':''}">skip: ${truth(n.skip)}</span>${n.result!==null?`<strong>→ ${truth(n.result)}</strong>`:''}</div>`:''}</section>`;
+"use strict";
+
+// LeetCode 416 — Partition Equal Subset Sum. Picture-first renderers for the three approaches:
+//   1. DP:     the dp row after every number, stacked as a grid (column = sum), with the two
+//              sources of dp[j] drawn as arrows: keep (straight down) and take (from j − num).
+//   2. Bitset: the bits as cells (bit 0 on the right), bits << num under them, and the OR result.
+//   3. DFS:    the current call path as a take (left, −num) / skip (right) tree, with sibling results.
+// The Python source is shown once, in the shared #codePanel (highlighted by script.js from step.codeLines);
+// locals are shown once, in the shared Variables panel (step.vars).
+
+// Preset inputs: [nums, Vietnamese label, English label]. The first preset is the default input.
+const PE416_CASES = Object.freeze([
+  ["3,1,5,9,4,2", "Ví dụ", "Example"],
+  ["1,5,11,5", "Ngắn", "Short"],
+  ["1,2,5", "Không chia được", "No split"],
+  ["1,2,3,5", "Tổng lẻ", "Odd total"],
+]);
+
+const PE416_COPY = Object.freeze({
+  vi: Object.freeze({
+    examples: "Ví dụ",
+    picture: ["Mỗi hàng = dp sau 1 số · cột = tổng", "bit = tổng (bit 0 bên phải)", "Đường gọi: trái = chọn, phải = bỏ"],
+    jumps: [["num", "Số kế →"], ["result", "Kết quả ↠"]],
+    dfsJumps: [["call", "Lời gọi kế →"], ["result", "Kết quả ↠"]],
+    legendDp: ["✓ tạo được", "↓ giữ dp[j]", "↘ thêm num", "tổng mới"],
+    legendBit: ["1 = tạo được", "← dịch num", "tổng mới"],
+    legendDfs: ["−num: chọn", "┄ bỏ", "✓ / × kết quả"],
+    groups: "2 nhóm",
+    chosen: "đã chọn",
+    noDp: "dp chưa tạo",
+    shortened: "trace rút gọn",
+  }),
+  en: Object.freeze({
+    examples: "Examples",
+    picture: ["Row = dp after a number · column = sum", "bit = sum (bit 0 on the right)", "Call path: left = take, right = skip"],
+    jumps: [["num", "Next number →"], ["result", "Result ↠"]],
+    dfsJumps: [["call", "Next call →"], ["result", "Result ↠"]],
+    legendDp: ["✓ reachable", "↓ keep dp[j]", "↘ add num", "new sum"],
+    legendBit: ["1 = reachable", "← shift by num", "new sum"],
+    legendDfs: ["−num: take", "┄ skip", "✓ / × result"],
+    groups: "2 groups",
+    chosen: "chosen",
+    noDp: "no dp yet",
+    shortened: "shortened trace",
+  }),
+});
+
+function pe416Escape(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function pe416Copy() {
+  return PE416_COPY[typeof lang !== "undefined" && lang === "vi" ? "vi" : "en"];
+}
+
+function pe416IsVi() {
+  return typeof lang !== "undefined" && lang === "vi";
+}
+
+function pe416Host() {
+  if (typeof $ === "function") return $("treeView");
+  return typeof document !== "undefined" && document.getElementById ? document.getElementById("treeView") : null;
+}
+
+function pe416Truth(value) {
+  return value === true ? "✓ True" : value === false ? "× False" : "?";
+}
+
+// ---------- Shared shell: header, presets, goal + numbers, picture card, groups, legend + jumps ----------
+
+function pe416Goal(total, target, odd) {
+  if (total === null || total === undefined) return "";
+  const right = odd
+    ? `<b class="pe416-goal-target is-odd">${pe416Escape(total)} % 2 = 1 ×</b>`
+    : `<b class="pe416-goal-target">${target === null || target === undefined ? "?" : pe416Escape(target)}</b>`;
+  return `<div class="pe416-goal" data-total="${pe416Escape(total)}"><span class="pe416-goal-total">Σ ${pe416Escape(total)}</span><i>÷ 2 =</i>${right}<small>🎯</small></div>`;
+}
+
+// Number chips. state(i) returns a class: is-active | is-done | is-taken | is-skipped | "".
+function pe416Numbers(nums, state, focus) {
+  const start = nums.length <= 14 ? 0 : Math.max(0, Math.min(nums.length - 14, (focus ?? 0) - 6));
+  const end = Math.min(nums.length, start + 14);
+  const chips = nums.slice(start, end).map((num, offset) => {
+    const index = start + offset;
+    return `<span class="pe416-num ${state(index)}" data-index="${index}"><b>${pe416Escape(num)}</b><small>${index}</small></span>`;
+  }).join("");
+  return `<div class="pe416-nums">${start ? `<small class="pe416-more">0…${start - 1}</small>` : ""}${chips}${end < nums.length ? `<small class="pe416-more">+${nums.length - end}</small>` : ""}</div>`;
+}
+
+function pe416Groups(nums, partition, copy) {
+  if (!partition) return "";
+  const group = (label, indices) => {
+    const sum = indices.reduce((total, index) => total + nums[index], 0);
+    const shown = indices.slice(0, 12).map((index) => `<span class="pe416-num" data-index="${index}"><b>${pe416Escape(nums[index])}</b></span>`).join("");
+    return `<div class="pe416-group" data-group="${label}"><header><b>${label}</b><strong>Σ ${sum}</strong></header><div>${shown}${indices.length > 12 ? `<small class="pe416-more">+${indices.length - 12}</small>` : ""}</div></div>`;
+  };
+  return `<section class="pe416-groups" aria-label="${pe416Escape(copy.groups)}">${group("A", partition.a)}<b class="pe416-equals">=</b>${group("B", partition.b)}</section>`;
+}
+
+function pe416Legend(items) {
+  return `<div class="pe416-legend" aria-hidden="true">${items.map((text, index) => `<span class="lg-${index}">${pe416Escape(text)}</span>`).join("")}</div>`;
+}
+
+function pe416Shell({ method, label, line, answer, final, body, presets = true, jumps, legend, groups = "", note = "" }) {
+  const copy = pe416Copy();
+  const vi = pe416IsVi();
+  const presetNav = presets ? `<nav class="pe416-presets" aria-label="${pe416Escape(copy.examples)}">${PE416_CASES.map((preset, index) => `<button type="button" data-pe416-case="${index}">${pe416Escape(vi ? preset[1] : preset[2])}</button>`).join("")}</nav>` : "";
+  const jumpNav = jumps.map(([kind, text]) => `<button type="button" data-pe416-jump="${kind}"${pe416Next(kind) < 0 ? " disabled" : ""}>${pe416Escape(text)}</button>`).join("");
+  const badge = `<b class="pe416-badge${answer === true ? " is-true" : answer === false ? " is-false" : ""}">${pe416Truth(final ? answer : null)}</b>`;
+  return `<section class="pe416-viz${final ? " is-final" : ""}" data-method="${method}" data-source-line="${line}" role="region" aria-label="LeetCode 416 · ${pe416Escape(label)} · line ${line}">`
+    + `<header class="pe416-head"><small>LEETCODE 416 · ${pe416Escape(label)}</small>${badge}</header>`
+    + presetNav
+    + body
+    + groups
+    + `<footer class="pe416-foot">${legend}${note ? `<small class="pe416-short">${pe416Escape(note)}</small>` : ""}<span class="pe416-jumps">${jumpNav}</span></footer>`
+    + `</section>`;
+}
+
+// ---------- Navigation (same contract as the other line-by-line renderers) ----------
+
+function pe416Next(kind) {
+  if (typeof steps === "undefined" || !Array.isArray(steps) || typeof stepIndex === "undefined") return -1;
+  return steps.findIndex((step, index) => {
+    if (index <= stepIndex || !step) return false;
+    if (kind === "result") return Boolean(step.final);
+    if (kind === "num") {
+      const event = step.equalSubset416View?.event || step.equalSubset416BitsetView?.phase;
+      return event === "choose-number" || event === "select";
+    }
+    if (kind === "call") return step.equalSubset416DfsView?.event === "zero-check";
+    return false;
+  });
+}
+
+function pe416Go(index) {
+  if (index < 0 || typeof steps === "undefined" || !steps[index]) return;
+  if (typeof stopPlay === "function") stopPlay();
+  stepIndex = index;
+  if (typeof renderStep === "function") renderStep();
+}
+
+function pe416Bind(host) {
+  if (!host || typeof host.querySelectorAll !== "function") return;
+  const bind = (selector, handler) => host.querySelectorAll(selector).forEach((element) => {
+    element.addEventListener("click", () => handler(element));
+  });
+  bind("[data-pe416-jump]", (element) => pe416Go(pe416Next(element.dataset.pe416Jump)));
+  bind("[data-pe416-case]", (element) => {
+    const preset = PE416_CASES[Number(element.dataset.pe416Case)];
+    const input = typeof document !== "undefined" ? document.getElementById("arrInput") : null;
+    if (!preset || !input) return;
+    input.value = preset[0];
+    if (typeof runViz === "function") runViz();
+  });
+}
+
+// Columns with "…" gaps where the sums list skips values (large targets are cropped by the builder).
+function pe416Columns(sums, pitch, start, reverse = false) {
+  const xs = [];
+  const gaps = [];
+  let x = start;
+  const order = reverse ? [...sums.keys()].reverse() : [...sums.keys()];
+  order.forEach((index, k) => {
+    if (k) {
+      const prev = sums[order[k - 1]];
+      if (Math.abs(sums[index] - prev) > 1) { gaps.push(x + 2); x += 18; }
+    }
+    xs[index] = x;
+    x += pitch;
+  });
+  return { xs, gaps, end: x };
+}
+
+const PE416_ARROWS = `<defs>${["keep", "take", "off", "shift", "edge"].map((name) => `<marker id="pe416-tip-${name}" class="pe416-tip-${name}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10Z"/></marker>`).join("")}</defs>`;
+
+// ---------- 1. DP grid ----------
+
+const PE416_CELL = 28;
+const PE416_PITCH = 34;
+const PE416_ROW = 52;
+const PE416_LABEL = 46;
+const PE416_HEAD = 24;
+
+function pe416DpPicture(view, copy) {
+  if (!view.rows || !view.rows.length) {
+    return `<div class="pe416-empty">${view.event === "odd-return" ? `<b class="is-false">${pe416Escape(view.total)} % 2 = 1</b> → False` : pe416Escape(copy.noDp)}</div>`;
   }
-  const stack=v.stack.length?`<section class="pe416-dfs-stack"><header>${t('Ngăn xếp','Call stack')} <small>${v.stack.length}</small></header>${v.stack.length>6?`<small>… ${v.stack.length-6}</small>`:''}${v.stack.slice(-6).map((frame,i,frames)=>`<div class="${i===frames.length-1?'current':''}" data-dfs-frame="${frame.id}"><span>${frame.branch==='take'?'↳ +':frame.branch==='skip'?'↳ −':'▶'}</span><code>dfs(${frame.i}, ${frame.remain})</code><small>${frame.branch?t(frame.branch==='take'?'chọn':'bỏ',frame.branch):''}</small></div>`).join('')}</section>`:'';
-  const group=(label,indices)=>`<div class="pe416-group"><header><b>${label}</b><strong>Σ = ${indices.reduce((s,i)=>s+v.nums[i],0)}</strong></header><div>${indices.map(i=>chip(i)).join('<i>+</i>')}</div></div>`;
-  const partition=v.partition?`<section class="pe416-partition"><svg class="pe416-balance" viewBox="0 0 300 38" role="img" aria-label="${v.target} = ${v.target}"><path d="M20 14H280M75 14V33M225 14V33M150 14V33M136 33H164"/><text x="150" y="10" text-anchor="middle">=</text></svg><div>${group('A',v.partition.a)}${group('B',v.partition.b)}</div></section>`:'';
-  const recent=v.recent.length?`<details class="pe416-dfs-recent"><summary>↩ ${t('Các lời gọi vừa trả về','Recent returns')}</summary><div>${v.recent.map(r=>`<code class="${r.result?'yes':'no'}">dfs(${r.i}, ${r.remain}) → ${truth(r.result)}</code>`).join('')}</div></details>`:'';
-  $('treeView').innerHTML=`<section class="pe416-viz pe416-dfs" data-method="3" aria-label="${t('DFS chọn hoặc bỏ từng số','Take or skip DFS visualization')}"><header class="pe416-heading"><small>#416 · DFS · ${t('Dòng','Line')} ${v.line}</small><strong class="${v.answer===true?'true':v.answer===false?'false':''}">${truth(v.answer)}</strong></header><div class="pe416-goal"><b>Σ ${total}</b><span>÷ 2 →</span><strong>${target}</strong><small>target</small></div><div class="pe416-inputs">${inputs}</div>${meter}${diagram}${stack}${partition}${v.event==='odd-return'?`<div class="pe416-reject">${v.total} ÷ 2 = ${v.total/2} × False</div>`:''}${recent}<footer><span>+ ${t('chọn','take')} · − ${t('bỏ','skip')}</span><span>${v.calls} ${t('lời gọi','calls')}</span><span>O(2ⁿ) · ${t('không memo','no memo')}</span>${v.shortened?`<b>${t('Trace rút gọn · đáp án tính đầy đủ','Shortened trace · full answer computed')}</b>`:''}</footer></section>`;
+  const { xs, gaps, end } = pe416Columns(view.sums, PE416_PITCH, PE416_LABEL);
+  const width = Math.max(end + 4, 220);
+  const top = PE416_HEAD + (view.rowsOmitted ? 14 : 0);
+  const rowY = (r) => top + r * PE416_ROW;
+  const height = rowY(view.rows.length - 1) + PE416_CELL + 8;
+  const parts = [];
+  const tr = view.transition;
+  const active = view.rows.findIndex((row) => row.active);
+  view.sums.forEach((sum, c) => {
+    const x = xs[c] + PE416_CELL / 2;
+    const cls = ["pe416-sum", sum === view.target ? "is-target" : "", tr && sum === tr.destination ? "is-j" : ""].filter(Boolean).join(" ");
+    parts.push(`<text class="${cls}" x="${x}" y="16">${sum}</text>`);
+  });
+  gaps.forEach((x) => parts.push(`<text class="pe416-sum is-gap" x="${x + 6}" y="16">…</text>`));
+  if (view.rowsOmitted) parts.push(`<text class="pe416-rowlabel is-more" x="${PE416_LABEL / 2 - 4}" y="${PE416_HEAD + 6}">⋮ ${view.rowsOmitted}</text>`);
+  view.rows.forEach((row, r) => {
+    const y = rowY(r);
+    const label = row.index === null ? "∅" : `+${row.num}`;
+    parts.push(`<text class="pe416-rowlabel${row.active ? " is-active" : ""}" x="${PE416_LABEL / 2 - 4}" y="${y + PE416_CELL / 2 + 5}">${pe416Escape(label)}</text>`);
+    const prev = r > 0 ? view.rows[r - 1] : null;
+    row.cells.forEach((on, c) => {
+      const sum = view.sums[c];
+      const isNew = row.index !== null && prev && on && !prev.cells[c];
+      const cls = ["pe416-cell", on ? "is-on" : "is-off", sum === view.target ? "is-target" : "", isNew ? "is-new" : "",
+        row.active && tr && sum === tr.destination ? "is-dest" : "", r === active - 1 && tr && sum === tr.source ? "is-src" : "",
+        r === active - 1 && tr && sum === tr.destination ? "is-keep" : ""].filter(Boolean).join(" ");
+      parts.push(`<g class="${cls}" data-row="${r}" data-sum="${sum}" data-on="${on}"><rect x="${xs[c]}" y="${y}" width="${PE416_CELL}" height="${PE416_CELL}" rx="6"/>${on ? `<text x="${xs[c] + PE416_CELL / 2}" y="${y + PE416_CELL / 2 + 5}">✓</text>` : ""}</g>`);
+    });
+  });
+  // dp[j] = dp[j] or dp[j - num]: keep arrow (straight down) and take arrow (from column j - num).
+  if (tr && active > 0) {
+    const c = view.sums.indexOf(tr.destination);
+    const s = view.sums.indexOf(tr.source);
+    const y0 = rowY(active - 1) + PE416_CELL + 2;
+    const y1 = rowY(active) - 3;
+    const preview = view.event === "inspect" ? " is-preview" : "";
+    if (c >= 0) {
+      const x = xs[c] + PE416_CELL / 2 + 6;
+      parts.push(`<path class="pe416-arrow is-keep${tr.before ? " is-on" : ""}${preview}" d="M${x},${y0}V${y1}" data-arrow="keep" marker-end="url(#pe416-tip-${tr.before ? "keep" : "off"})"/>`);
+    }
+    if (c >= 0 && s >= 0) {
+      const xa = xs[s] + PE416_CELL / 2;
+      const xb = xs[c] + PE416_CELL / 2 - 6;
+      parts.push(`<path class="pe416-arrow is-take${tr.from ? " is-on" : ""}${preview}" d="M${xa},${y0}L${xb},${y1}" data-arrow="take" marker-end="url(#pe416-tip-${tr.from ? "take" : "off"})"/>`);
+    }
+  }
+  return `<svg class="pe416-svg pe416-dp-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="dp">${PE416_ARROWS}${parts.join("")}</svg>`;
 }
 
 function renderEqualSubset416View(step) {
-  const view = step.equalSubset416View;
-  if (!view) return;
-  const host = $("treeView");
-  const t = (vi, en) => lang === 'vi' ? vi : en;
-  const tr = view.transition;
+  const view = step && step.equalSubset416View;
+  const host = pe416Host();
+  if (!view || !host) return;
+  const copy = pe416Copy();
   const item = view.itemIndex;
-  const width = Math.max(230, (host.clientWidth || 526) - 26);
-  const icon = value => value ? '✓' : '·';
-  const reached = view.current?.[view.sums.indexOf(view.target)] === true;
-  const witness = new Set(tr?.sourceWitness || []);
-  const chip = (index, cls = '') => `<span class="pe416-input ${cls}" data-index="${index}"><small>${index}</small><b>${view.nums[index]}</b></span>`;
-  const start = view.nums.length <= 12 ? 0 : Math.max(0, (item ?? 0) - 5);
-  const end = Math.min(view.nums.length, start + 12);
-  const inputs = `${start ? `<small class="pe416-more">0…${start - 1}</small>` : ''}${view.nums.slice(start, end).map((_, offset) => {
-    const index = start + offset;
-    return chip(index, `${index === item ? 'active' : witness.has(index) ? 'witness' : item !== null && index < item || view.event === 'return' ? 'processed' : ''}`);
-  }).join('')}${end < view.nums.length ? `<small class="pe416-more">+${view.nums.length - end}</small>` : ''}`;
-  let focus = '';
-  if (tr) {
-    const sourceX = width * .17;
-    const numX = width * .5;
-    const destX = width * .83;
-    const box = Math.min(85, width * .26);
-    const actual = view.event === 'inspect' ? tr.before : tr.after;
-    const node = (x, y, sum, state, cls) => `<g class="pe416-node ${cls} ${state ? 'yes' : 'no'}" transform="translate(${x - box / 2},${y})"><rect width="${box}" height="76" rx="9"/><text class="pe416-svg-small" x="${box / 2}" y="17" text-anchor="middle">Σ</text><text class="pe416-svg-number ${String(sum).length > 4 ? 'long' : ''}" x="${box / 2}" y="43" text-anchor="middle">${sum}</text><text class="pe416-svg-state" x="${box / 2}" y="65" text-anchor="middle">${icon(state)}</text></g>`;
-    focus = `<svg class="pe416-transfer" viewBox="0 0 ${width} 186" role="img" aria-label="${tr.source} + ${view.num} = ${tr.destination}; ${view.event}"><defs><marker id="pe416-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z"/></marker></defs>
-      <text class="pe416-svg-small" x="${destX}" y="13" text-anchor="middle">${t('Bỏ', 'Skip')} · ${icon(tr.before)}</text>
-      <path class="pe416-keep" d="M${destX},19 L${destX},75" marker-end="url(#pe416-arrow)"/>
-      ${node(sourceX, 79, tr.source, tr.from, 'source')}
-      <text class="pe416-svg-small" x="${numX}" y="90" text-anchor="middle">+ nums[${item}]</text>
-      <g class="pe416-number" transform="translate(${numX - 20},99)"><rect width="40" height="40" rx="8"/><text x="20" y="27" text-anchor="middle">${view.num}</text></g>
-      <path class="pe416-take ${tr.from ? '' : 'blocked'} ${view.event === 'inspect' ? 'preview' : ''}" d="M${sourceX + box / 2 + 2},119 L${numX - 24},119 M${numX + 24},119 L${destX - box / 2 - 4},119" marker-end="url(#pe416-arrow)"/>
-      ${node(destX, 79, tr.destination, actual, 'destination')}
-      <text class="pe416-svg-small" x="${destX}" y="176" text-anchor="middle">${view.event === 'inspect' ? t('Thử', 'Try') : t('Cập nhật', 'Update')}</text>
-    </svg>`;
-    if (tr.from) focus += `<div class="pe416-witness">${tr.sourceWitness.length ? tr.sourceWitness.slice(0, 8).map(index => chip(index, 'witness')).join('<i>+</i>') : '<i>∅</i>'}${tr.sourceWitness.length > 8 ? `<small>+${tr.sourceWitness.length - 8}</small>` : ''}<i>+</i>${chip(item, 'active')}<i>→</i><b>Σ ${tr.destination}</b></div>`;
-  } else if (view.event === 'skip-large') {
-    focus = `<div class="pe416-reject"><b>${view.num}</b><span>&gt;</span><b>${view.target}</b><span>×</span></div>`;
+  const witness = new Set(view.transition?.sourceWitness || []);
+  const numbers = pe416Numbers(view.nums, (index) => (index === item ? "is-active"
+    : view.partition && view.partition.a.includes(index) ? "is-taken"
+      : witness.has(index) ? "is-taken"
+        : item !== null && index < item || view.event === "return" ? "is-done" : ""), item);
+  const body = `<div class="pe416-top">${pe416Goal(view.total, view.target, view.event === "odd-return")}${numbers}</div>`
+    + `<section class="pe416-card" aria-label="${pe416Escape(copy.picture[0])}"><header><b>${pe416Escape(copy.picture[0])}</b></header>${pe416DpPicture(view, copy)}</section>`;
+  host.innerHTML = pe416Shell({
+    method: 1, label: "DP", line: view.line, answer: view.answer, final: Boolean(view.final || step.final), body,
+    jumps: copy.jumps, legend: pe416Legend(copy.legendDp), groups: pe416Groups(view.nums, view.partition, copy),
+    note: view.shortened ? copy.shortened : "",
+  });
+  pe416Bind(host);
+}
+
+// ---------- 2. Bitset rows (bit 0 on the right, as in binary) ----------
+
+function pe416BitPicture(view) {
+  if (!view.ready) {
+    return `<div class="pe416-empty">${view.phase === "odd-return" ? `<b class="is-false">${pe416Escape(view.total)} % 2 = 1</b> → False` : "bits = ?"}</div>`;
   }
-  const row = (values, before) => `<section class="pe416-row"><header>${before ? t('Trước', 'Before') : t('Hiện tại', 'Now')} ${!before && item !== null ? '← j' : ''}</header><div class="pe416-cells">${view.sums.map((sum, index) => `${index && sum > view.sums[index - 1] + 1 ? '<small class="pe416-more">…</small>' : ''}<article class="pe416-cell ${values[index] ? 'yes' : 'no'} ${sum === view.target ? 'goal' : ''} ${before && tr?.source === sum ? 'source' : ''} ${!before && tr?.destination === sum ? 'destination' : ''} ${!before && !view.before[index] && values[index] ? 'new' : ''}" data-row="${before ? 'before' : 'now'}" data-sum="${sum}" data-reachable="${values[index]}"><small>${sum}</small><b>${icon(values[index])}</b></article>`).join('')}</div></section>`;
-  const table = view.current ? `${item !== null ? row(view.before, true) : ''}${row(view.current, false)}` : '';
-  const group = (label, indices) => {
-    const sum = indices.reduce((total, index) => total + view.nums[index], 0);
-    const shown = indices.slice(0, 8);
-    const rest = indices.slice(8);
-    return `<div class="pe416-group"><header><b>${label}</b><strong>Σ = ${sum}</strong></header><div>${shown.map(index => chip(index)).join('<i>+</i>')}</div>${rest.length ? `<details><summary>+${rest.length}</summary><div>${rest.map(index => chip(index)).join('')}</div></details>` : ''}</div>`;
-  };
-  const partition = view.partition ? `<section class="pe416-partition"><svg class="pe416-balance" viewBox="0 0 300 38" role="img" aria-label="${view.target} = ${view.target}"><path d="M20 14H280M75 14V33M225 14V33M150 14V33M136 33H164"/><text x="150" y="10" text-anchor="middle">=</text></svg><div>${group('A', view.partition.a)}${group('B', view.partition.b)}</div></section>` : '';
-  const goal = view.total === null ? '' : `<div class="pe416-goal"><b>Σ ${view.total}</b><span>÷ 2 →</span><strong>${view.target ?? (view.answer === false ? `${view.total / 2} ×` : '?')}</strong><small>target</small></div>`;
-  const direction = item !== null && !view.partition ? `<details class="pe416-direction"><summary>← ${t('Mỗi số 1 lần', 'Use each number once')}</summary><svg viewBox="0 0 300 112" role="img" aria-label="${t('Duyệt ngược: không dùng cùng số hai lần', 'Reverse traversal prevents reusing an occurrence')}"><g class="wrong"><text x="10" y="25">→</text><text x="50" y="25">0</text><path d="M70 20H105M137 20H173"/><text x="111" y="25">2</text><text x="180" y="25">4</text><text x="225" y="25">2 × 2 ✕</text></g><g class="correct"><text x="10" y="80">←</text><text x="50" y="80">4 ✕</text><path d="M94 74H140"/><text x="151" y="80">2 ✓</text><text x="225" y="80">2 × 1 ✓</text></g></svg></details>` : '';
-  host.innerHTML = `<section class="pe416-viz" data-method="1" aria-label="${t('Mô phỏng chia hai nhóm tổng bằng nhau', 'Equal subset partition simulation')}"><header class="pe416-heading"><small>#416 · 0/1 DP</small><strong class="${view.answer === false ? 'false' : reached ? 'true' : ''}">${view.answer === false ? '× False' : view.answer === true ? '✓ True' : '?'}</strong></header>${goal}<div class="pe416-inputs">${inputs}</div>${focus}${partition}${view.partition ? `<details class="pe416-full-dp"><summary>dp</summary>${table}</details>` : table}${view.answer === false && view.target !== null ? `<div class="pe416-reject">Σ ${view.target} <b>×</b></div>` : ''}${direction}<footer><span>✓ ${t('tạo được', 'reachable')}</span><span>· ${t('chưa tạo được', 'unreachable')}</span>${view.cropped ? '<span>…</span>' : ''}${view.shortened ? `<span>${t('Trace rút gọn', 'Shortened trace')}</span>` : ''}</footer></section>`;
-  host._equalSubset416Step = step;
-  host._equalSubset416Width = host.clientWidth;
-  if (typeof ResizeObserver !== 'undefined' && !host._equalSubset416Observer) {
-    host._equalSubset416Observer = new ResizeObserver(() => {
-      if (host.querySelector('.pe416-viz[data-method="1"]') && host.clientWidth !== host._equalSubset416Width) renderEqualSubset416View(host._equalSubset416Step);
+  const { xs, gaps, end } = pe416Columns(view.sums, PE416_PITCH, PE416_LABEL, true);
+  const width = Math.max(end + 4, 220);
+  const shift = view.phase === "shift-or";
+  const rows = shift
+    ? [["before", "bits", view.before], ["shifted", `<<${view.num}`, view.shifted], ["after", "|=", view.after]]
+    : [["after", "bits", view.after]];
+  const rowY = (r) => PE416_HEAD + r * PE416_ROW;
+  const height = rowY(rows.length - 1) + PE416_CELL + 8;
+  const parts = [];
+  view.sums.forEach((sum, c) => parts.push(`<text class="pe416-sum${sum === view.target ? " is-target" : ""}" x="${xs[c] + PE416_CELL / 2}" y="16">${sum}</text>`));
+  gaps.forEach((x) => parts.push(`<text class="pe416-sum is-gap" x="${x + 6}" y="16">…</text>`));
+  rows.forEach(([name, label, bits], r) => {
+    const y = rowY(r);
+    parts.push(`<text class="pe416-rowlabel${name === "shifted" ? " is-shift" : ""}" x="${PE416_LABEL / 2 - 4}" y="${y + PE416_CELL / 2 + 5}">${pe416Escape(label)}</text>`);
+    bits.forEach((bit, c) => {
+      const sum = view.sums[c];
+      const isNew = shift && name === "after" && bit === 1 && view.before[c] === 0;
+      const cls = ["pe416-cell", bit ? "is-on" : "is-off", sum === view.target ? "is-target" : "", isNew ? "is-new" : "", name === "shifted" && bit ? "is-shifted" : ""].filter(Boolean).join(" ");
+      parts.push(`<g class="${cls}" data-row="${name}" data-sum="${sum}" data-bit="${bit}"><rect x="${xs[c]}" y="${y}" width="${PE416_CELL}" height="${PE416_CELL}" rx="6"/><text x="${xs[c] + PE416_CELL / 2}" y="${y + PE416_CELL / 2 + 5}">${bit}</text></g>`);
     });
-    host._equalSubset416Observer.observe(host);
+  });
+  // One arrow shows the shift: bit 0 (always on) moves num places left to bit num.
+  if (shift) {
+    const from = view.sums.indexOf(0);
+    const to = view.sums.indexOf(view.num);
+    if (from >= 0 && to >= 0) {
+      const xa = xs[from] + PE416_CELL / 2;
+      const xb = xs[to] + PE416_CELL / 2;
+      parts.push(`<path class="pe416-arrow is-shift" d="M${xa},${rowY(0) + PE416_CELL + 2}L${xb},${rowY(1) - 3}" data-arrow="shift" marker-end="url(#pe416-tip-shift)"/>`);
+    }
   }
+  return `<svg class="pe416-svg pe416-bit-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="bits">${PE416_ARROWS}${parts.join("")}</svg>`;
 }
 
 function renderEqualSubset416BitsetView(step) {
-  const view = step.equalSubset416BitsetView;
-  if (!view) return;
-  const host = $("treeView");
-  const t = (vi, en) => lang === "vi" ? vi : en;
-  const icon = value => value ? "1" : "0";
-  const start = view.nums.length <= 12 ? 0 : Math.max(0, (view.activeIndex ?? 0) - 5);
-  const end = Math.min(view.nums.length, start + 12);
-  const inputs = `${start ? `<small class="pe416-more">0…${start - 1}</small>` : ""}${view.nums.slice(start, end).map((num, offset) => {
-    const index = start + offset;
-    const cls = index === view.activeIndex ? "active" : index < (view.activeIndex ?? -1) || view.final ? "processed" : "";
-    return `<span class="pe416-input ${cls}" data-index="${index}"><small>${index}</small><b>${num}</b></span>`;
-  }).join("")}${end < view.nums.length ? `<small class="pe416-more">+${view.nums.length - end}</small>` : ""}`;
-  const row = (name, label, values, count, extra = "") => `<section class="pe416-bit-row"><header>${label}<small>${count}</small></header><div>${view.sums.map((sum, index) => `${index && sum > view.sums[index - 1] + 1 ? '<small class="pe416-more">…</small>' : ""}<article class="${values[index] ? "on" : "off"} ${sum === view.target ? "goal" : ""} ${extra && view.before[index] === 0 && view.after[index] === 1 ? "new" : ""}" data-row="${name}" data-sum="${sum}" data-bit="${values[index]}"><small>${sum}</small><b>${icon(values[index])}</b></article>`).join("")}</div></section>`;
-  const rows = view.target === null ? "" : `${view.phase === "shift-or" ? row("before", t("Trước", "Before"), view.before, view.beforeCount) : ""}${view.phase === "shift-or" ? row("shifted", `<< ${view.num}`, view.shifted, "") : ""}${row("after", view.phase === "shift-or" ? "OR" : t("Bitset hiện tại", "Current bitset"), view.after, view.afterCount, "new")}`;
-  const result = view.final
-    ? `<strong class="pe416-bit-answer ${view.answer ? "true" : "false"}">${view.answer ? "✓ True" : "× False"}</strong>`
-    : "<strong>?</strong>";
-  const status = view.target === null
-    ? `<div class="pe416-bit-odd">${t("Tổng lẻ", "Odd total")} · ${view.total} <b>×</b></div>`
-    : `<div class="pe416-bit-goal"><span>Σ ${view.total}</span><span>÷ 2 →</span><strong>${view.target}</strong><small>${t("bit cần bật", "target bit")}</small></div>`;
-  host.innerHTML = `<section class="pe416-viz pe416-bitset" data-method="2" aria-label="${t("Mô phỏng bitset cho bài 416", "416 bitset visualization")}"><header class="pe416-heading"><small>#416 · BITSET</small>${result}</header>${status}<div class="pe416-inputs">${inputs}</div><div class="pe416-bit-explain"><b>${t("Mỗi ô = một tổng", "Each cell = one sum")}</b><span>${view.phase === "shift-or" ? `${t("Dịch trái", "Shift left")} ${view.num} → OR · +${view.addedCount} ${t("tổng mới", "new sums")}` : t("1: tạo được · 0: chưa tạo được", "1: reachable · 0: unreachable")}</span></div>${rows}<footer><span>${t("Dịch bitset cũ: mỗi tổng s bật thêm s + num.", "Shift the old bitset: each sum s also sets s + num.")}</span><span>${t("Dùng bản cũ để không tái sử dụng cùng số.", "Shift the old snapshot to avoid reusing a number.")}</span></footer></section>`;
+  const view = step && step.equalSubset416BitsetView;
+  const host = pe416Host();
+  if (!view || !host) return;
+  const copy = pe416Copy();
+  const numbers = pe416Numbers(view.nums, (index) => (index === view.activeIndex ? "is-active"
+    : index < (view.activeIndex ?? -1) || view.final ? "is-done" : ""), view.activeIndex);
+  const body = `<div class="pe416-top">${pe416Goal(view.total, view.target, view.phase === "odd-return")}${numbers}</div>`
+    + `<section class="pe416-card" aria-label="${pe416Escape(copy.picture[1])}"><header><b>${pe416Escape(copy.picture[1])}</b></header>${pe416BitPicture(view)}</section>`;
+  host.innerHTML = pe416Shell({
+    method: 2, label: "BITSET", line: view.line, answer: view.answer, final: Boolean(view.final), body,
+    jumps: copy.jumps, legend: pe416Legend(copy.legendBit),
+  });
+  pe416Bind(host);
+}
+
+// ---------- 3. DFS call path ----------
+
+const PE416_R = 17;
+const PE416_STUB = 12;
+const PE416_SPREAD = 46;
+const PE416_LEVEL = 62;
+
+// Lays out the call stack as a path: take goes down-left, skip down-right. Each frame also shows its
+// other branch as a small stub (✓/× once returned, ? while pending).
+function pe416DfsLayout(view) {
+  const stack = view.stack || [];
+  const nodes = [];
+  const stubs = [];
+  const edges = [];
+  let x = 0;
+  const frames = stack.length ? stack : view.final && view.root ? [view.root] : [];
+  frames.forEach((frame, d) => {
+    if (d > 0) x += frame.branch === "take" ? -PE416_SPREAD : PE416_SPREAD;
+    nodes.push({ frame, x, d, top: d === frames.length - 1 });
+  });
+  nodes.forEach((node, k) => {
+    const next = nodes[k + 1];
+    const v = view.nums[node.frame.i];
+    const child = (branch, result, pending) => ({ branch, result, pending, x: node.x + (branch === "take" ? -PE416_SPREAD : PE416_SPREAD), d: node.d + 1, parent: node, v });
+    if (next) {
+      edges.push({ from: node, to: next, branch: next.frame.branch, v, onPath: true });
+      if (next.frame.branch === "skip") stubs.push(child("take", node.frame.take, false));
+      else stubs.push(child("skip", null, true));
+    } else if (!view.final && ["take", "skip", "combine"].includes(view.event)) {
+      stubs.push(child("take", node.frame.take, node.frame.take === null));
+      stubs.push(child("skip", node.frame.skip, node.frame.skip === null));
+    }
+  });
+  stubs.forEach((stub) => edges.push({ from: stub.parent, to: stub, branch: stub.branch, v: stub.v, onPath: false, active: stub.pending && stub.parent.top && view.event === stub.branch }));
+  return { nodes, stubs, edges };
+}
+
+function pe416DfsPicture(view) {
+  const { nodes, stubs, edges } = pe416DfsLayout(view);
+  if (!nodes.length) {
+    if (view.event === "odd-return") return `<div class="pe416-empty"><b class="is-false">${pe416Escape(view.total)} % 2 = 1</b> → False</div>`;
+    return `<div class="pe416-empty">${view.target === null ? "dfs(i, remain)" : `dfs(0, ${pe416Escape(view.target)})`}</div>`;
+  }
+  const xsAll = [...nodes.map((n) => n.x), ...stubs.map((s) => s.x)];
+  const depth = Math.max(...nodes.map((n) => n.d), ...stubs.map((s) => s.d));
+  const gutter = 34;
+  const minX = Math.min(...xsAll) - PE416_R - 26 - gutter;
+  const maxX = Math.max(...xsAll) + PE416_R + 26;
+  const X = (x) => x - minX;
+  const Y = (d) => 24 + d * PE416_LEVEL;
+  const width = Math.max(maxX - minX, 200);
+  const height = Y(depth) + PE416_R + 10;
+  const parts = [];
+  for (let d = 0; d <= depth; d++) parts.push(`<text class="pe416-level" x="${gutter / 2}" y="${Y(d) + 4}">i=${d}</text>`);
+  edges.forEach((edge) => {
+    const r1 = PE416_R;
+    const r2 = edge.onPath ? PE416_R : PE416_STUB;
+    const x1 = X(edge.from.x);
+    const y1 = Y(edge.from.d) + r1;
+    const x2 = X(edge.to.x);
+    const y2 = Y(edge.to.d) - r2 - 2;
+    const cls = ["pe416-edge", `is-${edge.branch}`, edge.onPath ? "is-path" : "is-stub", edge.active ? "is-active" : ""].filter(Boolean).join(" ");
+    parts.push(`<path class="${cls}" d="M${x1},${y1}L${x2},${y2}" data-arrow="${edge.branch}" marker-end="url(#pe416-tip-edge)"/>`);
+    if (edge.branch === "take") {
+      // Right-aligned just above-left of the midpoint: the down-left edge runs right of this point above it.
+      const mx = (x1 + x2) / 2 - 8;
+      const my = (y1 + y2) / 2 - 2;
+      parts.push(`<text class="pe416-edge-label" x="${mx}" y="${my}" text-anchor="end">−${pe416Escape(edge.v)}</text>`);
+    }
+  });
+  stubs.forEach((stub) => {
+    const cls = ["pe416-stub", stub.pending ? "is-pending" : stub.result ? "is-true" : "is-false"].join(" ");
+    parts.push(`<g class="${cls}" data-stub="${stub.branch}" data-result="${stub.pending ? "" : stub.result}"><circle cx="${X(stub.x)}" cy="${Y(stub.d)}" r="${PE416_STUB}"/><text x="${X(stub.x)}" y="${Y(stub.d) + 4}">${stub.pending ? "?" : stub.result ? "✓" : "×"}</text></g>`);
+  });
+  nodes.forEach((node) => {
+    const f = node.frame;
+    const state = f.result === true ? "is-true" : f.result === false ? "is-false" : f.remain === 0 ? "is-true" : f.remain < 0 ? "is-false" : "";
+    const cls = ["pe416-call", node.top ? "is-current" : "", state].filter(Boolean).join(" ");
+    const badge = f.result === null || f.result === undefined ? "" : `<text class="pe416-call-result ${f.result ? "is-true" : "is-false"}" x="${X(node.x) + PE416_R + 9}" y="${Y(node.d) + 5}">${f.result ? "✓" : "×"}</text>`;
+    parts.push(`<g class="${cls}" data-call="${f.id}" data-i="${f.i}" data-remain="${f.remain}"><circle cx="${X(node.x)}" cy="${Y(node.d)}" r="${PE416_R}"/><text x="${X(node.x)}" y="${Y(node.d) + 5}">${pe416Escape(f.remain)}</text>${badge}</g>`);
+  });
+  return `<svg class="pe416-svg pe416-dfs-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="dfs">${PE416_ARROWS}${parts.join("")}</svg>`;
+}
+
+function renderEqualSubset416DfsView(step) {
+  const view = step && step.equalSubset416DfsView;
+  const host = pe416Host();
+  if (!view || !host) return;
+  const copy = pe416Copy();
+  const n = view.current;
+  const chosen = new Set(view.partition?.a || n?.taken || []);
+  const numbers = pe416Numbers(view.nums, (index) => (n && n.i === index && !view.final ? "is-active"
+    : chosen.has(index) ? "is-taken" : n && index < n.i ? "is-skipped" : ""), n?.i);
+  let meter = "";
+  if (view.target !== null && n && !view.final) {
+    const sum = view.target - n.remain;
+    const pct = Math.max(0, Math.min(100, (100 * sum) / view.target));
+    meter = `<div class="pe416-meter${sum > view.target ? " is-over" : sum === view.target ? " is-full" : ""}" data-remain="${n.remain}"><span>Σ ${copy.chosen}</span><div><i style="width:${pct}%"></i></div><b>${sum} / ${view.target}</b></div>`;
+  }
+  const body = `<div class="pe416-top">${pe416Goal(view.total, view.target, view.event === "odd-return")}${numbers}${meter}</div>`
+    + `<section class="pe416-card" aria-label="${pe416Escape(copy.picture[2])}" data-dfs-call="${n ? n.id : ""}" data-dfs-take="${n ? n.take : ""}" data-dfs-skip="${n ? n.skip : ""}"><header><b>${pe416Escape(copy.picture[2])}</b><small>${view.calls} dfs()</small></header>${pe416DfsPicture(view)}</section>`;
+  host.innerHTML = pe416Shell({
+    method: 3, label: "DFS", line: view.line, answer: view.answer, final: Boolean(view.final), body,
+    jumps: copy.dfsJumps, legend: pe416Legend(copy.legendDfs), groups: pe416Groups(view.nums, view.partition, copy),
+    note: view.shortened ? copy.shortened : "",
+  });
+  pe416Bind(host);
 }

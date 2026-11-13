@@ -1,7 +1,13 @@
 "use strict";
 
+// LeetCode 416 — Partition Equal Subset Sum. Line-by-line builders for the DP and bitset approaches
+// (the DFS approach lives in partition-equal-subset-416-dfs.js). Each step is one executed Python line;
+// public/renderer-partition-equal-subset-416.js draws the picture, the shared #codePanel shows the source.
 const { bi, parseIntegerArray } = require("./hard-viz-shared");
 const MAX_TRACE_STEPS = 450;
+// Rows of the dp history picture: the last completed rows plus the row being updated.
+const MAX_GRID_ROWS = 7;
+const DEFAULT_INPUT = Object.freeze([3, 1, 5, 9, 4, 2]);
 const SOURCE = Object.freeze([
   "class Solution:",
   "    def canPartition(self, nums):",
@@ -27,9 +33,20 @@ const BITSET_SOURCE = Object.freeze([
   "        return ((bits >> target) & 1) == 1",
 ]);
 
+const py = (value) => (value ? "True" : "False");
+
 function parseNums(input) {
   return parseIntegerArray(input, { problemId: 416, name: "nums", maxLength: 200, minValue: 1, maxValue: 100 });
 }
+
+// Shared opening lines (class, def, total, odd check). Notes stay a few words; the picture carries the rest.
+const OPENING = Object.freeze({
+  class: bi("Định nghĩa lớp.", "Class defined."),
+  call: (n) => bi(`${n} số.`, `${n} numbers.`),
+  total: bi("Cộng tất cả số.", "Add up every number."),
+  odd: bi("Tổng lẻ → False.", "Odd total → False."),
+  even: bi("Tổng chẵn → tiếp.", "Even total → go on."),
+});
 
 function buildSteps(input) {
   const nums = parseNums(input);
@@ -46,6 +63,9 @@ function buildSteps(input) {
   let shortened = false;
   let reachableCount = 0;
   const history = [];
+  // Completed dp snapshots (∅ row, then one per processed number); only the last rows are kept.
+  const completed = [];
+  let completedCount = 0;
   let newSums = [];
   let newCount = 0;
   function witness(sum) {
@@ -68,11 +88,21 @@ function buildSteps(input) {
     }
     return [...sums].sort((a, b) => a - b);
   }
+  function gridRows(sums) {
+    if (dp === null) return { rows: [], omitted: 0 };
+    const live = completed.length === 0 || itemIndex !== null;
+    const keep = MAX_GRID_ROWS - (live ? 1 : 0);
+    const shown = completed.slice(-keep);
+    const rows = shown.map((row) => ({ index: row.index, num: row.num, cells: sums.map((sum) => row.dp[sum]), active: false }));
+    if (live) rows.push({ index: itemIndex, num: itemIndex === null ? null : nums[itemIndex], cells: sums.map((sum) => dp[sum]), active: true });
+    return { rows, omitted: completedCount - shown.length };
+  }
   function emit(line, event, title, note, final = false) {
     if (!final && steps.length >= MAX_TRACE_STEPS) { shortened = true; return; }
     const sums = displaySums();
     const chosen = answer === true ? witness(target) : null;
     const chosenSet = new Set(chosen || []);
+    const grid = gridRows(sums);
     steps.push({
       arr: [], codeLines: [line], final,
       title: bi(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`), note,
@@ -83,31 +113,40 @@ function buildSteps(input) {
         sums, cropped: dp !== null && sums.length < dp.length,
         before: dp === null ? null : sums.map(sum => (rowBefore || dp)[sum]),
         current: dp === null ? null : sums.map(sum => dp[sum]),
+        rows: grid.rows, rowsOmitted: grid.omitted,
         reachableCount, transition: transition ? { ...transition, sourceWitness: [...transition.sourceWitness], existingWitness: [...transition.existingWitness] } : null,
         newlyReached: [...newSums], newlyReachedCount: newCount,
         history: history.slice(-6).map(row => ({ ...row, added: [...row.added] })),
         historyOmitted: Math.max(0, history.length - 6), shortened,
-        answer, partition: chosen ? { a: [...chosen], b: nums.map((_, index) => index).filter(index => !chosenSet.has(index)) } : null,
+        answer, final, partition: chosen ? { a: [...chosen], b: nums.map((_, index) => index).filter(index => !chosenSet.has(index)) } : null,
       },
     });
   }
+  function complete(index) {
+    completed.push({ index, num: index === null ? null : nums[index], dp: [...dp] });
+    if (completed.length > MAX_GRID_ROWS) completed.shift();
+    completedCount++;
+  }
+  emit(1, "class", bi("class Solution", "class Solution"), OPENING.class);
+  emit(2, "call", bi("canPartition(nums)", "canPartition(nums)"), OPENING.call(nums.length));
   total = nums.reduce((sum, num) => sum + num, 0);
   locals.total = total;
-  emit(3, "total", bi(`Tổng tất cả số = ${total}`, `Sum of all numbers = ${total}`), bi("Hai nhóm bằng nhau phải có tổng bằng một nửa tổng mảng.", "Both groups must sum to half the array's total."));
+  emit(3, "total", bi(`total = ${total}`, `total = ${total}`), OPENING.total);
   const odd = total % 2 !== 0;
   if (odd) answer = false;
-  emit(4, odd ? "odd-return" : "even-check", bi(odd ? "Tổng lẻ → không chia được" : "Tổng chẵn → tiếp tục", odd ? "Odd total → cannot partition" : "Even total → continue"), bi(odd ? `${total} ÷ 2 không nguyên, nên trả về False ngay.` : "Chỉ cần tìm một nhóm tổng total / 2; nhóm còn lại tự có cùng tổng.", odd ? `${total} ÷ 2 is not an integer, so return False immediately.` : "Find one group totaling total / 2; the rest will automatically have the same sum."), odd);
+  emit(4, odd ? "odd-return" : "even-check", bi(`${total} % 2 = ${total % 2}`, `${total} % 2 = ${total % 2}`), odd ? OPENING.odd : OPENING.even, odd);
   if (odd) return { original: [...nums], answer: false, steps };
   target = total / 2;
   locals.target = target;
-  emit(5, "target", bi(`Mỗi nhóm cần tổng ${target}`, `Each group needs sum ${target}`), bi(`Tìm một tập con tổng ${target}, không cần thử cách chia cả hai nhóm cùng lúc.`, `Find a subset summing to ${target}; there is no need to search both groups simultaneously.`));
+  emit(5, "target", bi(`target = ${target}`, `target = ${target}`), bi("Tìm 1 nhóm tổng = nửa.", "Find one half-sum group."));
   dp = Array(target + 1).fill(false);
   parents = Array(target + 1).fill(null);
   locals.dp = dp;
-  emit(6, "init-dp", bi("dp[s] = có tạo được tổng s không?", "dp[s] = can we make sum s?"), bi("Mỗi ô là một tổng, không phải một phần tử nums. Ban đầu các ô đều False.", "Each cell represents a sum, not an element of nums. Initially all cells are False."));
+  emit(6, "init-dp", bi(`dp = [False] × ${target + 1}`, `dp = [False] × ${target + 1}`), bi("dp[s]: tạo được tổng s?", "dp[s]: can we make s?"));
   dp[0] = true;
   reachableCount = 1;
-  emit(7, "zero", bi("Tổng 0 tạo được bằng nhóm rỗng", "Sum 0 is reachable with the empty group"), bi("Chưa chọn số nào: chỉ tổng 0 có thể tạo được.", "Before choosing any number, only sum 0 is reachable."));
+  emit(7, "zero", bi("dp[0] = True", "dp[0] = True"), bi("Nhóm rỗng → tổng 0.", "Empty group → sum 0."));
+  complete(null);
   nums.forEach((num, index) => {
     itemIndex = index;
     locals.num = num;
@@ -115,10 +154,11 @@ function buildSteps(input) {
     transition = null;
     newSums = [];
     newCount = 0;
-    emit(8, "choose-number", bi(`Xét nums[${index}] = ${num}`, `Process nums[${index}] = ${num}`), bi(`Giữ hàng Trước để thấy các tổng tạo được bằng ${index} số trước đó. Số hiện tại chỉ dùng tối đa một lần.`, `The Before row shows sums reachable using the previous ${index} numbers. Use this occurrence at most once.`));
+    emit(8, "choose-number", bi(`num = ${num}`, `num = ${num}`), bi(`Hàng mới cho ${num}.`, `New row for ${num}.`));
     if (num > target) {
       history.push({ item: index, num, added: [], addedCount: 0, reachableCount });
-      emit(9, "skip-large", bi(`${num} > ${target}: không có ô để cập nhật`, `${num} > ${target}: no cells to update`), bi("range này rỗng. Bỏ qua số quá lớn; không thể dùng số dương này để tạo target.", "This range is empty. Skip this positive value because it exceeds the target."));
+      emit(9, "skip-large", bi(`range(${target}, ${num - 1}, -1) rỗng`, `range(${target}, ${num - 1}, -1) is empty`), bi(`${num} > ${target}: bỏ qua.`, `${num} > ${target}: skip.`));
+      complete(index);
       return;
     }
     for (let j = target; j >= num; j--) {
@@ -128,7 +168,7 @@ function buildSteps(input) {
       const recording = steps.length < MAX_TRACE_STEPS;
       if (recording) {
         transition = { destination: j, source: j - num, before, from: source, after: before || source, sourceWitness: witness(j - num) || [], existingWitness: witness(j) || [], changed: !before && source };
-        emit(9, "inspect", bi(`Thử tổng ${j}: cần tổng ${j - num} + ${num}`, `Try sum ${j}: need ${j - num} + ${num}`), bi("Nguồn j−num ở bên trái, chưa được cập nhật bằng số hiện tại. Nó vẫn thuộc hàng Trước.", "Source j−num is to the left and has not been updated with this occurrence. It still belongs to the Before row."));
+        emit(9, "inspect", bi(`j = ${j}`, `j = ${j}`), bi(`Xét ${j} = ${j - num} + ${num}.`, `Try ${j} = ${j - num} + ${num}.`));
       } else shortened = true;
       dp[j] = before || source;
       if (!before && source) {
@@ -138,8 +178,15 @@ function buildSteps(input) {
         if (newSums.length < 16) newSums.push(j);
       }
       if (j === num) history.push({ item: index, num, added: [...newSums].sort((a, b) => a - b), addedCount: newCount, reachableCount });
-      if (recording) emit(10, "update", bi(`dp[${j}] = ${before ? "True" : "False"} or ${source ? "True" : "False"} → ${dp[j] ? "True" : "False"}`, `dp[${j}] = ${before ? "True" : "False"} or ${source ? "True" : "False"} → ${dp[j] ? "True" : "False"}`), bi(before ? "Đã tạo được tổng này trước đó: có thể không chọn số hiện tại." : source ? `Tạo được tổng mới ${j}: lấy nhóm tổng ${j - num}, thêm đúng số ở vị trí ${index}.` : `Chưa tạo được tổng ${j - num}, nên thêm ${num} vẫn chưa tạo được ${j}.`, before ? "This sum was already reachable: we may skip the current number." : source ? `New sum ${j}: take a group totaling ${j - num} and add the occurrence at index ${index}.` : `Sum ${j - num} is unreachable, so adding ${num} cannot make ${j}.`));
+      if (recording) {
+        const title = `dp[${j}] = ${py(before)} or ${py(source)} → ${py(dp[j])}`;
+        const note = before ? bi("Đã có sẵn → giữ.", "Already reachable → keep.")
+          : source ? bi(`Tổng mới ${j}!`, `New sum ${j}!`)
+            : bi(`Chưa có ${j - num} → bỏ.`, `${j - num} unreachable → no.`);
+        emit(10, "update", bi(title, title), note);
+      }
     }
+    complete(index);
   });
   answer = dp[target];
   itemIndex = null;
@@ -147,8 +194,14 @@ function buildSteps(input) {
   rowBefore = null;
   newSums = [];
   newCount = 0;
-  emit(11, "return", bi(answer ? "Có thể chia thành hai nhóm bằng nhau" : "Không tạo được tổng target", answer ? "Two equal-sum groups exist" : "Target sum is unreachable"), bi(`dp[${target}] = ${answer ? "True" : "False"}.`, `dp[${target}] = ${answer ? "True" : "False"}.`), true);
+  emit(11, "return", bi(`return dp[${target}] → ${py(answer)}`, `return dp[${target}] → ${py(answer)}`), answer ? bi("Chia được 2 nhóm!", "Two equal groups!") : bi("Không tạo được target.", "Target unreachable."), true);
   return { original: [...nums], answer, steps };
+}
+
+// Python's bin(), shortened for the Variables panel when the integer is long.
+function binary(bits) {
+  const text = bits.toString(2);
+  return text.length <= 40 ? `0b${text}` : `0b…${text.slice(-32)} (${text.length} bits)`;
 }
 
 function buildBitsetSteps(input) {
@@ -158,11 +211,14 @@ function buildBitsetSteps(input) {
   const odd = total % 2 !== 0;
   const target = odd ? null : total / 2;
   let bits = 1n;
+  let ready = false;
+  let known = { total: false, target: false };
   let answer = odd ? false : null;
   let activeIndex = null;
+  let currentNum;
 
   function shownSums(num = null) {
-    if (target === null) return [];
+    if (target === null || !known.target) return [];
     const sums = new Set();
     const addRange = (center, radius) => {
       if (!Number.isFinite(center)) return;
@@ -192,15 +248,18 @@ function buildBitsetSteps(input) {
       title: bi(`Dòng ${line}: ${title.vi}`, `Line ${line}: ${title.en}`),
       note,
       vars: [
-        { name: "total", value: total },
-        ...(target === null ? [] : [{ name: "target", value: target }]),
-        ...(opts.num === undefined ? [] : [{ name: "num", value: opts.num }]),
+        ...(known.total ? [{ name: "total", value: total }] : []),
+        ...(known.target ? [{ name: "target", value: target }] : []),
+        ...(ready ? [{ name: "bits", value: binary(bits) }] : []),
+        ...(currentNum === undefined ? [] : [{ name: "num", value: currentNum }]),
       ],
       equalSubset416BitsetView: {
+        line,
         nums: [...nums],
-        total,
-        target,
+        total: known.total ? total : null,
+        target: known.target ? target : null,
         odd,
+        ready,
         activeIndex,
         num: opts.num ?? null,
         sums,
@@ -217,58 +276,37 @@ function buildBitsetSteps(input) {
     });
   }
 
-  snapshot(3, "total", bi(`Tổng các số = ${total}`, `Sum of numbers = ${total}`), bi(
-    "Mỗi bit biểu diễn một tổng có thể tạo được.",
-    "Each set bit represents a sum we can make.",
-  ));
+  snapshot(1, "class", bi("class Solution", "class Solution"), OPENING.class);
+  snapshot(2, "call", bi("canPartition(nums)", "canPartition(nums)"), OPENING.call(nums.length));
+  known.total = true;
+  snapshot(3, "total", bi(`total = ${total}`, `total = ${total}`), OPENING.total);
   if (odd) {
     answer = false;
-    snapshot(4, "odd-return", bi("Tổng lẻ → không thể chia đôi", "Odd total → cannot split equally"), bi(
-      `${total} là số lẻ nên trả về False.`,
-      `${total} is odd, so return False.`,
-    ), { final: true });
+    snapshot(4, "odd-return", bi(`${total} % 2 = 1 → return False`, `${total} % 2 = 1 → return False`), OPENING.odd, { final: true });
     return { original: [...nums], answer, steps };
   }
-
-  snapshot(5, "target", bi(`Mỗi nhóm cần tổng ${target}`, `Each group needs sum ${target}`), bi(
-    "Chỉ cần xem bit target có bật sau khi xử lý mọi số hay không.",
-    "We only need to check whether the target bit is set after all numbers.",
-  ));
-  snapshot(6, "init-bitset", bi("Bit 0 bật: tổng 0 tạo được", "Bit 0 on: sum 0 is reachable"), bi(
-    "bits = 1 chỉ bật bit thấp nhất, tương ứng với nhóm rỗng.",
-    "bits = 1 sets only the lowest bit, representing the empty subset.",
-  ));
+  snapshot(4, "even-check", bi(`${total} % 2 = 0`, `${total} % 2 = 0`), OPENING.even);
+  known.target = true;
+  snapshot(5, "target", bi(`target = ${target}`, `target = ${target}`), bi("Cần bật bit target.", "Need the target bit on."));
+  ready = true;
+  snapshot(6, "init-bitset", bi("bits = 1", "bits = 1"), bi("Bit 0 bật: tổng 0.", "Bit 0 on: sum 0."));
 
   nums.forEach((num, index) => {
     activeIndex = index;
+    currentNum = num;
     const before = bits;
-    snapshot(7, "select", bi(
-      `Xét nums[${index}] = ${num}`,
-      `Process nums[${index}] = ${num}`,
-    ), bi(
-      "Bitset trước khi dùng số hiện tại.",
-      "Bitset before processing the current number.",
-    ), { num, before, after: before });
+    snapshot(7, "select", bi(`num = ${num}`, `num = ${num}`), bi("Số tiếp theo.", "Next number."), { num, before, after: before });
     const shifted = before << BigInt(num);
     bits = before | shifted;
-    snapshot(8, "shift-or", bi(
-      `Số ${num}: dịch bit sang trái ${num} rồi OR`,
-      `Number ${num}: shift left ${num}, then OR`,
-    ), bi(
-      `Mỗi bit cũ tạo thêm một tổng mới lớn hơn ${num}. OR giữ các tổng cũ hoặc mới; dùng snapshot cũ nên mỗi số chỉ dùng một lần.`,
-      `Each old set bit creates a sum ${num} larger. OR keeps old and new sums; shifting the old snapshot means each number is used once.`,
-    ), { num, before, shifted, after: bits });
+    const added = (bits & ~before).toString(2).replace(/0/g, "").length;
+    snapshot(8, "shift-or", bi(`bits |= bits << ${num}`, `bits |= bits << ${num}`), bi(`Dịch ${num}, OR: +${added} tổng.`, `Shift ${num}, OR: +${added} sums.`), { num, before, shifted, after: bits });
   });
 
   answer = ((bits >> BigInt(target)) & 1n) === 1n;
   activeIndex = null;
-  snapshot(9, "return", bi(
-    answer ? `Bit ${target} bật → có thể chia` : `Bit ${target} tắt → không thể chia`,
-    answer ? `Bit ${target} is on → partition exists` : `Bit ${target} is off → no partition`,
-  ), bi(
-    `Đọc bit ${target}: ${answer ? "1" : "0"}.`,
-    `Read bit ${target}: ${answer ? "1" : "0"}.`,
-  ), { final: true });
+  snapshot(9, "return", bi(`bit ${target} → ${py(answer)}`, `bit ${target} → ${py(answer)}`), answer
+    ? bi(`Bit ${target} bật → True.`, `Bit ${target} on → True.`)
+    : bi(`Bit ${target} tắt → False.`, `Bit ${target} off → False.`), { final: true });
   return { original: [...nums], answer, steps };
 }
 
@@ -280,7 +318,7 @@ module.exports = {
     title: bi("Chia mảng thành hai nhóm tổng bằng nhau", "Partition Equal Subset Sum"),
     titleVi: bi("Tìm một nhóm có tổng bằng một nửa", "Find one group totaling half the sum"),
     statement: bi("Cho mảng số nguyên dương nums. Có thể chia tất cả phần tử thành hai nhóm, mỗi phần tử dùng đúng một lần, sao cho hai nhóm có tổng bằng nhau không?", "Given positive integers nums, can all occurrences be divided into two groups with equal sums, using each occurrence exactly once?"),
-    defaultInput: [1, 5, 11, 5], inputKind: "positive",
+    defaultInput: [...DEFAULT_INPUT], inputKind: "positive",
     inputLabel: bi("nums (1–200 phần tử, giá trị 1–100)", "nums (1–200 values, each 1–100)"),
     extraParams: [{
       key: "approach", label: bi("Cách giải", "Approach"), type: "select", default: 1,

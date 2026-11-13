@@ -1,0 +1,481 @@
+{
+ "approaches": {
+  "m1-default-dark": {
+   "steps": 122,
+   "lines": "1,2,3,4,5,6,7,8,9,10,11",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 25,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-short-dark": {
+   "steps": 64,
+   "lines": "1,2,3,4,5,6,7,8,9,10,11",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 25,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-no-dark": {
+   "steps": 26,
+   "lines": "1,2,3,4,5,6,7,8,9,10,11",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-odd-dark": {
+   "steps": 4,
+   "lines": "1,2,3,4",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 20,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-default-light": {
+   "steps": 122,
+   "lines": "1,2,3,4,5,6,7,8,9,10,11",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 25,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-short-light": {
+   "steps": 64,
+   "lines": "1,2,3,4,5,6,7,8,9,10,11",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 25,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-no-light": {
+   "steps": 26,
+   "lines": "1,2,3,4,5,6,7,8,9,10,11",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m1-odd-light": {
+   "steps": 4,
+   "lines": "1,2,3,4",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 20,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-default-dark": {
+   "steps": 19,
+   "lines": "1,2,3,4,5,6,7,8,9",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 23,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-short-dark": {
+   "steps": 15,
+   "lines": "1,2,3,4,5,6,7,8,9",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 23,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-no-dark": {
+   "steps": 13,
+   "lines": "1,2,3,4,5,6,7,8,9",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 23,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-odd-dark": {
+   "steps": 4,
+   "lines": "1,2,3,4",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 20,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-default-light": {
+   "steps": 19,
+   "lines": "1,2,3,4,5,6,7,8,9",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 23,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-short-light": {
+   "steps": 15,
+   "lines": "1,2,3,4,5,6,7,8,9",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 23,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-no-light": {
+   "steps": 13,
+   "lines": "1,2,3,4,5,6,7,8,9",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 23,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m2-odd-light": {
+   "steps": 4,
+   "lines": "1,2,3,4",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 20,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-default-dark": {
+   "steps": 335,
+   "lines": "1,2,3,5,8,10,12,13,16,17,20,23,25,27",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0.05555555555555555,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-short-dark": {
+   "steps": 97,
+   "lines": "1,2,3,5,8,10,12,13,16,17,20,23,25,27",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0.05555555555555555,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-no-dark": {
+   "steps": 67,
+   "lines": "1,2,3,5,8,10,12,16,17,20,23,25,27",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0.05555555555555555,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-odd-dark": {
+   "steps": 5,
+   "lines": "1,2,3,5,6",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 20,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-default-light": {
+   "steps": 335,
+   "lines": "1,2,3,5,8,10,12,13,16,17,20,23,25,27",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0.05555555555555555,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-short-light": {
+   "steps": 97,
+   "lines": "1,2,3,5,8,10,12,13,16,17,20,23,25,27",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0.05555555555555555,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-no-light": {
+   "steps": 67,
+   "lines": "1,2,3,5,8,10,12,16,17,20,23,25,27",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0.05555555555555555,
+   "notFit": 0,
+   "maxNote": 24,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  },
+  "m3-odd-light": {
+   "steps": 5,
+   "lines": "1,2,3,5,6",
+   "mismatches": [],
+   "overlaps": 0,
+   "clipped": 0,
+   "labelOnArrow": 0,
+   "maxArrowShare": 0,
+   "notFit": 0,
+   "maxNote": 20,
+   "inViewSource": 0,
+   "codeScroll": 0,
+   "noteVisible": true
+  }
+ },
+ "code-m1-dark": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 254,
+  "clientH": 254,
+  "vScroll": false,
+  "visibleLines": 11,
+  "clipped": 0
+ },
+ "colors-m1-dark": {
+  "bg": "rgb(15, 26, 37)",
+  "text": "rgb(234, 243, 251)",
+  "card": "rgb(21, 36, 52)"
+ },
+ "code-m1-light": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 254,
+  "clientH": 254,
+  "vScroll": false,
+  "visibleLines": 11,
+  "clipped": 0
+ },
+ "colors-m1-light": {
+  "bg": "rgb(244, 247, 251)",
+  "text": "rgb(23, 40, 58)",
+  "card": "rgb(255, 255, 255)"
+ },
+ "code-m2-dark": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 218,
+  "clientH": 218,
+  "vScroll": false,
+  "visibleLines": 9,
+  "clipped": 0
+ },
+ "colors-m2-dark": {
+  "bg": "rgb(15, 26, 37)",
+  "text": "rgb(234, 243, 251)",
+  "card": "rgb(21, 36, 52)"
+ },
+ "code-m2-light": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 218,
+  "clientH": 218,
+  "vScroll": false,
+  "visibleLines": 9,
+  "clipped": 0
+ },
+ "colors-m2-light": {
+  "bg": "rgb(244, 247, 251)",
+  "text": "rgb(23, 40, 58)",
+  "card": "rgb(255, 255, 255)"
+ },
+ "code-m3-dark": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 539,
+  "clientH": 539,
+  "vScroll": false,
+  "visibleLines": 27,
+  "clipped": 0
+ },
+ "colors-m3-dark": {
+  "bg": "rgb(15, 26, 37)",
+  "text": "rgb(234, 243, 251)",
+  "card": "rgb(21, 36, 52)"
+ },
+ "code-m3-light": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 539,
+  "clientH": 539,
+  "vScroll": false,
+  "visibleLines": 27,
+  "clipped": 0
+ },
+ "colors-m3-light": {
+  "bg": "rgb(244, 247, 251)",
+  "text": "rgb(23, 40, 58)",
+  "card": "rgb(255, 255, 255)"
+ },
+ "others": {
+  "146": {
+   "steps": 116,
+   "pe416": false,
+   "maxHeight": "420px",
+   "errors": 0
+  },
+  "410": {
+   "steps": 134,
+   "pe416": false,
+   "maxHeight": "420px",
+   "errors": 0
+  },
+  "426": {
+   "steps": 94,
+   "pe416": false,
+   "maxHeight": "none",
+   "errors": 0
+  },
+  "432": {
+   "steps": 320,
+   "pe416": false,
+   "maxHeight": "none",
+   "errors": 0
+  },
+  "514": {
+   "steps": 64,
+   "pe416": false,
+   "maxHeight": "420px",
+   "errors": 0
+  },
+  "698": {
+   "steps": 16,
+   "pe416": false,
+   "maxHeight": "420px",
+   "errors": 0
+  },
+  "707": {
+   "steps": 70,
+   "pe416": false,
+   "maxHeight": "420px",
+   "errors": 0
+  },
+  "1416": {
+   "steps": 48,
+   "pe416": false,
+   "maxHeight": "420px",
+   "errors": 0
+  },
+  "2416": {
+   "steps": 110,
+   "pe416": false,
+   "maxHeight": "580px",
+   "errors": 0
+  }
+ },
+ "errors": []
+}
