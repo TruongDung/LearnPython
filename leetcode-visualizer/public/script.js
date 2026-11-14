@@ -150,6 +150,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.finishing3668View), surface: "treeView", render: (step) => { renderFinishing3668Pictures(step); } },
     { predicate: (step) => Boolean(step.absolute3667View), surface: "treeView", render: (step) => { renderAbsolute3667Pictures(step); } },
     { predicate: (step) => Boolean(step.floodBatchView), surface: "treeView", render: (step) => { renderFloodBatchPictures(step); } },
+    { predicate: (step) => Boolean(step.commonFree9031View), surface: "treeView", render: (step) => { renderCommonFree9031Pictures(step); } },
+    { predicate: (step) => Boolean(step.minPositive3364View), surface: "treeView", render: (step) => { renderMinPositive3364Pictures(step); } },
+    { predicate: (step) => Boolean(step.charWindow3View), surface: "treeView", render: (step) => { renderCharWindow3Pictures(step); } },
     { predicate: (step) => Boolean(step.visited2876View), surface: "treeView", render: (step) => { renderCountVisited2876Pictures(step); } },
     { predicate: (step) => Boolean(step.distanceCycle2204View), surface: "treeView", render: (step) => { renderDistanceCycle2204Pictures(step); } },
     { predicate: (step) => Boolean(step.coins2603View), surface: "treeView", render: (step) => { renderCoins2603Pictures(step); } },
@@ -1319,7 +1322,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderLongestCycle2360Pictures(step);
     } },
     { predicate: (step) => Boolean(step.countPaths1976View), surface: "treeView", render: (step) => {
-      renderCountPaths1976View(step);
+      renderShortestWays1976Pictures(step);
     } },
     { predicate: (step) => Boolean(step.substitutions3481View), surface: "treeView", render: (step) => {
       renderTopologyLessonPictures(step);
@@ -1744,6 +1747,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.sumQueriesView), surface: "treeView", render: (step) => {
       renderSumQueriesView(step);
     } },
+    { predicate: (step) => step.segmentTreeView?.variant === "range-sum-2d-308", surface: "treeView", render: (step) => {
+      renderMatrixRegions308Pictures(step);
+    } },
     { predicate: (step) => Boolean(step.segmentTreeView), surface: "treeView", render: (step) => {
       renderSegmentTreeView(step);
     } },
@@ -1784,7 +1790,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderMaximumProduct628View(step);
     } },
     { predicate: (step) => Boolean(step.substringConcatView), surface: "treeView", render: (step) => {
-      renderSubstringConcatView(step);
+      renderWordBlocks30Pictures(step);
     } },
     { predicate: (step) => Boolean(step.sequenceTraceView), surface: "treeView", render: (step) => {
       renderSequenceTraceView(step);

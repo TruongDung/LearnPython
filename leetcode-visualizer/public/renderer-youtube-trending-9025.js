@@ -405,8 +405,8 @@ function renderYouTubeTrending9025View(step) {
   const legend = `<div class="yt9025-legend" aria-hidden="true">${copy.legend[state.approach].map(([cls, text]) => `<span class="lg-${cls}">${yt9025Escape(text)}</span>`).join("")}</div>`;
   const picture = copy.picture[state.approach];
 
-  host.innerHTML = `<article class="yt9025-viz${state.final ? " is-final" : ""}" data-problem-id="9025" data-approach="${state.approach}" data-source-line="${state.line}" role="region" aria-label="9025 YouTube Trending · ${vi ? "dòng" : "line"} ${state.line}">`
-    + `<header class="yt9025-head"><div><small>INTERVIEW 9025 · YOUTUBE TRENDING · TOP K</small><h2><code>${yt9025Escape(heading)}</code></h2></div><span class="yt9025-status">${yt9025Escape(status)}</span></header>`
+  host.innerHTML = `<article class="yt9025-viz${state.final ? " is-final" : ""}" data-problem-id="9025" data-approach="${state.approach}" data-source-line="${state.line}" role="region" aria-label="9025 Videos — Top K · ${vi ? "dòng" : "line"} ${state.line}">`
+    + `<header class="yt9025-head"><div><small>INTERVIEW 9025 · VIDEOS — TOP K</small><h2><code>${yt9025Escape(heading)}</code></h2></div><span class="yt9025-status">${yt9025Escape(status)}</span></header>`
     + `<nav class="yt9025-presets" aria-label="${yt9025Escape(copy.examples)}">${presets}</nav>`
     + `<section class="yt9025-card yt9025-call-card">${yt9025Calls(state, copy)}</section>`
     + `<section class="yt9025-card yt9025-picture-card" aria-label="${yt9025Escape(picture)}"><header><b>${yt9025Escape(picture)}</b></header>${yt9025Picture(state, copy)}${legend}</section>`

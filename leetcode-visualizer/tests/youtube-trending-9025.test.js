@@ -416,8 +416,8 @@ test('9025 aria-labels follow the page language', () => {
     const line = steps[last].codeLines[0];
     assert.ok(vi.render(steps[last], steps, last).includes('role="img" aria-label="Kết quả: 3, 2"'), `vi ${approach}`);
     assert.ok(en.render(steps[last], steps, last).includes('role="img" aria-label="Result: 3, 2"'), `en ${approach}`);
-    assert.ok(vi.render(steps[last], steps, last).includes(`aria-label="9025 YouTube Trending · dòng ${line}"`));
-    assert.ok(en.render(steps[last], steps, last).includes(`aria-label="9025 YouTube Trending · line ${line}"`));
+    assert.ok(vi.render(steps[last], steps, last).includes(`aria-label="9025 Videos — Top K · dòng ${line}"`));
+    assert.ok(en.render(steps[last], steps, last).includes(`aria-label="9025 Videos — Top K · line ${line}"`));
     assert.ok(vi.render(steps[0], steps, 0).includes('aria-label="Lượt gọi"'));
     assert.ok(en.render(steps[0], steps, 0).includes('aria-label="Calls"'));
   }
@@ -468,7 +468,7 @@ test('9025 rejects inputs outside the visualizer limits', () => {
 test('9025 assets are wired with light/dark tokens and no code-panel height cap', () => {
   const index = readFrontendIndex();
   assert.match(index, /youtube-trending-9025\.css\?v=youtube-trending-9025-v2" data-problem-ids="9025"/);
-  assert.match(index, /renderer-youtube-trending-9025\.js\?v=youtube-trending-9025-v1" data-problem-ids="9025"/);
+  assert.match(index, /renderer-youtube-trending-9025\.js\?v=youtube-trending-9025-v2" data-problem-ids="9025"/);
   assert.match(readFrontendJavaScript(), /step\.yt9025View\), surface: "treeView", render: \(step\) => \{\s*renderYouTubeTrending9025View\(step\)/);
   assert.match(CSS, /\.yt9025-viz \{[^}]*--yt9025-bg:/s);
   assert.match(CSS, /\[data-theme="light"\] \.yt9025-viz \{[^}]*--yt9025-bg:/s);

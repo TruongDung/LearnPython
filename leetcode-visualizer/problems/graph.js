@@ -20670,11 +20670,9 @@ module.exports = {
       { key: "n", label: { vi: "n (số giao lộ)", en: "n (intersections)" }, default: 7, min: 1, max: 30 },
     ],
     approach: [
-      { vi: "Xây adjacency list hai chiều vì mỗi road là vô hướng.", en: "Build a bidirectional adjacency list because every road is undirected." },
-      { vi: "Chạy Dijkstra từ node 0. dist[x] lưu thời gian nhỏ nhất; ways[x] lưu số đường đạt đúng dist[x].", en: "Run Dijkstra from node 0. dist[x] stores the shortest time; ways[x] counts routes attaining exactly dist[x]." },
-      { vi: "Nếu new_time < dist[v], tìm được mốc ngắn hơn: thay dist[v] và gán ways[v] = ways[u].", en: "If new_time < dist[v], a shorter time was found: replace dist[v] and set ways[v] = ways[u]." },
-      { vi: "Nếu new_time == dist[v], tìm thêm các đường cùng ngắn nhất: ways[v] = (ways[v] + ways[u]) % MOD; không push heap vì dist không đổi.", en: "If new_time == dist[v], more equally short routes were found: ways[v] = (ways[v] + ways[u]) % MOD; do not push because dist is unchanged." },
-      { vi: "Bỏ qua heap entry khi time > dist[u]. Sau khi heap rỗng, trả ways[n-1].", en: "Skip a heap entry when time > dist[u]. After the heap empties, return ways[n-1]." },
+      { vi: "⏱ Dijkstra tìm giờ đến sớm nhất; ways đếm số đường đạt đúng giờ đó.", en: "⏱ Dijkstra finds the earliest arrival; ways counts routes attaining it." },
+      { vi: "< Nhanh hơn: thay số cách. = Bằng giờ: cộng số cách. > Chậm hơn: bỏ qua.", en: "< Earlier: replace the count. = Same time: add counts. > Later: skip." },
+      { vi: "Trả ways[n−1], modulo 10⁹+7.", en: "Return ways[n−1], modulo 10⁹+7." },
     ],
     complexity: {
       time: "O((V + E) log V)",

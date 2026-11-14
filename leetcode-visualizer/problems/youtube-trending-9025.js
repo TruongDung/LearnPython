@@ -631,7 +631,7 @@ module.exports = {
       { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
       { key: "top-k", vi: "Top K", en: "Top K" },
     ],
-    title: { vi: "YouTube Trending Videos — Top K", en: "YouTube Trending Videos — Top K" },
+    title: { vi: "Videos — Top K", en: "Videos — Top K" },
     titleVi: bi9025("Top K video sau mỗi lượt tương tác", "Top K videos after each interaction"),
     statement: bi9025(
       "Thiết kế lớp YT giữ Top K video. records(video_id) cộng 1 điểm cho video đó rồi trả về k id điểm cao nhất, cao trước. Hòa điểm: so tuple (score, id) nên id lớn hơn (so chuỗi) đứng trước. Ví dụ: k = 2, điểm {1: 3, 2: 3, 3: 4}, records(\"1\") → [\"3\", \"1\"] (tập {1, 3}). Điểm đầu trong ô nhập là các lượt records() đã gọi trước (khởi động). Visualization: k 1–5, ≤ 8 video, điểm đầu 1–9, ≤ 8 lượt gọi, id 1–3 chữ/số.",

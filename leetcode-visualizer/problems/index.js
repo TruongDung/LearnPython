@@ -113,6 +113,8 @@ Object.assign(categories.array, {396: require('./numerical-lessons')[396]});
 Object.assign(categories.bitmask, {1521: require('./numerical-lessons')[1521]});
 Object.assign(categories.design, require('./sparse-vector-pictures-1570'));
 Object.assign(categories.interview, require('./nearby-merchants-9009'));
+Object.assign(categories.interview, require('./common-free-days-9031'));
+Object.assign(categories.sliding, require('./minimum-positive-sum-3364'));
 Object.assign(categories['binary-tree'], require('./tree-dfs-pictures'));
 
 // Dedicated 1284 lesson supersedes the shared grid preview.
