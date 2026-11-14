@@ -42,8 +42,10 @@ function buildSteps304(input, params) {
   const col2 = Math.max(firstCol, secondCol);
   const prefix = Array.from({ length: rows + 1 }, () => Array(cols + 1).fill(0));
   const steps = [];
+  const ready = [];
 
   const view = ({ matrixCell = null, prefixCell = null, region = null, terms = [], status = [] } = {}) => ({
+    problemId: 304, query: { row1, col1, row2, col2 }, ready: [...ready],
     matrix: matrix.map((row) => [...row]),
     prefix: prefix.map((row) => [...row]),
     matrixCell,
@@ -76,6 +78,7 @@ function buildSteps304(input, params) {
       const left = prefix[row][col - 1];
       const overlap = prefix[row - 1][col - 1];
       prefix[row][col] = value + up + left - overlap;
+      ready.push(`${row},${col}`);
       steps.push({
         title: { vi: `prefix[${row}][${col}] = ${prefix[row][col]}`, en: `prefix[${row}][${col}] = ${prefix[row][col]}` },
         codeLines: [7],

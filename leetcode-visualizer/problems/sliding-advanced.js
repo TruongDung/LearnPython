@@ -716,17 +716,26 @@ function buildStepsFixedMatch(input, params, config) {
   const text = String(input ?? "");
   const pattern = String(params?.[config.patternKey] ?? config.defaultPattern);
   if (!pattern) throw new Error(`${config.patternKey} must not be empty`);
+  const patternChars = [...pattern], patternSize = patternChars.length;
   const chars = [...text]; const need = new Map(); const window = new Map(); const steps = [];
   for (const ch of pattern) need.set(ch, (need.get(ch) || 0) + 1);
   let left = 0; const matches = [];
   const equal = () => need.size === window.size && [...need].every(([ch, count]) => window.get(ch) === count);
   const snap = (title, line, right = -1, note, extra = {}) => {
     const windowIndices = range(left, right);
+    const picture = {
+      id: 567, kind: 'match', items: [...chars], pattern: [...patternChars], need: Object.fromEntries(need),
+      count: Object.fromEntries(window), left, right, k: patternSize, answer: matches.length > 0,
+      answers: [...matches], line, phase: line <= 4 ? 'setup' : line === 5 ? 'visit' : line === 6 ? 'add' : line === 8 ? 'remove' : line === 9 ? 'shrink' : line === 11 ? 'found' : line === 12 ? 'result' : 'check',
+      pending: line === 5 ? right : null, removed: line === 8 ? left : line === 9 ? left - 1 : null,
+      final: Boolean(extra.final || line === 11),
+    };
     steps.push(makeStep(chars, {
       title, line, highlight: windowIndices, mark: extra.mark || [], final: extra.final, note,
       vars: [{ name: config.patternKey, value: JSON.stringify(pattern) }, { name: "need", value: mapText(need) }, { name: "windowFreq", value: mapText(window) }, { name: "left", value: left }, { name: "right", value: right >= 0 ? right : "-" }, { name: config.resultName, value: config.existsOnly ? (matches.length ? "True" : "False") : `[${matches.join(", ")}]` }, ...(extra.vars || [])],
-      slidingFreqView: { nums: chars, label: config.textLabel, left, right, window: windowIndices, best: extra.mark || [], freq: Object.fromEntries(window), k: pattern.length, mode: "frequency", activeValue: extra.activeValue, overLimit: false, ans: config.existsOnly ? (matches.length ? 1 : 0) : matches.length, done: extra.final },
+      slidingFreqView: { nums: chars, label: config.textLabel, left, right, window: windowIndices, best: extra.mark || [], freq: Object.fromEntries(window), k: patternSize, mode: "frequency", activeValue: extra.activeValue, overLimit: false, ans: config.existsOnly ? (matches.length ? 1 : 0) : matches.length, done: extra.final },
     }));
+    steps[steps.length - 1].windowStudyView = picture;
   };
   snap({ vi: `need = Counter(${config.patternKey})`, en: `need = Counter(${config.patternKey})` }, 3, -1, { vi: `Mẫu ${JSON.stringify(pattern)} yêu cầu đúng frequency: ${mapText(need)}.`, en: `Pattern ${JSON.stringify(pattern)} requires exact frequencies: ${mapText(need)}.` });
   snap({ vi: "window = {}, left = 0", en: "window = {}, left = 0" }, 4, -1, { vi: "Cửa sổ luôn được giữ có độ dài bằng pattern.", en: "The window is kept at the pattern length." });
@@ -735,18 +744,18 @@ function buildStepsFixedMatch(input, params, config) {
     snap({ vi: `Xét ${config.textLabel}[${right}] = ${JSON.stringify(ch)}`, en: `Inspect ${config.textLabel}[${right}] = ${JSON.stringify(ch)}` }, 5, right, { vi: "Mở rộng fixed window sang phải.", en: "Expand the fixed window to the right." }, { activeValue: ch });
     window.set(ch, (window.get(ch) || 0) + 1);
     snap({ vi: `window[${JSON.stringify(ch)}] += 1 → ${window.get(ch)}`, en: `window[${JSON.stringify(ch)}] += 1 → ${window.get(ch)}` }, 6, right, { vi: "Ghi nhận ký tự mới trong frequency của cửa sổ.", en: "Record the new character in the window frequency." }, { activeValue: ch });
-    if (right - left + 1 > pattern.length) {
-      snap({ vi: `window size > ${pattern.length} → bỏ cạnh trái`, en: `window size > ${pattern.length} → remove left edge` }, 7, right, { vi: "Cửa sổ đang dài hơn pattern, cần loại ký tự cũ nhất.", en: "The window is longer than the pattern, so remove its oldest character." });
+    if (right - left + 1 > patternSize) {
+      snap({ vi: `window size > ${patternSize} → bỏ cạnh trái`, en: `window size > ${patternSize} → remove left edge` }, 7, right, { vi: "Cửa sổ đang dài hơn pattern, cần loại ký tự cũ nhất.", en: "The window is longer than the pattern, so remove its oldest character." });
       const removed = chars[left]; window.set(removed, window.get(removed) - 1); if (window.get(removed) === 0) window.delete(removed);
       snap({ vi: `window[${JSON.stringify(removed)}] -= 1`, en: `window[${JSON.stringify(removed)}] -= 1` }, 8, right, { vi: `Loại ${JSON.stringify(removed)} khỏi frequency cửa sổ.`, en: `Remove ${JSON.stringify(removed)} from the window frequency.` }, { vars: [{ name: "removed", value: JSON.stringify(removed) }] });
       left++;
       snap({ vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, 9, right, { vi: "Cửa sổ quay về đúng độ dài pattern.", en: "The window returns to the pattern length." });
     }
-    const isMatch = right - left + 1 === pattern.length && equal();
+    const isMatch = right - left + 1 === patternSize && equal();
     snap({ vi: isMatch ? "windowFreq == need → khớp" : "windowFreq != need → chưa khớp", en: isMatch ? "windowFreq == need → match" : "windowFreq != need → no match" }, 10, right, { vi: isMatch ? "Mọi ký tự và số lần xuất hiện đều khớp pattern." : "Frequency hiện tại chưa giống pattern.", en: isMatch ? "Every character and count matches the pattern." : "The current frequency does not yet match the pattern." }, { mark: isMatch ? range(left, right) : [] });
     if (isMatch) {
       matches.push(left);
-      snap({ vi: config.existsOnly ? `return True tại start=${left}` : `ans.append(${left})`, en: config.existsOnly ? `return True at start=${left}` : `ans.append(${left})` }, 11, right, { vi: config.existsOnly ? "Đã tìm thấy một hoán vị của pattern trong text." : `Lưu vị trí bắt đầu ${left} của anagram.`, en: config.existsOnly ? "A permutation of the pattern was found in the text." : `Save anagram start index ${left}.` }, { mark: range(left, right), vars: [{ name: "matched window", value: JSON.stringify(text.slice(left, right + 1)) }] });
+      snap({ vi: config.existsOnly ? `return True tại start=${left}` : `ans.append(${left})`, en: config.existsOnly ? `return True at start=${left}` : `ans.append(${left})` }, 11, right, { vi: config.existsOnly ? "Đã tìm thấy một hoán vị của pattern trong text." : `Lưu vị trí bắt đầu ${left} của anagram.`, en: config.existsOnly ? "A permutation of the pattern was found in the text." : `Save anagram start index ${left}.` }, { mark: range(left, right), vars: [{ name: "matched window", value: JSON.stringify(chars.slice(left, right + 1).join('')) }] });
       if (config.existsOnly) return { original: text, [config.patternKey]: pattern, answer: true, steps: steps.map((step, index) => index === steps.length - 1 ? { ...step, final: true } : step) };
     }
   }

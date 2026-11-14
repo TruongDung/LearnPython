@@ -152,6 +152,8 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.floodBatchView), surface: "treeView", render: (step) => { renderFloodBatchPictures(step); } },
     { predicate: (step) => Boolean(step.commonFree9031View), surface: "treeView", render: (step) => { renderCommonFree9031Pictures(step); } },
     { predicate: (step) => Boolean(step.minPositive3364View), surface: "treeView", render: (step) => { renderMinPositive3364Pictures(step); } },
+    { predicate: (step) => step.prefix2DView?.problemId === 304, surface: "treeView", render: (step) => { renderPrefixRegion304Pictures(step); } },
+    { predicate: (step) => Boolean(step.windowStudyView), surface: "treeView", render: (step) => { renderWindowStudyPictures(step); } },
     { predicate: (step) => Boolean(step.charWindow3View), surface: "treeView", render: (step) => { renderCharWindow3Pictures(step); } },
     { predicate: (step) => Boolean(step.visited2876View), surface: "treeView", render: (step) => { renderCountVisited2876Pictures(step); } },
     { predicate: (step) => Boolean(step.distanceCycle2204View), surface: "treeView", render: (step) => { renderDistanceCycle2204Pictures(step); } },

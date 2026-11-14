@@ -1899,102 +1899,8 @@ function buildSteps643Prefix(input, params) {
  * LeetCode 487: Max Consecutive Ones II.
  * Sliding window: allow flipping at most one 0 to 1.
  */
-function buildSteps487(nums) {
-  const steps = [];
-  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
-
-  let left = 0;
-  let zeroCount = 0;
-  let maxLen = 0;
-  let bestL = 0;
-  let bestR = -1;
-
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [...nums],
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5],
-    vars: [
-      { name: "left", value: 0 },
-      { name: "zeroCount", value: 0 },
-      { name: "maxLen", value: 0 },
-    ],
-    note: {
-      vi: `Mảng nhị phân. Được lật tối đa 1 số 0 thành 1. Tìm dãy 1 liên tiếp dài nhất.`,
-      en: `Binary array. May flip at most one 0 to 1. Find the longest consecutive-ones run.`,
-    },
-  });
-
-  for (let right = 0; right < nums.length; right++) {
-    if (nums[right] === 0) zeroCount++;
-
-    steps.push({
-      title: { vi: `Mở rộng: right = ${right}`, en: `Expand: right = ${right}` },
-      arr: [...nums],
-      highlight: inWindow(left, right),
-      mark: [],
-      codeLines: [6, 7, 8],
-      vars: [
-        { name: "left", value: left },
-        { name: "right", value: right },
-        { name: "zeroCount", value: zeroCount },
-        { name: "maxLen", value: maxLen },
-      ],
-      note: {
-        vi: `Thêm nums[${right}]=${nums[right]}. Số 0 trong cửa sổ = ${zeroCount}.`,
-        en: `Add nums[${right}]=${nums[right]}. Zeros in window = ${zeroCount}.`,
-      },
-    });
-
-    while (zeroCount > 1) {
-      if (nums[left] === 0) zeroCount--;
-      left++;
-      steps.push({
-        title: { vi: `Co: left = ${left}`, en: `Shrink: left = ${left}` },
-        arr: [...nums],
-        highlight: left <= right ? inWindow(left, right) : [],
-        mark: [],
-        codeLines: [9, 10, 11],
-        vars: [
-          { name: "left", value: left },
-          { name: "right", value: right },
-          { name: "zeroCount", value: zeroCount },
-          { name: "maxLen", value: maxLen },
-        ],
-        note: {
-          vi: `zeroCount > 1 → co trái. Bỏ nums[${left - 1}]. zeroCount = ${zeroCount}.`,
-          en: `zeroCount > 1 → shrink left. Drop nums[${left - 1}]. zeroCount = ${zeroCount}.`,
-        },
-      });
-    }
-
-    const len = right - left + 1;
-    if (len > maxLen) {
-      maxLen = len;
-      bestL = left;
-      bestR = right;
-    }
-  }
-
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...nums],
-    highlight: [],
-    mark: bestR >= 0 ? inWindow(bestL, bestR) : [],
-    final: true,
-    codeLines: [12],
-    vars: [
-      { name: "maxLen", value: maxLen },
-      { name: "window", value: `[${bestL}..${bestR}]` },
-    ],
-    note: {
-      vi: `Dãy 1 liên tiếp dài nhất (lật ≤1 số 0) = ${maxLen}, đoạn [${bestL}..${bestR}].`,
-      en: `Longest consecutive ones (flipping ≤1 zero) = ${maxLen}, segment [${bestL}..${bestR}].`,
-    },
-  });
-
-  return { original: [...nums], answer: maxLen, steps };
+function buildSteps487(input) {
+  return require('./window-pictures').build487(input);
 }
 
 /**
@@ -2781,90 +2687,7 @@ function buildSteps1358Last(input) {
  * 10          return result
  */
 function buildSteps424(input, params) {
-  const s = typeof input === "string" ? input : String(input ?? "");
-  const k = params && params.k !== undefined ? Number(params.k) : 2;
-  const chars = s.split("");
-  const steps = [];
-  const count = {};
-  let left = 0, maxFreq = 0, result = 0;
-  let bestL = 0, bestR = -1;
-
-  const countStr = () => `{${Object.entries(count).filter(([, v]) => v > 0).map(([c, v]) => `${c}:${v}`).join(", ")}}`;
-  const inWin = (lo, hi) => (lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []);
-
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: chars, sub: chars.map((_, i) => `[${i}]`),
-    highlight: [], mark: [],
-    codeLines: [3],
-    vars: [{ name: "k", value: k }, { name: "left", value: 0 }, { name: "max_freq", value: 0 }, { name: "result", value: 0 }],
-    note: {
-      vi:
-        `Cửa sổ hợp lệ khi (độ dài) - (tần suất ký tự nhiều nhất) ≤ k, tức số ký tự cần THAY ≤ k.\n` +
-        `Mở rộng right; khi cửa sổ không hợp lệ thì co left.`,
-      en:
-        `A window is valid when (length) - (max single-char freq) ≤ k, i.e. chars to REPLACE ≤ k.\n` +
-        `Expand right; shrink left when the window becomes invalid.`,
-    },
-  });
-
-  for (let right = 0; right < chars.length; right++) {
-    const ch = chars[right];
-    count[ch] = (count[ch] || 0) + 1;
-    maxFreq = Math.max(maxFreq, count[ch]);
-    steps.push({
-      title: { vi: `right=${right} '${ch}': count[${ch}]=${count[ch]}, max_freq=${maxFreq}`, en: `right=${right} '${ch}': count[${ch}]=${count[ch]}, max_freq=${maxFreq}` },
-      arr: chars, sub: chars.map((_, x) => `[${x}]`),
-      highlight: inWin(left, right), mark: [right],
-      codeLines: [4, 5, 6],
-      vars: [
-        { name: "right", value: right }, { name: "char", value: `'${ch}'` },
-        { name: "count", value: countStr() }, { name: "max_freq", value: maxFreq },
-      ],
-      note: { vi: `Thêm '${ch}'. max_freq = ký tự xuất hiện nhiều nhất trong cửa sổ = ${maxFreq}.`, en: `Add '${ch}'. max_freq = most frequent char count in window = ${maxFreq}.` },
-    });
-
-    while ((right - left + 1) - maxFreq > k) {
-      const lch = chars[left];
-      count[lch] -= 1;
-      left++;
-      steps.push({
-        title: { vi: `Cửa sổ không hợp lệ → co: bỏ '${lch}', left=${left}`, en: `Window invalid → shrink: drop '${lch}', left=${left}` },
-        arr: chars, sub: chars.map((_, x) => `[${x}]`),
-        highlight: inWin(left, right), mark: [],
-        codeLines: [7, 8],
-        vars: [
-          { name: "window len", value: right - left + 2 },
-          { name: "max_freq", value: maxFreq },
-          { name: "need replace", value: (right - left + 2) - maxFreq },
-          { name: "left", value: left },
-        ],
-        note: { vi: `(độ dài - max_freq) > k=${k} → phải thay quá ${k} ký tự → bỏ '${lch}' bên trái, left tiến.`, en: `(length - max_freq) > k=${k} → would replace more than ${k} chars → drop '${lch}' on the left, advance left.` },
-      });
-    }
-
-    const len = right - left + 1;
-    if (len > result) { result = len; bestL = left; bestR = right; }
-    steps.push({
-      title: { vi: `result = max(result, ${len}) = ${result}`, en: `result = max(result, ${len}) = ${result}` },
-      arr: chars, sub: chars.map((_, x) => `[${x}]`),
-      highlight: inWin(left, right), mark: inWin(bestL, bestR),
-      codeLines: [9],
-      vars: [{ name: "window len", value: len }, { name: "result", value: result }],
-      note: { vi: `Cửa sổ [${left}..${right}] hợp lệ, dài ${len}. result = ${result}.`, en: `Window [${left}..${right}] valid, length ${len}. result = ${result}.` },
-    });
-  }
-
-  steps.push({
-    title: { vi: `return ${result}`, en: `return ${result}` },
-    arr: chars, sub: chars.map((_, i) => `[${i}]`),
-    highlight: [], mark: inWin(bestL, bestR), final: true,
-    codeLines: [10],
-    vars: [{ name: "answer", value: result }],
-    note: { vi: `Chuỗi con dài nhất có thể biến thành 1 ký tự lặp bằng ≤ k lần thay = ${result}.`, en: `Longest substring turnable into one repeating char with ≤ k replacements = ${result}.` },
-  });
-
-  return { original: s, k, answer: result, steps };
+  return require('./window-pictures').build424(input, params);
 }
 
 /**
@@ -2886,140 +2709,8 @@ function buildSteps424(input, params) {
  * 11                  else: result.append((window[k//2-1]+window[k//2])/2)
  * 12          return result
  */
-function buildSteps480(inputNums, params) {
-  const nums = Array.isArray(inputNums)
-    ? [...inputNums]
-    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
-  const k = params && params.k !== undefined ? Number(params.k) : 3;
-  const n = nums.length;
-  const steps = [];
-
-  if (n === 0 || k <= 0 || k > n) {
-    steps.push({
-      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
-      arr: [], highlight: [], mark: [], final: true, codeLines: [2],
-      vars: [], note: { vi: "Cần 0 < k ≤ len(nums).", en: "Need 0 < k ≤ len(nums)." },
-    });
-    return { original: nums, k, answer: [], steps };
-  }
-
-  const win = [];  // sorted window
-  const result = [];
-  const median = () => (k % 2 === 1 ? win[(k - 1) / 2] : (win[k / 2 - 1] + win[k / 2]) / 2);
-  const winStr = () => `[${win.join(", ")}]`;
-  const windowCells = (i) => {
-    const lo = Math.max(0, i - k + 1);
-    return Array.from({ length: i - lo + 1 }, (_, x) => lo + x);
-  };
-
-  steps.push({
-    title: { vi: "window = SortedList(), result = []", en: "window = SortedList(), result = []" },
-    arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: [], mark: [],
-    codeLines: [3, 4],
-    vars: [{ name: "k", value: k }, { name: "window", value: "[]" }, { name: "result", value: "[]" }],
-    note: {
-      vi:
-        `Giữ cửa sổ hiện tại LUÔN ĐƯỢC SẮP XẾP. Trung vị = phần tử giữa (k lẻ) hoặc trung bình 2 phần tử giữa (k chẵn).\n` +
-        `Mỗi bước: thêm nums[i], nếu vượt kích thước thì bỏ nums[i-k], rồi đọc trung vị.`,
-      en:
-        `Keep the current window ALWAYS SORTED. Median = middle element (odd k) or average of the two middle (even k).\n` +
-        `Each step: add nums[i], if over size remove nums[i-k], then read the median.`,
-    },
-  });
-
-  for (let i = 0; i < n; i++) {
-    // add nums[i] in sorted position
-    let pos = 0;
-    while (pos < win.length && win[pos] < nums[i]) pos++;
-    win.splice(pos, 0, nums[i]);
-
-    steps.push({
-      title: { vi: `window.add(${nums[i]}) → ${winStr()}`, en: `window.add(${nums[i]}) → ${winStr()}` },
-      arr: [...nums],
-      sub: nums.map((_, x) => `[${x}]`),
-      highlight: windowCells(i),
-      mark: [i],
-      codeLines: [5, 6],
-      vars: [
-        { name: "i", value: i },
-        { name: "num", value: nums[i] },
-        { name: "window (sorted)", value: winStr() },
-      ],
-      note: {
-        vi: `Chèn ${nums[i]} vào vị trí đúng để cửa sổ vẫn được sắp xếp: ${winStr()}.`,
-        en: `Insert ${nums[i]} at the right position to keep the window sorted: ${winStr()}.`,
-      },
-    });
-
-    if (i >= k) {
-      const out = nums[i - k];
-      win.splice(win.indexOf(out), 1);
-      steps.push({
-        title: { vi: `window.remove(${out}) (ra khỏi cửa sổ) → ${winStr()}`, en: `window.remove(${out}) (left window) → ${winStr()}` },
-        arr: [...nums],
-        sub: nums.map((_, x) => `[${x}]`),
-        highlight: windowCells(i),
-        mark: [i - k],
-        codeLines: [7, 8],
-        vars: [
-          { name: "leaving", value: `nums[${i - k}] = ${out}` },
-          { name: "window (sorted)", value: winStr() },
-        ],
-        note: {
-          vi: `Phần tử nums[${i - k}]=${out} rời cửa sổ → xóa khỏi window: ${winStr()}.`,
-          en: `Element nums[${i - k}]=${out} leaves the window → remove from window: ${winStr()}.`,
-        },
-      });
-    }
-
-    if (i >= k - 1) {
-      const med = median();
-      result.push(med);
-      const midCells = k % 2 === 1
-        ? [(k - 1) / 2]
-        : [k / 2 - 1, k / 2];
-      steps.push({
-        title: { vi: `Trung vị = ${med} → result = [${result.join(", ")}]`, en: `Median = ${med} → result = [${result.join(", ")}]` },
-        arr: [...nums],
-        sub: nums.map((_, x) => `[${x}]`),
-        highlight: windowCells(i),
-        mark: [],
-        codeLines: k % 2 === 1 ? [9, 10] : [9, 11],
-        vars: [
-          { name: "window (sorted)", value: winStr() },
-          { name: "middle idx", value: midCells.join(", ") },
-          { name: "median", value: med },
-          { name: "result", value: `[${result.join(", ")}]` },
-        ],
-        note: {
-          vi: k % 2 === 1
-            ? `k=${k} lẻ → trung vị = window[${(k - 1) / 2}] = ${med}.`
-            : `k=${k} chẵn → trung vị = (window[${k / 2 - 1}] + window[${k / 2}]) / 2 = ${med}.`,
-          en: k % 2 === 1
-            ? `k=${k} odd → median = window[${(k - 1) / 2}] = ${med}.`
-            : `k=${k} even → median = (window[${k / 2 - 1}] + window[${k / 2}]) / 2 = ${med}.`,
-        },
-      });
-    }
-  }
-
-  steps.push({
-    title: { vi: `return [${result.join(", ")}]`, en: `return [${result.join(", ")}]` },
-    arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: [], mark: [],
-    final: true,
-    codeLines: [12],
-    vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
-    note: {
-      vi: `Trung vị của mỗi cửa sổ trượt kích thước ${k}: [${result.join(", ")}].`,
-      en: `Median of each sliding window of size ${k}: [${result.join(", ")}].`,
-    },
-  });
-
-  return { original: nums, k, answer: result, steps };
+function buildSteps480(input, params) {
+  return require('./window-pictures').build480(input, params);
 }
 
 /**
@@ -4370,6 +4061,13 @@ function buildStepsAtMostDistinct(input, limit, config) {
       title, arr: [...items], sub: items.map((_, index) => `[${index}]`), highlight: window, mark, final, codeLines: [line],
       vars: [{ name: "left", value: viewLeft }, { name: "right", value: right >= 0 ? right : "-" }, { name: "freq", value: viewFreqText || freqText() }, { name: "distinct", value: distinct() }, { name: "limit", value: limit }, { name: "ans", value: ans }, ...vars],
       note,
+      ...(config.isString ? { windowStudyView: {
+        id: 340, kind: 'distinct', items: [...items], k: limit, left: viewLeft, right,
+        count: { ...(viewFreq || Object.fromEntries(freq)) }, best: [bestLeft, bestRight], answer: ans, line,
+        phase: final ? 'result' : line <= 5 ? 'setup' : line === 6 ? 'visit' : line === 7 ? 'add' : line === 9 ? 'remove' : line === 12 ? 'shrink' : line === 13 ? mark.length ? 'best' : 'keep' : 'check',
+        pending: line === 6 ? right : null, removed: [9, 10, 11].includes(line) ? left : line === 12 ? left - 1 : null,
+        final,
+      } } : {}),
       slidingFreqView: { nums: [...items], label: config.source, left: viewLeft, right, window, best: bestRight >= bestLeft ? indices(bestLeft, bestRight) : [], freq: viewFreq || Object.fromEntries(freq), k: limit, mode: "distinct", activeValue, overLimit, ans, done: final },
     });
   };
@@ -5697,8 +5395,8 @@ module.exports = {
     ],
     approach: [
       { vi: "Cửa sổ trượt; count đếm tần suất từng ký tự trong cửa sổ.", en: "Sliding window; count tracks each char's frequency in the window." },
-      { vi: "max_freq = tần suất ký tự nhiều nhất. Cần thay = (độ dài) - max_freq.", en: "max_freq = highest char frequency. Replacements needed = (length) - max_freq." },
-      { vi: "Nếu cần thay > k → cửa sổ không hợp lệ → co left.", en: "If replacements needed > k → window invalid → shrink left." },
+      { vi: "max_freq giữ kỷ lục tần suất, không giảm khi co cửa sổ.", en: "max_freq keeps a frequency record and does not decrease when the window shrinks." },
+      { vi: "Độ dài − max_freq > k → co left. Hình đổi chữ dùng tần suất thật.", en: "Length − max_freq > k → shrink left. The conversion picture uses actual counts." },
       { vi: "result = độ dài cửa sổ hợp lệ dài nhất.", en: "result = length of the longest valid window." },
     ],
     complexity: { time: "O(n)", space: "O(1)", note: { vi: "Mỗi ký tự vào/ra cửa sổ 1 lần; bảng đếm ≤ 26.", en: "Each char enters/leaves once; count table ≤ 26." } },

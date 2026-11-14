@@ -105,7 +105,7 @@ test("438 snapshots follow valid Python source lines and keep matches accurate",
 test("438 renderer and UI assets are registered and work in both languages", () => {
   const element = {
     innerHTML: "",
-    querySelector: () => ({ clientWidth: 100, scrollLeft: 0, querySelector: () => null }),
+    dataset: {}, querySelector: () => null,
   };
   const context = {
     lang: "en",
@@ -113,6 +113,7 @@ test("438 renderer and UI assets are registered and work in both languages", () 
     escapeHtml: (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
   };
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-window-pictures.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-find-anagrams-438.js"), "utf8"), context);
 
   for (const language of ["en", "vi"]) {
@@ -123,14 +124,14 @@ test("438 renderer and UI assets are registered and work in both languages", () 
       assert.equal((element.innerHTML.match(/class="ana438-cell(?: |")/g) || []).length, 10);
       assert.equal(
         (element.innerHTML.match(/class="ana438-counter(?: |")/g) || []).length,
-        Object.keys(step.anagram438View.need).length,
+        [...new Set([...Object.keys(context.wsScene(context.wsRead(step), Number(element.dataset.wsSelected || 0)).need), ...Object.keys(context.wsScene(context.wsRead(step), Number(element.dataset.wsSelected || 0)).count)])].length,
       );
     }
   }
 
   const html = fs.readFileSync(require.resolve("../public/index.html"), "utf8");
-  assert.ok(html.includes('find-anagrams-438.css?v=find-anagrams-438-v2" data-problem-ids="438"'));
-  assert.ok(html.includes('renderer-find-anagrams-438.js?v=find-anagrams-438-v3" data-problem-ids="438"'));
+  assert.ok(html.includes('window-pictures.css?v=window-pictures-v1" data-problem-ids="304 340 424 438 480 487 567 632"'));
+  assert.ok(html.includes('renderer-find-anagrams-438.js?v=find-anagrams-438-pictures-v4" data-problem-ids="438"'));
   const script = fs.readFileSync(require.resolve("../public/script.js"), "utf8");
   assert.ok(script.includes("renderFindAnagrams438View(step)"));
 });
