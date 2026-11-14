@@ -5643,17 +5643,16 @@ module.exports = {
       { key: "k", label: { vi: "k (kích thước cửa sổ)", en: "k (window size)" }, default: 3, min: 1 },
     ],
     approach: [
-      { vi: "Dùng deque lưu INDEX theo giá trị GIẢM DẦN. Front dq[0] luôn là index của max cửa sổ.", en: "Use a deque of INDICES in DECREASING value order. Front dq[0] is always the window max index." },
-      { vi: "Trước khi thêm i: pop khỏi đuôi mọi index có giá trị < nums[i] (chúng không bao giờ là max nữa).", en: "Before adding i: pop from the back every index whose value < nums[i] (they can never be max again)." },
-      { vi: "Pop front nếu nó ra khỏi cửa sổ (dq[0] ≤ i-k).", en: "Pop the front if it left the window (dq[0] ≤ i-k)." },
-      { vi: "Khi i ≥ k-1, ghi nums[dq[0]] (max cửa sổ hiện tại) vào result.", en: "When i ≥ k-1, append nums[dq[0]] (current window max) to result." },
+      { vi: "Deque giữ index theo giá trị không tăng; đầu là ứng viên max.", en: "The deque stores indices in non-increasing value order; the front is the max candidate." },
+      { vi: "Số mới lớn hơn → bỏ các số nhỏ ở đuôi. Bằng nhau vẫn giữ.", en: "A larger new value removes smaller values from the back. Equal values stay." },
+      { vi: "Index hết cửa sổ → bỏ ở đầu. Đủ k phần tử → ghi giá trị ở đầu.", en: "Expired index → remove front. Once the window has k values → emit the front value." },
     ],
     complexity: {
       time: "O(n)",
       space: "O(k)",
       note: {
-        vi: "Mỗi index được push và pop tối đa 1 lần → O(n). Deque chứa tối đa k phần tử.",
-        en: "Each index is pushed and popped at most once → O(n). The deque holds at most k elements.",
+        vi: "Mỗi index được thêm và bỏ tối đa một lần. Deque dùng O(k) bộ nhớ.",
+        en: "Each index is added and removed at most once. The deque uses O(k) space.",
       },
     },
     debugMode: "line-by-line",

@@ -417,21 +417,130 @@ function sm239RenderResult(state, copy) {
   return `<section class="sm239-result ${state.final ? "sm239-is-final" : ""}" role="status" aria-live="polite"><small>${sm239Escape(state.final ? copy.finalAnswer : copy.answer)}</small><strong>${sm239Escape(answer)}</strong></section>`;
 }
 
-function renderSlidingMaximum239View(step) {
-  const host = typeof document !== "undefined" && document.getElementById
-    ? document.getElementById("treeView")
-    : typeof $ === "function" ? $("treeView") : null;
-  if (!host) return;
-  const locale = sm239Locale();
-  const copy = SM239_TEXT[locale];
-  const state = sm239Normalize(step);
-  const timing = state.timing === "before" ? copy.before : copy.after;
-  const eventInfo = SM239_EVENT_RAIL.find((item) => item.event === state.event);
-  const eventLabel = eventInfo ? eventInfo[locale] : state.event;
-  const summary = `${copy.region}. ${copy.line} ${state.sourceLine === null ? "—" : state.sourceLine}, ${eventLabel}.`;
-  const note = state.note
-    ? `<aside class="sm239-note"><strong>${sm239Escape(copy.note)}</strong><p>${sm239Escape(state.note)}</p></aside>`
-    : "";
+function sm239WindowDeque(nums, left, right) {
+  const indices = [];
+  for (let i = left; i <= right; i++) {
+    while (indices.length && nums[indices.at(-1)] < nums[i]) indices.pop();
+    indices.push(i);
+  }
+  return indices.map((index, i) => ({ index, value: nums[index], front: i === 0, back: i === indices.length - 1 }));
+}
 
-  host.innerHTML = `<article class="sm239-viz ${state.final ? "sm239-is-final" : ""}" role="region" aria-label="${sm239Escape(summary)}"><header class="sm239-header"><div><span>${sm239Escape(copy.kicker)}</span><h2>${sm239Escape(state.title)}</h2></div><div class="sm239-line-state"><strong>${sm239Escape(copy.line)} ${state.sourceLine === null ? "—" : state.sourceLine}</strong><span class="sm239-timing-${state.timing}">${sm239Escape(timing)}</span><em>${sm239Escape(eventLabel)}</em></div></header>${sm239RenderRail(state, copy, locale)}${sm239RenderSource(state, copy, locale)}${sm239RenderArray(state, copy)}<div class="sm239-main">${sm239RenderDeque(state, copy)}${sm239RenderRules(state, copy, locale)}</div>${sm239RenderOutputs(state, copy)}${note}${sm239RenderResult(state, copy)}</article>`;
+function sm239PictureScene(state, selected, timeline = []) {
+  if (!state.final || !state.answerWitness.length) return state;
+  const witness = state.answerWitness[selected] || state.answerWitness[0];
+  const saved = timeline.find(step => step.slidingMaximum239View?.event === 'append-maximum' && step.slidingMaximum239View.currentWitness?.answerIndex === witness.answerIndex);
+  const deque = saved ? sm239Normalize(saved).deque.after : sm239WindowDeque(state.nums, witness.windowLeft, witness.windowRight);
+  return { ...state, i: witness.windowRight, num: state.nums[witness.windowRight],
+    window: { left: witness.windowLeft, right: witness.windowRight, size: state.k, full: true, expiryCutoff: witness.windowLeft - 1 },
+    deque: { before: deque, after: deque }, check: { kind: null, result: null, candidate: null },
+    action: { kind: 'none', side: null, removed: null, pushed: null, dominatedBy: null }, currentWitness: witness };
+}
+
+function sm239PictureArray(state) {
+  const nums = state.nums, digitWidth = Math.max(1, ...nums.map(value => sm239Display(value).length));
+  const pitch = Math.max(58, digitWidth * 8 + 16), pad = 16, width = Math.max(270, pad * 2 + state.n * pitch), height = 283, zero = 128;
+  const center = i => pad + (i + .5) * pitch;
+  const maximum = Math.max(1, ...nums.map(value => Math.abs(value || 0)));
+  const deque = new Set(state.deque.after.map(entry => entry.index));
+  const front = state.deque.after[0];
+  const ready = state.i !== null && deque.has(state.i);
+  const maxIndex = ready && front && front.index >= state.window.left ? front.index : null;
+  const removed = state.action.removed?.index;
+  let drawing = `<path class="p239-zero" d="M${pad},${zero} H${width - pad}"/>`;
+  if (state.window.left !== null) {
+    const left = pad + state.window.left * pitch + 3, size = state.window.size * pitch - 6;
+    const pointers = state.window.size === 1 ? `<text class="p239-pointer" x="${left + size / 2}" y="19" text-anchor="middle">L=R ${state.window.left}</text>` : `<text class="p239-pointer" x="${left + 7}" y="19">L ${state.window.left}</text><text class="p239-pointer" x="${left + size - 7}" y="19" text-anchor="end">R ${state.window.right}</text>`;
+    drawing += `<rect class="p239-window" x="${left}" y="30" width="${size}" height="208" rx="10"/>${pointers}`;
+  }
+  drawing += nums.map((value, index) => {
+    const x = center(index), h = Math.max(3, Math.abs(value || 0) / maximum * 77), y = value < 0 ? zero : zero - h;
+    const inWindow = state.window.left !== null && index >= state.window.left && index <= state.window.right;
+    const cls = [inWindow ? 'in-window' : '', index === maxIndex ? 'maximum' : '', index === state.i ? 'current' : '', index === removed ? 'removed' : '', value < 0 ? 'negative' : ''].join(' ');
+    return `<g class="p239-number ${cls}" data-array-index="${index}" data-value="${value ?? '—'}" data-in-window="${inWindow}" data-in-deque="${deque.has(index)}" data-maximum="${index === maxIndex}"><title>[${index}] = ${sm239Escape(sm239Display(value))}</title><rect class="p239-bar" x="${x - 15}" y="${y}" width="30" height="${h}" rx="5"/><text class="p239-value" x="${x}" y="${value < 0 ? y + h + 18 : y - 10}" text-anchor="middle">${sm239Escape(sm239Display(value))}</text><text class="p239-index" x="${x}" y="254" text-anchor="middle">${index}</text>${deque.has(index) ? `<circle class="p239-deque-dot" cx="${x}" cy="268" r="3"/>` : ''}${index === removed ? `<path class="p239-cross" d="M${x - 8},260 l16,14 M${x + 8},260 l-16,14"/>` : ''}${index === maxIndex ? `<text class="p239-star" x="${x}" y="${value < 0 ? zero - 12 : y - 30}" text-anchor="middle">★</text>` : ''}</g>`;
+  }).join('');
+  return { width, center, svg: `<svg class="p239-array" style="width:${width}px;min-width:${Math.min(width, Math.max(300, width * .8))}px;max-width:100%" viewBox="0 0 ${width} ${height}" role="img" aria-label="${sm239Locale() === 'vi' ? 'Khung là cửa sổ, sao xanh là lớn nhất, chấm tím là index trong deque' : 'Frame: current window; green star: maximum; purple dot: index in deque'}">${drawing}</svg>` };
+}
+
+function renderSlidingMaximum239View(step) {
+  const host = typeof document !== 'undefined' && document.getElementById ? document.getElementById('treeView') : typeof $ === 'function' ? $('treeView') : null;
+  if (!host) return;
+  const t = (vi, en) => sm239Locale() === 'vi' ? vi : en, esc = sm239Escape;
+  const original = sm239Normalize(step), key = JSON.stringify([original.nums, original.k]);
+  const same = host.dataset?.p239Key === key, wasFinal = host.dataset?.p239Final === '1';
+  const selected = original.final && same && wasFinal ? Math.max(0, Math.min(original.answerWitness.length - 1, Number(host.dataset.p239SelectedOutput || 0))) : 0;
+  const timeline = typeof steps === 'undefined' ? [] : steps;
+  const state = sm239PictureScene(original, selected, timeline);
+  const focus = state.i === null ? 0 : state.i, oldFocus = same ? host.dataset?.p239Focus : null;
+  const oldMap = same ? host.querySelector?.('.p239-array-scroll') : null;
+  const oldLeft = oldMap?.scrollLeft || 0, oldWidth = Number(host.dataset?.p239Width || 0);
+  if (host.dataset) { host.dataset.p239Key = key; host.dataset.p239Final = original.final ? '1' : '0'; host.dataset.p239SelectedOutput = String(selected); host.dataset.p239Focus = String(focus); host.dataset.p239Width = String(host.clientWidth || 600); }
+  const card = (label, content, cls = '') => `<section class="p239-card ${cls}"><header>${label}</header>${content}</section>`;
+  const names = {
+    'initialize-deque': t('Giữ các ứng viên lớn nhất', 'Keep the maximum candidates'),
+    'initialize-result': t('Chuẩn bị kết quả từng cửa sổ', 'Prepare one result per window'),
+    'visit-number': t('Cửa sổ tiến sang phải', 'Move the window right'),
+    'check-dominated-back': t('So số mới với cuối deque', 'Compare the new value with the back'),
+    'pop-dominated-back': t('Nhỏ hơn số mới → bỏ ở đuôi', 'Smaller than the new value → remove back'),
+    'push-current-index': t('Thêm index mới vào đuôi', 'Add the new index at the back'),
+    'check-expired-front': t('Đầu deque còn trong khung?', 'Is the front still inside the window?'),
+    'pop-expired-front': t('Ra ngoài khung → bỏ ở đầu', 'Outside the window → remove front'),
+    'check-full-window': t('Đủ k phần tử rồi lấy max', 'Once k values are present, take the max'),
+    'append-maximum': t('Đầu deque → maximum', 'Deque front → maximum'),
+    'return-result': t('Chọn một kết quả để xem lại cửa sổ', 'Choose a result to inspect its window'),
+  };
+  const picture = sm239PictureArray(state);
+  const chart = card(`<b>nums · k=${state.k ?? '—'}</b><small><span class="p239-green">★ max</span> · <span class="p239-purple">● deque</span> · <span class="p239-red">× ${t('bỏ', 'remove')}</span></small>`, `<div class="p239-array-scroll" tabindex="0" role="region" aria-label="nums">${picture.svg}</div>${picture.width * .8 > (host.clientWidth || 600) - 50 ? `<small class="p239-scroll-hint">↔ ${t('Kéo để xem', 'Scroll to explore')}</small>` : ''}`);
+  const token = (entry, cls = '', label = '') => `<span class="p239-token ${cls}" data-dq-index="${entry.index}" data-dq-value="${entry.value ?? '—'}">${label ? `<small>${label}</small>` : ''}<b>${esc(sm239Display(entry.value))}</b><small>[${entry.index}]</small></span>`;
+  const changed = sm239DequeChanged(state), removed = state.action.removed;
+  const row = (entries, before = false) => `<div class="p239-deque-scroll"><div class="p239-deque-row" data-p239-deque="${before ? 'before' : 'after'}">${entries.map((entry, i) => token(entry, before && removed?.index === entry.index ? 'removed' : !before && state.action.pushed?.index === entry.index ? 'pushed' : i === 0 ? 'front' : '', i === 0 && i === entries.length - 1 ? 'FRONT / BACK' : i === 0 ? 'FRONT' : i === entries.length - 1 ? 'BACK' : '')).join('<i>›</i>') || '<span class="p239-empty">∅</span>'}</div></div>`;
+  const deque = card(`<b>deque</b><small>${t('Giá trị không tăng →', 'Values never increase →')}</small>`, `${changed ? `<div class="p239-before"><small>${t('Trước', 'Before')}</small>${row(state.deque.before, true)}</div><div class="p239-mutation-arrow">${state.action.side === 'front' ? '←' : state.action.kind === 'push' ? '＋ →' : '× →'}</div>` : ''}${row(state.deque.after)}`);
+  const candidate = state.check.candidate;
+  let action = '';
+  if (!state.final && state.check.kind === 'dominated-back' && candidate) {
+    const smaller = candidate.value < state.num, equal = candidate.value === state.num;
+    action = card(smaller ? t('Ứng viên cũ bị số mới thay thế', 'The new value dominates this candidate') : equal ? t('Bằng nhau → giữ cả hai', 'Equal values → keep both') : t('Vẫn giữ ứng viên lớn hơn', 'Keep the larger candidate'), `<div class="p239-comparison">${token(candidate, smaller ? 'removed' : 'front')}<strong>${smaller ? '&lt;' : equal ? '=' : '&gt;'}</strong>${token({ index: state.i, value: state.num }, 'pushed')}<b class="${smaller ? 'p239-red' : 'p239-green'}">${smaller ? '×' : '✓'}</b></div>`);
+  } else if (!state.final && state.check.kind === 'expired-front' && candidate) {
+    action = card(t('So index với cạnh trái L', 'Compare the index with the left edge L'), `<div class="p239-expiry"><span><small>index</small><b>${candidate.index}</b></span><i>${state.check.result ? '&lt;' : '≥'}</i><span><small>L</small><b>${state.window.left}</b></span><strong class="${state.check.result ? 'p239-red' : 'p239-green'}">${state.check.result ? '← ×' : '✓'}</strong></div>`);
+  } else if (!state.final && state.action.kind === 'append-output' && state.currentWitness) {
+    action = `<div class="p239-emit"><span>FRONT</span><b>${state.currentWitness.value}</b><i>→</i><span>result</span><strong>${state.currentWitness.value}</strong></div>`;
+  } else if (!state.final && state.i !== null && !state.window.full) {
+    action = `<div class="p239-warmup"><span>${state.window.size} / ${state.k}</span>${Array.from({ length: state.k || 0 }, (_, i) => `<i class="${i < state.window.size ? 'filled' : ''}"></i>`).join('')}</div>`;
+  }
+  const outputs = card(`<b>result</b><small>${t('Mỗi ô = max của một cửa sổ', 'Each tile = one window maximum')}</small>`, `<div class="p239-outputs">${state.answerWitness.map(witness => `<button type="button" class="p239-output ${state.final ? witness.answerIndex === selected ? 'selected' : '' : witness.answerIndex === state.currentWitness?.answerIndex ? 'selected' : ''}" data-p239-output="${witness.answerIndex}" data-window-left="${witness.windowLeft}" data-window-right="${witness.windowRight}" data-witness-index="${witness.witnessIndex}" aria-pressed="${state.final && selected === witness.answerIndex}"><small>${witness.windowLeft}…${witness.windowRight}</small><b>${esc(sm239Display(witness.value))}</b></button>`).join('') || '<span class="p239-empty">∅</span>'}</div>${state.final && state.answerWitness.length ? `<nav class="p239-play"><button type="button" data-p239-select="${selected - 1}" ${selected <= 0 ? 'disabled' : ''}>←</button><span>${selected + 1} / ${state.answerWitness.length}</span><button type="button" data-p239-select="${selected + 1}" ${selected >= state.answerWitness.length - 1 ? 'disabled' : ''}>${t('Trượt', 'Slide')} →</button></nav>` : ''}`);
+  const jumpEvents = [['pop-dominated-back', t('Bỏ đuôi', 'Pop back')], ['pop-expired-front', t('Hết hạn', 'Expire')], ['append-maximum', 'max'], ['return-result', '🏁']];
+  const at = typeof stepIndex === 'undefined' ? -1 : stepIndex;
+  const jumps = !state.final ? `<nav class="p239-jumps">${jumpEvents.filter(([event]) => timeline.some((s, i) => i > at && s.slidingMaximum239View?.event === event)).map(([event, label]) => `<button type="button" data-p239-jump="${event}">${label} →</button>`).join('')}</nav>` : '';
+  const examples = [
+    { nums: [1, 3, -1, -3, 5, 3, 6, 7], k: 3, label: t('Ví dụ', 'Example') },
+    { nums: [9, 7, 5, 3, 1], k: 3, label: t('Giảm dần', 'Decreasing') },
+    { nums: [4, 4, 4, 2, 4], k: 3, label: t('Bằng nhau', 'Equal values') },
+    { nums: [-5, -1, -3, -2, -7], k: 2, label: t('Toàn âm', 'All negative') },
+    { nums: [3, 1, 3, 2], k: 1, label: 'k = 1' },
+  ];
+  host.innerHTML = `<section class="sm239-viz sm239-picture"><header class="p239-heading"><strong>${names[state.event] || 'Sliding Window Maximum'}</strong><small>#239 · L${state.sourceLine ?? '—'}</small></header>${chart}${deque}${action}${outputs}${jumps}<nav class="p239-examples">${examples.map((example, i) => `<button type="button" data-p239-example="${i}">${example.label}</button>`).join('')}</nav></section>`;
+  const scroller = host.querySelector?.('.p239-array-scroll');
+  if (scroller) {
+    scroller.scrollLeft = oldLeft;
+    if (oldFocus !== String(focus) || oldWidth !== host.clientWidth) {
+      const svg = scroller.querySelector('svg'), bounds = svg.getBoundingClientRect(), box = scroller.getBoundingClientRect();
+      scroller.scrollLeft += bounds.left + picture.center(focus) * bounds.width / picture.width - box.left - box.width / 2;
+    }
+  }
+  const outputStrip = host.querySelector?.('.p239-outputs'), selectedOutput = outputStrip?.querySelector('.selected');
+  if (selectedOutput) {
+    const tile = selectedOutput.getBoundingClientRect(), strip = outputStrip.getBoundingClientRect();
+    outputStrip.scrollLeft += tile.left - strip.left - (strip.width - tile.width) / 2;
+  }
+  const stop = () => { if (typeof stopPlay === 'function') stopPlay(); };
+  host.querySelectorAll?.('button').forEach(button => button.addEventListener('keydown', event => { if (event.key === ' ' || event.key === 'Enter') event.stopPropagation(); }));
+  const selectOutput = (index, selector) => {
+    stop();
+    if (state.final) { host.dataset.p239SelectedOutput = String(index); renderSlidingMaximum239View(step); (host.querySelector(`${selector}:not(:disabled)`) || host.querySelector('.p239-play button:not(:disabled)'))?.focus({ preventScroll: true }); }
+    else { const target = timeline.findIndex(s => s.slidingMaximum239View?.event === 'append-maximum' && s.slidingMaximum239View.currentWitness?.answerIndex === index); if (target >= 0) { stepIndex = target; renderStep(); } }
+  };
+  host.querySelectorAll?.('[data-p239-output]').forEach(button => button.addEventListener('click', () => selectOutput(Number(button.dataset.p239Output), `[data-p239-output="${button.dataset.p239Output}"]`)));
+  host.querySelectorAll?.('[data-p239-select]').forEach(button => button.addEventListener('click', () => selectOutput(Number(button.dataset.p239Select), `.p239-play button:${Number(button.dataset.p239Select) < selected ? 'first' : 'last'}-child`)));
+  host.querySelectorAll?.('[data-p239-example]').forEach(button => button.addEventListener('click', async () => { stop(); const example = examples[Number(button.dataset.p239Example)]; $('arrInput').value = example.nums.join(','); $('param-k').value = example.k; await runViz(); }));
+  host.querySelectorAll?.('[data-p239-jump]').forEach(button => button.addEventListener('click', () => { stop(); const target = timeline.findIndex((s, i) => i > at && s.slidingMaximum239View?.event === button.dataset.p239Jump); if (target >= 0) { stepIndex = target; renderStep(); } }));
 }
