@@ -340,6 +340,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.arrangingCoins441View), surface: "treeView", render: (step) => {
       renderArrangingCoins441View(step);
     } },
+    { predicate: (step) => step.timeRoomView?.id === 3341, surface: "treeView", render: (step) => {
+      renderLastRoom3341Pictures(step);
+    } },
     { predicate: (step) => Boolean(step.timeRoomView), surface: "treeView", render: (step) => {
       renderTimeRoomPictures(step);
     } },
