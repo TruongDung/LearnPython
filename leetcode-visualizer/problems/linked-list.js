@@ -621,6 +621,7 @@ function buildSteps1472(input, params) {
   let currentId = null;
   let nextId = 1;
   const outputs = [null];
+  let storyOperation = 0;
 
   function currentNode() {
     return nodes.find((node) => node.id === currentId);
@@ -690,6 +691,8 @@ function buildSteps1472(input, params) {
     const curr = currentNode();
     const chain = activeChain().map((node) => shortUrl(node.url));
     steps.push({
+      linkedStoryView: { id: 1472, approach: 2, operations: commands.map(c => ({ ...c })), operationIndex: storyOperation,
+        current: currentId, order: [...chainIds], nodes: nodes.filter(n => visibleIds.has(n.id)).map(n => ({ ...n })), outputs: [...outputs] },
       title: opts.title,
       arr: [],
       graph: {
@@ -850,6 +853,7 @@ function buildSteps1472(input, params) {
   });
 
   for (let commandIndex = 1; commandIndex < commands.length; commandIndex++) {
+    storyOperation = commandIndex;
     const command = commands[commandIndex];
 
     if (command.op === "visit") {
@@ -1135,6 +1139,7 @@ function buildArrayHistorySteps1472(raw, commands, shortUrl, displayUrl) {
   let history = [commands[0].url || "leetcode.com"];
   let index = 0;
   const outputs = [null];
+  let storyOperation = 0;
 
   function snapshot(opts) {
     const current = opts.index == null ? index : opts.index;
@@ -1154,6 +1159,8 @@ function buildArrayHistorySteps1472(raw, commands, shortUrl, displayUrl) {
     }
 
     steps.push({
+      linkedStoryView: { id: 1472, approach: 1, operations: commands.map(c => ({ ...c })), operationIndex: storyOperation,
+        current: index, order: history.map((_, i) => i), nodes: history.map((url, id) => ({ id, url })), outputs: [...outputs] },
       title: opts.title,
       arr: [],
       graph: {
@@ -1192,6 +1199,7 @@ function buildArrayHistorySteps1472(raw, commands, shortUrl, displayUrl) {
   });
 
   for (let commandIndex = 1; commandIndex < commands.length; commandIndex++) {
+    storyOperation = commandIndex;
     const command = commands[commandIndex];
 
     if (command.op === "visit") {
@@ -2047,6 +2055,7 @@ function buildSteps430(input, params) {
   const childSpec = params && params.children !== undefined ? params.children : "3:7,8,9,10;8:11,12";
   const { nodes, nextMap, prevMap, childMap, headId } = parseMultilevelList(input, childSpec);
   const steps = [];
+  const storyFrames = [];
 
   const nodeLabel = (id) => (id === null || id === undefined ? "None" : String(nodes.get(id).val));
 
@@ -2060,6 +2069,8 @@ function buildSteps430(input, params) {
 
   function push({ title, hlNodes = [], annotations = {}, codeLines, vars, note, final = false }) {
     steps.push({
+      linkedStoryView: { id: 430, head: headId, frames: storyFrames.map(frame => ({ ...frame })), nodes: [...nodes.values()].map(n => ({ id: n.id, value: n.val,
+        next: nextMap.get(n.id) ?? null, prev: prevMap.get(n.id) ?? null, child: childMap.get(n.id) ?? null })) },
       title,
       arr: [],
       graph: {
@@ -2132,6 +2143,8 @@ function buildSteps430(input, params) {
 
   function dfs(nodeId) {
     let cur = nodeId;
+    const frame = { root: nodeId, cur, last: null, child: null, nxt: null, tail: null };
+    storyFrames.push(frame);
     push({
       title: { vi: `dfs(${nodeLabel(nodeId)}): cur = node`, en: `dfs(${nodeLabel(nodeId)}): cur = node` },
       hlNodes: [cur],
@@ -2142,6 +2155,7 @@ function buildSteps430(input, params) {
     });
 
     let last = nodeId;
+    frame.last = last;
     push({
       title: { vi: "last = node", en: "last = node" },
       hlNodes: [cur],
@@ -2169,6 +2183,7 @@ function buildSteps430(input, params) {
       });
 
       const child = childMap.get(cur) || null;
+      frame.child = child;
       push({
         title: { vi: `child = cur.child = ${nodeLabel(child)}`, en: `child = cur.child = ${nodeLabel(child)}` },
         hlNodes: child ? [cur, child] : [cur],
@@ -2179,6 +2194,7 @@ function buildSteps430(input, params) {
       });
 
       const nxt = nextMap.get(cur) || null;
+      frame.nxt = nxt;
       push({
         title: { vi: `nxt = cur.next = ${nodeLabel(nxt)}`, en: `nxt = cur.next = ${nodeLabel(nxt)}` },
         hlNodes: nxt ? [cur, nxt] : [cur],
@@ -2231,6 +2247,7 @@ function buildSteps430(input, params) {
           note: { vi: `Tạm dừng dfs(${nodeLabel(cur)}), đệ quy vào dfs(${nodeLabel(child)}) để flatten chain con.`, en: `Pause dfs(${nodeLabel(cur)}), recurse into dfs(${nodeLabel(child)}) to flatten the child chain.` },
         });
         const tail = dfs(child);
+        frame.tail = tail;
         push({
           title: { vi: `dfs(${nodeLabel(child)}) trả về tail = ${nodeLabel(tail)}`, en: `dfs(${nodeLabel(child)}) returned tail = ${nodeLabel(tail)}` },
           hlNodes: [cur, tail],
@@ -2284,6 +2301,7 @@ function buildSteps430(input, params) {
         }
 
         last = tail;
+        frame.last = last;
         push({
           title: { vi: `last = tail = ${nodeLabel(tail)}`, en: `last = tail = ${nodeLabel(tail)}` },
           hlNodes: [tail],
@@ -2294,6 +2312,7 @@ function buildSteps430(input, params) {
         });
       } else {
         last = cur;
+        frame.last = last;
         push({
           title: { vi: `last = cur = ${nodeLabel(cur)}`, en: `last = cur = ${nodeLabel(cur)}` },
           hlNodes: [cur],
@@ -2305,6 +2324,7 @@ function buildSteps430(input, params) {
       }
 
       cur = nxt;
+      frame.cur = cur;
       push({
         title: { vi: `cur = nxt = ${nodeLabel(cur)}`, en: `cur = nxt = ${nodeLabel(cur)}` },
         hlNodes: cur ? [cur] : [],
@@ -2331,6 +2351,7 @@ function buildSteps430(input, params) {
       vars: [{ name: "returns", value: nodeLabel(last) }],
       note: { vi: `dfs(${nodeLabel(nodeId)}) hoàn tất, trả về node cuối ${nodeLabel(last)}.`, en: `dfs(${nodeLabel(nodeId)}) finishes, returning the last node ${nodeLabel(last)}.` },
     });
+    storyFrames.pop();
     return last;
   }
 
@@ -2409,6 +2430,7 @@ function buildSteps3507(input) {
       edges.push({ u: ord[i + 1], v: ord[i], w: "", kind: "prev" });
     }
     steps.push({
+      linkedStoryView: { id: 3507, merges: nums.length - ord.length, nodes: ord.map(id => ({ id, value: nodes.get(id).val })) },
       title: opts.title,
       arr: [],
       graph: {

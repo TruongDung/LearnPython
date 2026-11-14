@@ -4117,6 +4117,9 @@ function buildSteps1797HashMap(input, params) {
   const tokens = new Map(); // tokenId -> expiry
   const order = []; // stable display order (insertion order)
   const outputs = [];
+  let storyOperation = -1;
+  const story = () => ({ id: 1797, approach: 1, ttl, operations: commands.map(c => ({ ...c })), operationIndex: storyOperation,
+    time: commands[storyOperation]?.time ?? null, entries: [...tokens].map(([id, expiry]) => ({ id, expiry })), outputs: [...outputs] });
 
   function nodesFor(hlId, extraStatus) {
     return order.map((id) => {
@@ -4132,6 +4135,7 @@ function buildSteps1797HashMap(input, params) {
 
   function push({ title, hlId, activeIds = [], extraStatus, operation, codeLines, vars, note, final = false }) {
     steps.push({
+      linkedStoryView: story(),
       title,
       arr: [],
       graph: {
@@ -4165,7 +4169,8 @@ function buildSteps1797HashMap(input, params) {
     },
   });
 
-  for (const command of commands) {
+  for (const [commandIndex, command] of commands.entries()) {
+    storyOperation = commandIndex;
     if (command.op === "generate") {
       const { tokenId, time } = command;
       if (!order.includes(tokenId)) order.push(tokenId);
@@ -4196,8 +4201,6 @@ function buildSteps1797HashMap(input, params) {
       outputs.push(null);
     } else if (command.op === "renew") {
       const { tokenId, time } = command;
-      const known = order.includes(tokenId);
-      if (!known) order.push(tokenId);
       const currentExp = tokens.has(tokenId) ? tokens.get(tokenId) : 0;
 
       push({
@@ -4347,6 +4350,7 @@ function buildSteps1797HashMap(input, params) {
     },
     final: true,
   };
+  fs.linkedStoryView = story();
   steps.push(fs);
 
   return { original: raw, answer: outputs, steps };
@@ -4459,6 +4463,7 @@ function buildSteps1797DLL(input, params) {
   nextMap.set(HEAD, TAIL);
   prevMap.set(TAIL, HEAD);
   const outputs = [];
+  let storyOperation = -1;
 
   function order() {
     const ord = [];
@@ -4484,6 +4489,8 @@ function buildSteps1797DLL(input, params) {
       edges.push({ u: ord[i + 1], v: ord[i], w: "prev", kind: "prev" });
     }
     steps.push({
+      linkedStoryView: { id: 1797, approach: 2, ttl, operations: commands.map(c => ({ ...c })), operationIndex: storyOperation,
+        time: commands[storyOperation]?.time ?? null, entries: [...map].map(([id, expiry]) => ({ id, expiry })), order: [...ord], outputs: [...outputs] },
       title,
       arr: [],
       graph: {
@@ -4532,7 +4539,8 @@ function buildSteps1797DLL(input, params) {
     },
   });
 
-  for (const command of commands) {
+  for (const [commandIndex, command] of commands.entries()) {
+    storyOperation = commandIndex;
     if (command.op === "generate") {
       const { tokenId, time } = command;
       push({
@@ -4780,6 +4788,8 @@ function buildSteps1797DLL(input, params) {
 
   const ordFinal = order();
   const fs = {
+    linkedStoryView: { id: 1797, approach: 2, ttl, operations: commands.map(c => ({ ...c })), operationIndex: storyOperation,
+      time: commands[storyOperation]?.time ?? null, entries: [...map].map(([id, expiry]) => ({ id, expiry })), order: [...ordFinal], outputs: [...outputs] },
     title: { vi: "Kết quả", en: "Result" },
     arr: [],
     graph: {
