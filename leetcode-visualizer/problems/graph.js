@@ -26016,108 +26016,48 @@ function buildSteps2360(input) {
 function buildSteps2876(input) {
   const edges = parseFunctionalGraph(input, "edges", false);
   const n = edges.length;
-  const indegree = Array(n).fill(0);
-  const queue = [];
-  const removed = [];
-  const pruned = new Set();
-  const cycleNodes = new Set();
-  const answer = Array(n).fill(0);
-  const steps = [];
+  const indegree = Array(n).fill(0), queue = [], removed = [];
+  const pruned = new Set(), cycleNodes = new Set();
+  const answer = Array(n).fill(0), cycles = [], steps = [];
 
-  function graphState({ hlNodes = [], hlEdges = [] } = {}) {
-    const annotations = {};
-    for (const node of queue) annotations[node] = "queue";
-    for (const node of cycleNodes) annotations[node] = annotations[node] ? annotations[node] + ", cycle" : "cycle";
-    return {
-      nodes: Array.from({ length: n }, (_, node) => ({ id: node, label: String(node), sub: "in=" + indegree[node] + ", ans=" + (answer[node] || "?") })),
-      edges: edges.map((next, node) => ({ u: node, v: next })),
-      hlNodes,
-      hlEdges,
-      visitedNodes: [...pruned],
-      annotations,
-      caption: {
-        vi: "Xanh = node bị tỉa bởi Kahn · cycle = node còn lại trong cycle · số dưới node hiển thị indegree và đáp án",
-        en: "Green = node pruned by Kahn · cycle = node remaining in a cycle · numbers under a node show indegree and answer",
-      },
-    };
-  }
-
-  function snapshot({ title, note, codeLines, hlNodes, hlEdges, final = false }) {
+  function snapshot(phase, event, title, codeLines, detail = {}) {
     steps.push({
-      title,
-      note,
-      codeLines,
-      final,
-      arr: [...answer],
-      sub: answer.map((value) => value || "?"),
-      highlight: [],
-      mark: [],
-      graph: graphState({ hlNodes, hlEdges }),
-      vars: [
-        { name: "edges", value: "[" + edges.join(", ") + "]" },
-        { name: "indegree", value: "[" + indegree.join(", ") + "]" },
-        { name: "queue", value: "[" + queue.join(", ") + "]" },
-        { name: "removed", value: "[" + removed.join(", ") + "]" },
-        { name: "answer", value: "[" + answer.join(", ") + "]" },
-      ],
+      title, note: { vi: "", en: "" }, codeLines,
+      final: event === "result",
+      arr: [...answer], highlight: [], mark: [], vars: [],
+      visited2876View: {
+        frame: steps.length + 1, phase, event, edges: [...edges],
+        indegree: [...indegree], queue: [...queue], removed: [...removed],
+        pruned: [...pruned], cycleNodes: [...cycleNodes],
+        cycles: cycles.map(cycle => [...cycle]), answer: [...answer],
+        current: null, next: null, cycle: [], change: null, ...detail,
+      },
     });
   }
 
-  snapshot({
-    title: { vi: "Tính indegree", en: "Compute indegree" },
-    note: { vi: "Mỗi node có đúng một cạnh đi ra. Kahn sẽ tỉa các node không thể nằm trong cycle trước.", en: "Every node has exactly one outgoing edge. Kahn first prunes nodes that cannot be in a cycle." },
-    codeLines: [3, 4, 5],
-  });
+  snapshot("prune", "input", { vi: "Đi theo mũi tên, dừng khi gặp lại", en: "Follow arrows, stop at the first repeat" }, [5, 6]);
   for (const next of edges) indegree[next] += 1;
-  snapshot({
-    title: { vi: "indegree đã hoàn tất", en: "Indegree complete" },
-    note: { vi: "Node có indegree 0 không thể thuộc một directed cycle.", en: "A node with indegree 0 cannot belong to a directed cycle." },
-    codeLines: [4, 5],
-  });
-
+  snapshot("prune", "indegree", { vi: "Đếm các mũi tên đi vào", en: "Count incoming arrows" }, [7, 8]);
   for (let node = 0; node < n; node += 1) if (indegree[node] === 0) queue.push(node);
-  snapshot({
-    title: { vi: "Đưa mọi node indegree = 0 vào queue", en: "Enqueue every indegree-0 node" },
-    note: { vi: "Queue ban đầu: [" + queue.join(", ") + "].", en: "Initial queue: [" + queue.join(", ") + "]." },
-    codeLines: [6],
-    hlNodes: [...queue],
-  });
+  snapshot("prune", "queue", { vi: "Không có cạnh vào → hàng đợi", en: "No incoming edge → queue" }, [9, 10]);
 
   while (queue.length) {
     const node = queue.shift();
     removed.push(node);
     pruned.add(node);
-    snapshot({
-      title: { vi: "Pop " + node + " và thêm vào removed", en: "Pop " + node + " and append to removed" },
-      note: { vi: "Node " + node + " không nằm trong cycle. Lưu thứ tự tỉa để tính DP ngược sau này.", en: "Node " + node + " is not in a cycle. Save pruning order for reverse DP later." },
-      codeLines: [7, 8],
-      hlNodes: [node],
-    });
-    const next = edges[node];
+    snapshot("prune", "prune", { vi: "Tỉa đỉnh " + node, en: "Peel node " + node }, [11, 12, 13], { current: node, next: edges[node] });
+    const next = edges[node], before = indegree[next];
     indegree[next] -= 1;
-    snapshot({
-      title: { vi: "indegree[" + next + "] -= 1 → " + indegree[next], en: "indegree[" + next + "] -= 1 → " + indegree[next] },
-      note: { vi: "Bỏ cạnh " + node + " → " + next + " khỏi graph còn lại.", en: "Remove edge " + node + " → " + next + " from the remaining graph." },
-      codeLines: [9, 10],
-      hlNodes: [node, next],
-      hlEdges: [[node, next]],
+    snapshot("prune", "decrement", { vi: "Bỏ mũi tên " + node + " → " + next, en: "Remove arrow " + node + " → " + next }, [14, 15], {
+      current: node, next, change: { node: next, from: before, to: indegree[next] },
     });
     if (indegree[next] === 0) {
       queue.push(next);
-      snapshot({
-        title: { vi: "indegree = 0 → queue.append(" + next + ")", en: "indegree = 0 → queue.append(" + next + ")" },
-        note: { vi: "Node " + next + " cũng không thể ở cycle sau khi các cạnh đi vào đã bị tỉa.", en: "Node " + next + " also cannot be in a cycle once its incoming edges have been pruned." },
-        codeLines: [11, 12],
-        hlNodes: [next],
-      });
+      snapshot("prune", "enqueue", { vi: "Đỉnh " + next + " hết cạnh vào", en: "Node " + next + " has no incoming edges left" }, [16, 17], { current: next });
     }
   }
 
-  snapshot({
-    title: { vi: "Các node còn lại là cycle", en: "Remaining nodes are cycles" },
-    note: { vi: "Sau Kahn, các node có indegree > 0 nằm đúng trong các directed cycle.", en: "After Kahn, nodes with indegree above 0 are exactly the directed-cycle nodes." },
-    codeLines: [14, 15],
-  });
+  snapshot("cycle", "reveal", { vi: "Chỉ còn các vòng khép kín", en: "Only closed loops remain" }, [18, 19, 20]);
   for (let start = 0; start < n; start += 1) {
     if (indegree[start] === 0 || cycleNodes.has(start)) continue;
     const cycle = [];
@@ -26126,35 +26066,22 @@ function buildSteps2876(input) {
       cycleNodes.add(node);
       cycle.push(node);
       node = edges[node];
+      snapshot("cycle", "trace-cycle", { vi: "Đi quanh vòng", en: "Walk around the loop" }, [22, 23, 24, 25, 26], { current: cycle.at(-1), next: node, cycle: [...cycle] });
     }
     for (const current of cycle) answer[current] = cycle.length;
-    snapshot({
-      title: { vi: "Cycle [" + cycle.join(", ") + "] có độ dài " + cycle.length, en: "Cycle [" + cycle.join(", ") + "] has length " + cycle.length },
-      note: { vi: "Bắt đầu từ bất kỳ node nào trong cycle cũng thăm đúng " + cycle.length + " node rồi quay lại.", en: "Starting from any node in this cycle visits exactly " + cycle.length + " nodes before returning." },
-      codeLines: [16, 17, 18, 19, 20],
-      hlNodes: cycle,
-    });
+    cycles.push([...cycle]);
+    snapshot("cycle", "cycle", { vi: "Vòng có " + cycle.length + " đỉnh → mỗi đáp án = " + cycle.length, en: cycle.length + " nodes in the loop → each answer = " + cycle.length }, [27, 28], { cycle: [...cycle] });
   }
 
   for (let index = removed.length - 1; index >= 0; index -= 1) {
-    const node = removed[index];
-    const next = edges[node];
+    const node = removed[index], next = edges[node];
     answer[node] = 1 + answer[next];
-    snapshot({
-      title: { vi: "answer[" + node + "] = 1 + answer[" + next + "] → " + answer[node], en: "answer[" + node + "] = 1 + answer[" + next + "] → " + answer[node] },
-      note: { vi: "Tính ngược theo thứ tự tỉa: từ " + node + " ta thăm chính nó rồi mọi node mà " + next + " thăm được.", en: "Process pruning order in reverse: from " + node + " visit itself plus every node reachable from " + next + "." },
-      codeLines: [21, 22],
-      hlNodes: [node, next],
-      hlEdges: [[node, next]],
+    snapshot("backfill", "assign", { vi: "Đỉnh " + node + ": thêm chính mình", en: "Node " + node + ": add itself" }, [29, 30], {
+      current: node, next, change: { node, base: answer[next], to: answer[node] },
     });
   }
 
-  snapshot({
-    title: { vi: "return answer", en: "return answer" },
-    note: { vi: "Mỗi answer[i] là số node khác nhau nhìn thấy khi bắt đầu tại i.", en: "Each answer[i] is the number of distinct nodes seen when starting at i." },
-    codeLines: [23],
-    final: true,
-  });
+  snapshot("done", "result", { vi: "Chọn một đỉnh để thử đường đi", en: "Choose a node to try its walk" }, [31]);
   return { original: edges, answer, steps };
 }
 
