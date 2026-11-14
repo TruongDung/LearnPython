@@ -131,6 +131,18 @@ Object.assign(categories.graph, require('./time-room-pictures'), require('./shor
 Object.assign(categories.graph, require('./frog-position-1377'));
 Object.assign(categories.graph, require('./same-label-subtrees-1519'));
 
+const windowDecisionPictures = require('./window-decision-pictures');
+for (const id of windowDecisionPictures.ids) {
+  const base = categories.sliding[id], picture = windowDecisionPictures.attach(id, base);
+  for (let method = 2; method <= 7; method++) if (typeof base['builder' + method] === 'function') {
+    const variant = windowDecisionPictures.attach(id, { ...base, builder: base['builder' + method] }).builder;
+    picture['builder' + method] = (input, params = {}) => variant(input, { ...params, approach: String(method) });
+  }
+  categories.sliding[id] = picture;
+}
+categories['two-pointer'][283] = windowDecisionPictures.attach(283, categories['two-pointer'][283]);
+categories['binary-search'][528] = require('./random-pick-three-528')(categories['binary-search'][528]);
+
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 const { PREFIX_MAX_TAG, PREFIX_MAX_ROSTER, PREFIX_MAX_ORDER, PREFIX_MAX_ORDER_LABEL, PREFIX_MAX_GUIDE, prefixMaxSubTabs } = require('./prefix-max-catalog');

@@ -2285,6 +2285,12 @@ function buildSteps100(input, params) {
   const steps = [];
   const matchedP = new Set();
   const matchedQ = new Set();
+  const topology = root => {
+    const out = [];
+    const visit = (node, path) => { if (!node) return; out.push({ id: node.id, value: node.val, path }); visit(node.left, path + '.left'); visit(node.right, path + '.right'); };
+    visit(root, 'root'); return out;
+  };
+  const pTopology = topology(pRoot), qTopology = topology(qRoot);
 
   const nodeValue = (node) => (node ? node.val : "None");
   const pythonBool = (value) => (value ? "True" : "False");
@@ -2301,6 +2307,7 @@ function buildSteps100(input, params) {
       title,
       arr: [],
       sameTreeView: {
+        pTopology, qTopology, pId: p?.id ?? null, qId: q?.id ?? null,
         pTree: treeState(pRoot, p, matchedP, "p"),
         qTree: treeState(qRoot, q, matchedQ, "q"),
         pValue: pDisplay !== undefined ? pDisplay : nodeValue(p),

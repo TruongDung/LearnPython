@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.windowDecisionView || step.sameTreeView || step.equalSubarrays3505View || step.vowelSubstrings3306View || step.occurrenceLookupView || step.randomPickView), surface: "treeView", render: (step) => { renderWindowDecisionPictures(step); } },
     { predicate: (step) => Boolean(step.linkedStoryView) || [707, 2296].includes(step.linkedDesignView?.id) || step.dllRoadmapView?.id === 1823, surface: "treeView", render: (step) => { renderLinkedStoryPictures(step); } },
     { predicate: (step) => Boolean(step.sweepStudyView), surface: "treeView", render: (step) => { renderSweepStudy(step); } },
     { predicate: (step) => Boolean(step.advancedStackView), surface: "treeView", render: (step) => { renderAdvancedStackPictures(step); } },
