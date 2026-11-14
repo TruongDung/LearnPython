@@ -18099,7 +18099,8 @@ function buildSteps1000(input, params) {
  * LeetCode 1563: Stone Game V. Interval DP: dp[i][j] = điểm tối đa Alice lấy trên stones[i..j].
  */
 function buildSteps1563(input) {
-  const stones = (Array.isArray(input) ? input.map(Number) : String(input).split(",").map((v) => Number(v.trim()))).filter(Number.isFinite).slice(0, 10);
+  const stones = Array.isArray(input) ? input.map(Number) : String(input).split(",").map(v => Number(v.trim()));
+  if (!stones.length || stones.length > 10 || stones.some(v => !Number.isSafeInteger(v) || v <= 0)) throw new Error("1563: use 1 to 10 positive integer stones");
   const n = stones.length;
   const prefix = new Array(n + 1).fill(0);
   for (let i = 0; i < n; i++) prefix[i + 1] = prefix[i] + stones[i];
@@ -18107,11 +18108,19 @@ function buildSteps1563(input) {
   const dp = Array.from({ length: n }, () => new Array(n).fill(0));
   const computed = Array.from({ length: n }, () => new Array(n).fill(false));
   for (let i = 0; i < n; i++) computed[i][i] = true;
+  const choice = Array.from({ length: n }, () => Array(n).fill(null));
   const steps = [];
   const labels = stones.map((v) => `${v}`);
   const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : (j < i ? "" : "·"))));
   const push = (opts) => {
     steps.push({
+      stoneSplit1563View: {
+        stones: [...stones], dp: dp.map(row => [...row]), computed: computed.map(row => [...row]),
+        choice: choice.map(row => row.map(item => item ? { ...item } : null)),
+        interval: opts.hlCell || [0, n - 1], options: (opts.options || []).map(option => ({ ...option })),
+        split: opts.split ?? null, phase: opts.final ? 'result' : opts.hlCell ? 'interval' : 'setup',
+        answer: opts.final ? dp[0][n - 1] : null,
+      },
       title: opts.title, arr: [],
       grid: { dp: display(), text1: labels.slice(1), text2: labels.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
       highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
@@ -18120,7 +18129,7 @@ function buildSteps1563(input) {
 
   push({
     title: { vi: `stones = [${stones.join(", ")}], dp[i][i] = 0`, en: `stones = [${stones.join(", ")}], dp[i][i] = 0` },
-    codeLines: [4],
+    codeLines: [7],
     caption: "dp[i][j] = điểm tối đa Alice giành được trên stones[i..j]",
     vars: [{ name: "stones", value: `[${stones.join(", ")}]` }],
     note: {
@@ -18134,6 +18143,8 @@ function buildSteps1563(input) {
       const j = i + len - 1;
       let best = 0;
       let bestSplit = -1;
+      let bestSide = null;
+      const options = [];
       for (let k = i; k < j; k++) {
         const left = sum(i, k);
         const right = sum(k + 1, j);
@@ -18141,14 +18152,17 @@ function buildSteps1563(input) {
         if (left < right) cand = left + dp[i][k];
         else if (right < left) cand = right + dp[k + 1][j];
         else cand = left + Math.max(dp[i][k], dp[k + 1][j]);
-        if (cand > best) { best = cand; bestSplit = k; }
+        const side = left < right ? 'left' : right < left ? 'right' : dp[i][k] >= dp[k + 1][j] ? 'left' : 'right';
+        options.push({ split: k, leftSum: left, rightSum: right, leftFuture: dp[i][k], rightFuture: dp[k + 1][j], side, score: cand });
+        if (cand > best) { best = cand; bestSplit = k; bestSide = side; }
       }
       dp[i][j] = best;
       computed[i][j] = true;
+      choice[i][j] = { split: bestSplit, side: bestSide };
       push({
         title: { vi: `dp[${i}][${j}] = ${best}`, en: `dp[${i}][${j}] = ${best}` },
-        codeLines: [9, 10, 11],
-        hlCell: [i, j],
+        codeLines: [20],
+        hlCell: [i, j], split: bestSplit, options,
         pathCells: bestSplit >= 0 ? [[i, bestSplit], [bestSplit + 1, j]] : [],
         caption: `dp[${i}][${j}] = ${best} · đoạn [${stones.slice(i, j + 1).join(",")}]`,
         vars: [
@@ -18167,7 +18181,7 @@ function buildSteps1563(input) {
   const answer = n ? dp[0][n - 1] : 0;
   push({
     title: { vi: `Kết quả: dp[0][${n - 1}] = ${answer}`, en: `Result: dp[0][${n - 1}] = ${answer}` },
-    codeLines: [12], hlCell: [0, Math.max(0, n - 1)], final: true,
+    codeLines: [21], hlCell: [0, Math.max(0, n - 1)], final: true,
     caption: `Đáp án = ${answer}`,
     vars: [{ name: "answer", value: answer }],
     note: { vi: `Điểm tối đa Alice giành được = ${answer}.`, en: `Alice's maximum score = ${answer}.` },
@@ -18723,7 +18737,8 @@ function buildSteps1269(input, params) {
  * Interval DP trên các điểm cắt đã thêm 0 và n rồi sắp xếp.
  */
 function buildSteps1547(input, params) {
-  const n = Math.max(1, Number((params && params.n) ?? 7));
+  const n = Number((params && params.n) ?? 7);
+  if (!Number.isSafeInteger(n) || n < 1) throw new Error("1547: n must be a positive integer");
   const cutsRaw = (Array.isArray(input) ? input.map(Number) : String(input).split(",").map((v) => Number(v.trim())))
     .filter((c) => Number.isFinite(c) && c > 0 && c < n);
   const points = [0, ...Array.from(new Set(cutsRaw)).sort((a, b) => a - b), n];
@@ -18731,6 +18746,8 @@ function buildSteps1547(input, params) {
   const dp = Array.from({ length: m }, () => new Array(m).fill(0));
   const computed = Array.from({ length: m }, () => new Array(m).fill(false));
   for (let i = 0; i < m; i++) computed[i][i] = true;
+  const choice = Array.from({ length: m }, () => Array(m).fill(null));
+  for (let i = 0; i + 1 < m; i++) computed[i][i + 1] = true;
   const steps = [];
 
   // Pass the m×m interval table directly. The generic grid treats row 0 / col 0
@@ -18738,6 +18755,13 @@ function buildSteps1547(input, params) {
   const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : (j <= i ? "" : "·"))));
   const push = (opts) => {
     steps.push({
+      cutStick1547View: {
+        n, points: [...points], dp: dp.map(row => [...row]), computed: computed.map(row => [...row]),
+        choice: choice.map(row => [...row]), interval: opts.hlCell || [0, m - 1],
+        split: opts.split ?? null, options: (opts.options || []).map(option => ({ ...option })),
+        phase: opts.final ? 'result' : opts.hlCell ? 'interval' : 'setup',
+        answer: opts.final ? dp[0][m - 1] : null,
+      },
       title: opts.title,
       arr: [],
       grid: {
@@ -18774,16 +18798,19 @@ function buildSteps1547(input, params) {
       const j = i + len;
       let best = Infinity;
       let bestK = -1;
+      const options = [];
       for (let kk = i + 1; kk < j; kk++) {
         const cost = dp[i][kk] + dp[kk][j] + (points[j] - points[i]);
+        options.push({ split: kk, cut: points[kk], left: dp[i][kk], right: dp[kk][j], length: points[j] - points[i], cost });
         if (cost < best) { best = cost; bestK = kk; }
       }
       dp[i][j] = best === Infinity ? 0 : best;
       computed[i][j] = true;
+      choice[i][j] = bestK;
       push({
         title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
         codeLines: [9, 10],
-        hlCell: [i, j],
+        hlCell: [i, j], split: bestK, options,
         pathCells: bestK >= 0 ? [[i, bestK], [bestK, j]] : [],
         caption: `dp[${i}][${j}] = min_k( dp[${i}][k]+dp[k][${j}] ) + (${points[j]}−${points[i]}) = ${dp[i][j]}`,
         vars: [
@@ -24849,6 +24876,8 @@ function buildSteps1655(input, params = {}) {
         phase,
         answer: final ? reachable.has(fullMask) : null,
         assignments: final && reachable.has(fullMask) ? buildAssignments(fullMask) : [],
+        stateAssignments: buildAssignments(phase === 'transition' ? newMask : fromMask ?? 0),
+        reachableAssignments: final ? [...reachable].map(mask => ({ mask, assignments: buildAssignments(mask) })) : [],
         traceTruncated,
       },
     });
@@ -24928,7 +24957,9 @@ function buildSteps1655(input, params = {}) {
 // Step lines refer to code2 numbering (1–22).
 function buildSteps1655Backtracking(input, params = {}) {
   const nums = parseIntegerList1655(input, "nums");
-  const quantity = parseIntegerList1655(params.quantity ?? "", "quantity").sort((left, right) => right - left);
+  const originalQuantity = parseIntegerList1655(params.quantity ?? "", "quantity");
+  const requests = originalQuantity.map((need, originalIndex) => ({ need, originalIndex })).sort((a, b) => b.need - a.need || a.originalIndex - b.originalIndex);
+  const quantity = requests.map(request => request.need), requestOrder = requests.map(request => request.originalIndex);
   if (nums.length > 16 || quantity.length < 1 || quantity.length > 5 || quantity.some((value) => value < 1 || value > 10)) {
     throw new Error("Use up to 16 nums and 1 to 5 positive quantity requests (each at most 10).");
   }
@@ -24968,7 +24999,7 @@ function buildSteps1655Backtracking(input, params = {}) {
         ...(final ? [{ name: "result", value: finalAnswer }] : []),
       ],
       distribute1655BacktrackView: {
-        quantity,
+        quantity: [...quantity], originalQuantity: [...originalQuantity], requestOrder: [...requestOrder],
         bucketLabels,
         counts: [...counts],
         initialCounts,
