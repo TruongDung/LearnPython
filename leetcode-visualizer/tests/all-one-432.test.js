@@ -102,8 +102,8 @@ test('432 renders every frame in both languages with the executed line number an
 test('432 assets are wired with light and dark theme tokens', () => {
   const index = readFrontendIndex();
   const css = readFrontendStyles();
-  assert.match(index, /all-one-432\.css\?v=all-one-432-v5/);
-  assert.match(index, /renderer-all-one-432\.js\?v=all-one-432-v5/);
+  assert.match(index, /all-one-432\.css\?v=all-one-432-pictures-v6/);
+  assert.match(index, /renderer-all-one-432\.js\?v=all-one-432-pictures-v6/);
   assert.match(css, /\.ao432-viz \{[^}]*--ao432-bg:/s);
   assert.match(css, /\[data-theme="light"\] \.ao432-viz \{[^}]*--ao432-bg:/s);
   assert.equal(problem.debugMode, 'line-by-line');

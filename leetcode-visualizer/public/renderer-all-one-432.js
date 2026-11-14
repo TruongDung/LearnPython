@@ -636,53 +636,103 @@ function ao432Bind(host) {
   });
 }
 
+function ao432CompletedIndex(timeline, operationIndex) {
+  let target = -1;
+  timeline.forEach((step, i) => {
+    const v = step.allOne432View;
+    if (v?.operation?.index === operationIndex && v.operation.status === "complete") target = i;
+  });
+  return target;
+}
+
+function ao432OperationChange(state, timeline = []) {
+  const index = state.operation.index, key = state.operation.key;
+  if (!index || !key) return null;
+  const entry = timeline.find(step => step.allOne432View?.operation?.index === index)?.allOne432View;
+  const before = entry ? entry.maps.keyCount.find(item => item.key === key)?.count ?? 0
+    : state.locals.oldCount ?? (state.operation.name === "inc" && state.operation.outputs.length >= index ? Math.max(0, (state.maps.keyCount.find(item => item.key === key)?.count || 1) - 1) : state.maps.keyCount.find(item => item.key === key)?.count ?? 0);
+  const after = state.operation.name === "inc" ? before + 1 : Math.max(0, before - 1);
+  return { key, before, after, complete: state.operation.outputs.length >= index };
+}
+
+function ao432VisibleDetached(state) {
+  const linked = new Set(state.structure.order);
+  const referenced = new Set([state.locals.bucket, state.locals.target, state.locals.newBucket, state.locals.predecessor, state.locals.successor, state.mutation.object, state.structure.constructing, ...state.maps.keyBucket.map(entry => entry.bucket)].filter(Boolean));
+  return state.structure.buckets.filter(bucket => !linked.has(bucket.id) && referenced.has(bucket.id));
+}
+
+function ao432GroupCards(state, selectedKey, inspectedKind) {
+  const esc = ao432Escape, t = (vi, en) => ao432IsVi() ? vi : en;
+  const { order, byId } = state.structure;
+  const real = order.map(id => byId.get(id)).filter(bucket => !bucket.sentinel);
+  const extreme = inspectedKind ? inspectedKind === "min" ? real[0]?.id : real.at(-1)?.id : state.query.bucket;
+  const group = (bucket, detached = false) => {
+    const min = real[0]?.id === bucket.id, max = real.at(-1)?.id === bucket.id;
+    const ghost = state.mutation.kind === "key-remove" && state.mutation.object === bucket.id && ao432Key(state.mutation.before) && !bucket.keys.includes(state.mutation.before) ? state.mutation.before : null;
+    return `<section class="aop-group ${bucket.sentinel ? 'sentinel' : ''} ${detached ? 'detached' : ''} ${bucket.keys.includes(selectedKey) ? 'selected-key' : ''} ${bucket.id === extreme ? 'inspected' : ''} ${bucket.id === state.structure.constructing ? 'constructing' : ''}" data-ao432-group-id="${bucket.id}" data-linked="${!detached}" data-count="${bucket.count ?? ''}"><header>${bucket.sentinel ? `<b>${bucket.sentinel.toUpperCase()}</b>` : `<small>${min && max ? 'min = max' : min ? 'min' : max ? 'max' : 'count'}</small><strong>${bucket.count ?? '—'}</strong>`}</header>${bucket.sentinel ? '' : `<div class="aop-group-keys">${bucket.keys.map(key => `<button type="button" class="${key === selectedKey ? 'selected' : ''} ${key === state.query.chosen ? 'returned' : ''}" data-ao432-key="${key}" data-key-count="${bucket.count ?? ''}">${esc(key)}${key === state.query.chosen ? ' ★' : ''}</button>`).join('') || '<i>∅</i>'}${ghost ? `<s class="aop-ghost" data-ao432-ghost="${ghost}">${esc(ghost)}</s>` : ''}</div>`}</section>`;
+  };
+  const linked = order.map((id, i) => {
+    const bucket = byId.get(id), next = byId.get(order[i + 1]);
+    const link = next ? `<span class="aop-link ${next.prev === id ? '' : 'oneway'}" data-ao432-link-from="${id}" data-next="${next.id}" data-reciprocal="${next.prev === id}" aria-label="${next.prev === id ? 'next and prev' : 'next'}">${next.prev === id ? '⇄' : '→'}</span>` : '';
+    return group(bucket) + link;
+  }).join('');
+  const detached = state.invariants.stable === true ? [] : ao432VisibleDetached(state);
+  return `<div class="aop-group-scroll" tabindex="0" role="region" aria-label="${t('Các bucket count tăng dần', 'Buckets in increasing count order')}"><div class="aop-groups">${linked || '<i class="aop-muted">∅</i>'}</div></div>${detached.length ? `<div class="aop-detached"><small>⤵ ${t('Đang nối / đã tách', 'Being linked / detached')}</small><div class="aop-group-scroll"><div class="aop-groups">${detached.map(bucket => group(bucket, true)).join('')}</div></div></div>` : ''}`;
+}
+
 function renderAllOne432View(step) {
-  const host = typeof document !== "undefined" && document.getElementById
-    ? document.getElementById("treeView")
-    : typeof $ === "function" ? $("treeView") : null;
+  const host = typeof document !== "undefined" && document.getElementById ? document.getElementById("treeView") : typeof $ === "function" ? $("treeView") : null;
   if (!host) return;
-  const vi = ao432IsVi();
-  const copy = AO432_COPY[vi ? "vi" : "en"];
-  const state = ao432Normalize(step);
-  const status = ao432Status(state, copy);
-  const query = typeof host.querySelector === "function" ? host.querySelector.bind(host) : () => null;
-  const scrolls = new Map(["chain", "ops"].map((name) => {
-    const element = query(`[data-ao432-scroll="${name}"]`);
-    return [name, element ? { x: element.scrollLeft, y: element.scrollTop } : null];
-  }));
-  const detailsOpen = Boolean(query(".ao432-details") && query(".ao432-details").open);
-  const command = state.operation.index > 0 ? state.commands[state.operation.index - 1] : null;
-  const heading = command ? ao432CallText(command.op, command.key) : "AllOne()";
-  const presets = AO432_CASES.map((preset, index) => `<button type="button" data-ao432-case="${index}">${ao432Escape(vi ? preset[1] : preset[2])}</button>`).join("");
-  const jumps = copy.jumps.map(([kind, label]) => `<button type="button" data-ao432-jump="${kind}"${ao432Next(kind) < 0 ? " disabled" : ""}>${ao432Escape(label)}</button>`).join("");
-  const legend = `<div class="ao432-legend" aria-hidden="true"><span class="lg-next">→ next</span><span class="lg-prev">← prev</span><span class="lg-written">→ ${ao432Escape(copy.written)}</span><span class="lg-oneway">⇢ ${ao432Escape(copy.oneWay)}</span><span class="lg-count">${ao432Escape(copy.countLegend)}</span></div>`;
-
-  host.innerHTML = `<article class="ao432-viz ao432-status-${status.kind}${state.final ? " is-final" : ""}" data-problem-id="432" data-source-line="${state.line}" data-phase="${state.phase}" role="region" aria-label="LeetCode 432 · line ${state.line}">`
-    + `<header class="ao432-head"><div><small>LEETCODE 432 · ALL O\`ONE</small><h2><code>${ao432Escape(heading)}</code></h2></div><span class="ao432-status" title="${ao432Escape(status.label)}">${status.icon} ${ao432Escape(status.label)}</span></header>`
-    + `<nav class="ao432-presets" aria-label="${ao432Escape(copy.examples)}">${presets}</nav>`
-    + `<section class="ao432-card ao432-ops-card" aria-label="${ao432Escape(copy.ops)}"><div class="ao432-scroll" data-ao432-scroll="ops" tabindex="0">${ao432Operations(state)}</div></section>`
-    + `<section class="ao432-card ao432-chain-card" aria-label="${ao432Escape(copy.chain)}"><header><b>${ao432Escape(copy.chain)}</b></header><div class="ao432-scroll" data-ao432-scroll="chain" tabindex="0">${ao432Picture(state, copy)}</div>${legend}</section>`
-    + `<div class="ao432-split"><section class="ao432-card ao432-code-card" aria-label="${ao432Escape(copy.code)}">${ao432Code(state, copy)}</section>`
-    + `<section class="ao432-card ao432-maps-card" aria-label="${ao432Escape(copy.maps)}"><header><b>${ao432Escape(copy.maps)}</b></header>${ao432Maps(state, copy)}</section></div>`
-    + `${ao432Details(state, copy, vi)}<footer class="ao432-foot">${jumps}</footer></article>`;
-
-  const restored = typeof host.querySelector === "function" ? host.querySelector(".ao432-details") : null;
-  if (restored) restored.open = detailsOpen;
-  if (typeof host.querySelectorAll === "function") {
-    host.querySelectorAll("[data-ao432-scroll]").forEach((element) => {
-      const saved = scrolls.get(element.dataset.ao432Scroll);
-      if (saved) {
-        element.scrollLeft = saved.x;
-        element.scrollTop = saved.y;
-      }
-      const focus = element.querySelector(".is-current, .is-written, .is-constructing");
-      if (focus && typeof focus.getBoundingClientRect === "function") {
-        const outer = element.getBoundingClientRect();
-        const inner = focus.getBoundingClientRect();
-        if (inner.left < outer.left + 8) element.scrollLeft -= outer.left + 8 - inner.left;
-        if (inner.right > outer.right - 8) element.scrollLeft += inner.right - outer.right + 8;
-      }
-    });
-  }
-  ao432Bind(host);
+  const state = ao432Normalize(step), vi = ao432IsVi(), copy = AO432_COPY[vi ? "vi" : "en"], esc = ao432Escape;
+  const t = (a, b) => vi ? a : b;
+  const timeline = typeof steps === 'undefined' ? [] : steps;
+  const frame = JSON.stringify([state.commands, state.operation.index, state.line, state.event, state.structure.constructing, state.mutation.object, state.mutation.after]);
+  const same = host.dataset?.aopFrameKey === frame;
+  const defaultKey = state.operation.key || state.query.chosen || null;
+  const selectedKey = same && host.dataset?.aopSelectedKey ? host.dataset.aopSelectedKey : defaultKey;
+  const inspectedKind = same ? host.dataset?.aopInspectedKind || '' : '';
+  const query = typeof host.querySelector === 'function' ? host.querySelector.bind(host) : () => null;
+  const technicalOpen = query('.aop-technical')?.open || false;
+  const oldScroll = same ? query('.aop-group-scroll')?.scrollLeft || 0 : 0;
+  if (host.dataset) { host.dataset.aopFrameKey = frame; host.dataset.aopSelectedKey = selectedKey || ''; host.dataset.aopInspectedKind = inspectedKind; }
+  const card = (label, content, cls = '') => `<section class="ao432-card ${cls}"><header>${label}</header>${content}</section>`;
+  const change = ao432OperationChange(state, timeline);
+  const status = ao432Status(state, copy), stable = state.invariants.stable === true;
+  const queryKind = inspectedKind || state.query.kind;
+  const real = state.structure.order.map(id => state.structure.byId.get(id)).filter(bucket => !bucket.sentinel);
+  const extreme = queryKind === 'min' ? real[0] : queryKind === 'max' ? real.at(-1) : null;
+  const command = state.operation.index ? ao432CallText(state.operation.name, state.operation.key) : 'AllOne()';
+  const transition = change ? `<div class="aop-change ${change.after === 0 ? 'deleting' : ''}" data-ao432-before="${change.before}" data-ao432-after="${change.after}" data-ao432-complete="${change.complete}"><span><small>${t('trước', 'before')}</small><b>${esc(change.key)}</b><strong>${change.before || '∅'}</strong></span><i>${state.operation.name === 'inc' ? '＋1 →' : change.before ? '−1 →' : '→'}</i><span class="target"><small>${change.complete ? '✓' : t('đích', 'target')}</small><b>${change.after ? esc(change.key) : `<s>${esc(change.key)}</s>`}</b><strong>${change.after || '∅'}</strong></span></div>` : '';
+  const queryPicture = queryKind ? card(`<b>${inspectedKind ? t('Thử', 'Inspect') + ' ' : ''}${queryKind === 'min' ? 'getMinKey' : 'getMaxKey'}</b><small>${t('Key bằng count đều hợp lệ', 'Any key at this count is valid')}</small>`, `<div class="aop-query"><span>${queryKind === 'min' ? 'HEAD →' : 'TAIL ←'}</span>${extreme ? `<strong>${extreme.count}</strong><i>→</i><div>${extreme.keys.map(key => `<button type="button" data-ao432-key="${key}" class="${key === selectedKey ? 'selected' : ''}">${esc(key)}${!inspectedKind && key === state.query.chosen ? ' ★' : ''}</button>`).join('')}</div>` : '<strong>∅ → ""</strong>'}</div>`) : '';
+  const countEntry = state.maps.keyCount.find(entry => entry.key === selectedKey), bucketEntry = state.maps.keyBucket.find(entry => entry.key === selectedKey);
+  const bucket = bucketEntry ? state.structure.byId.get(bucketEntry.bucket) : null;
+  const physical = selectedKey ? state.structure.buckets.filter(record => record.keys.includes(selectedKey)) : [];
+  const route = selectedKey ? card(`<b>🔑 ${esc(selectedKey)}</b><small>${t('Bấm key để lần theo map', 'Choose a key to trace its maps')}</small>`, `<div class="aop-route" data-ao432-route-key="${esc(selectedKey)}"><span>${esc(selectedKey)}</span><i>→</i><span><small>keyCount</small><b>${countEntry?.count ?? '∅'}</b></span><i>·</i><span class="${bucket && countEntry && bucket.count !== countEntry.count ? 'updating' : ''}"><small>keyBucket</small><b>${bucket ? '[' + (bucket.count ?? '—') + ']' : '∅'}</b></span></div>${!physical.length && countEntry ? `<div class="aop-inflight">⇢ <b>${esc(selectedKey)}</b> ⇢ <small>${t('đang dời vào bucket', 'moving into a bucket')}</small></div>` : ''}`) : '';
+  const opButton = (index, label, result = '', current = false) => `<button type="button" data-aop-operation="${index}" class="${current ? 'selected' : ''}"><small>${index || '⚙'}</small><b>${esc(label)}</b>${result ? `<em>${esc(result)}</em>` : ''}</button>`;
+  const operations = opButton(0, '∅', '', state.operation.index === 0) + state.commands.map((item, i) => {
+    const output = state.operation.outputs[i], result = i < state.operation.outputs.length && output !== null ? output === '' ? '""' : output : '';
+    return opButton(i + 1, item.op === 'inc' ? '＋ ' + item.key : item.op === 'dec' ? '− ' + item.key : item.op === 'getMaxKey' ? 'max' : 'min', result, state.operation.index === i + 1);
+  }).join('');
+  const previous = ao432CompletedIndex(timeline, Math.max(0, state.operation.index - 1));
+  const complete = ao432CompletedIndex(timeline, state.operation.index);
+  const next = ao432CompletedIndex(timeline, state.operation.index + 1);
+  const currentIndex = typeof stepIndex === 'undefined' ? -1 : stepIndex;
+  const completeNow = state.operation.index === 0 ? stable : state.operation.outputs.length >= state.operation.index;
+  const advance = !completeNow && complete > currentIndex ? complete : next;
+  const now = `<div class="ao432-now" data-code-line="${state.line}" aria-current="step"><span class="ao432-lineno">L${state.line}</span><small>${esc(ao432Effect(state) || (step?.note && typeof step.note === 'object' ? step.note[vi ? 'vi' : 'en'] : '') || '')}</small>${state.condition !== null ? `<b class="ao432-branch is-${state.condition ? 'true' : 'false'}">${state.condition ? '✓' : '×'}</b>` : ''}</div>`;
+  host.innerHTML = `<article class="ao432-viz ao432-pictures ao432-status-${status.kind}" data-problem-id="432" data-source-line="${state.line}" data-phase="${state.phase}"><header class="aop-heading"><strong>${esc(command)}</strong><small>#432 · ${state.operation.index}/${state.commands.length} · ${status.icon}</small></header>${transition}${queryPicture}${card(`<b>count ↑</b><small>${t('Mỗi hộp chứa các key cùng count', 'Each box contains equal-count keys')}</small>`, ao432GroupCards(state, selectedKey, inspectedKind))}<nav class="aop-extremes"><button type="button" data-aop-inspect="min" ${!stable ? 'disabled' : ''}>← min</button><button type="button" data-aop-inspect="max" ${!stable ? 'disabled' : ''}>max →</button></nav>${route}<nav class="aop-play"><button type="button" data-aop-go="${previous}" data-aop-control="previous" ${previous < 0 || state.operation.index === 0 ? 'disabled' : ''}>←</button><button type="button" data-aop-go="${advance}" data-aop-control="next" ${advance < 0 ? 'disabled' : ''}>${!completeNow ? t('Xong thao tác', 'Finish operation') : t('Thao tác kế', 'Next operation')} →</button></nav>${card(`<b>${t('Bấm một thao tác để xem kết quả', 'Choose an operation to see its result')}</b>`, `<div class="aop-op-scroll"><div class="aop-operations">${operations}</div></div>`)}${now}<details class="aop-technical" ${technicalOpen ? 'open' : ''}><summary>${t('Pointer · hash map · chi tiết', 'Pointers · hash maps · details')}</summary><div class="ao432-scroll">${ao432Picture(state, copy)}</div><div class="aop-technical-maps">${ao432Maps(state, copy)}</div>${ao432Details(state, copy, vi)}<nav class="ao432-foot">${copy.jumps.map(([kind, label]) => `<button type="button" data-ao432-jump="${kind}" ${ao432Next(kind) < 0 ? 'disabled' : ''}>${esc(label)}</button>`).join('')}</nav></details><nav class="aop-examples">${AO432_CASES.map((preset, i) => `<button type="button" data-ao432-case="${i}">${esc(vi ? preset[1] : preset[2])}</button>`).join('')}</nav></article>`;
+  const redraw = selector => { renderAllOne432View(step); host.querySelector?.(selector)?.focus({ preventScroll: true }); };
+  host.querySelectorAll?.('button').forEach(button => button.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }));
+  host.querySelectorAll?.('summary').forEach(summary => summary.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }));
+  const go = (index, selector) => { ao432Go(index); (host.querySelector?.(`${selector}:not(:disabled)`) || host.querySelector?.('.aop-operations .selected'))?.focus({ preventScroll: true }); };
+  host.querySelectorAll?.('[data-aop-operation]').forEach(button => button.addEventListener('click', () => go(ao432CompletedIndex(timeline, Number(button.dataset.aopOperation)), `[data-aop-operation="${button.dataset.aopOperation}"]`)));
+  host.querySelectorAll?.('[data-aop-go]').forEach(button => button.addEventListener('click', () => go(Number(button.dataset.aopGo), `[data-aop-control="${button.dataset.aopControl}"]`)));
+  host.querySelectorAll?.('[data-aop-inspect]').forEach(button => button.addEventListener('click', () => { if (typeof stopPlay === 'function') stopPlay(); host.dataset.aopInspectedKind = button.dataset.aopInspect; redraw(`[data-aop-inspect="${button.dataset.aopInspect}"]`); }));
+  host.querySelectorAll?.('[data-ao432-key]').forEach(button => button.addEventListener('click', () => { if (typeof stopPlay === 'function') stopPlay(); host.dataset.aopSelectedKey = button.dataset.ao432Key; redraw(`.aop-group [data-ao432-key="${button.dataset.ao432Key}"]`); }));
+  host.querySelectorAll?.('[data-ao432-jump]').forEach(button => button.addEventListener('click', () => ao432Go(ao432Next(button.dataset.ao432Jump))));
+  host.querySelectorAll?.('[data-ao432-case]').forEach(button => button.addEventListener('click', async () => { if (typeof stopPlay === 'function') stopPlay(); const input = typeof document !== 'undefined' ? document.getElementById('arrInput') : $('arrInput'); input.value = AO432_CASES[Number(button.dataset.ao432Case)][0]; if (typeof runViz === 'function') await runViz(); }));
+  const groupScroll = query('.aop-group-scroll'), focused = query('.aop-group.selected-key, .aop-group.inspected, .aop-group.constructing');
+  if (groupScroll) { groupScroll.scrollLeft = oldScroll; if (!same && focused && groupScroll.contains(focused)) { const a = groupScroll.getBoundingClientRect(), b = focused.getBoundingClientRect(); groupScroll.scrollLeft += b.left - a.left - (a.width - b.width) / 2; } }
+  const opScroll = query('.aop-op-scroll'), activeOp = query('.aop-operations .selected');
+  if (opScroll && activeOp) { const a = opScroll.getBoundingClientRect(), b = activeOp.getBoundingClientRect(); opScroll.scrollLeft += b.left - a.left - (a.width - b.width) / 2; }
 }

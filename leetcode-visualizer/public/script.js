@@ -84,6 +84,7 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.shortestUnsorted581View), surface: "treeView", render: (step) => { renderShortestUnsorted581(step); } },
     { predicate: (step) => Boolean(step.visiblePeople2282View), surface: "treeView", render: (step) => { renderVisiblePeople2282(step); } },
     { predicate: (step) => Boolean(step.dllRoadmapView), surface: "treeView", render: (step) => { renderDllRoadmap(step); } },
+    { predicate: (step) => step.linkedDesignView?.id === 146, surface: "treeView", render: (step) => { renderLruCache146Pictures(step); } },
     { predicate: (step) => Boolean(step.linkedDesignView), surface: "treeView", render: (step) => { renderLinkedDesign(step); } },
     { predicate: (step) => Boolean(step.serverSchedulingView), surface: "treeView", render: (step) => { renderBusiestServers1606(step); } },
     { predicate: (step) => Boolean(step.maximumTreeView), surface: "treeView", render: (step) => { renderMaximumTree654(step); } },
@@ -869,7 +870,7 @@ const ORDERED_RENDERER_REGISTRY = [
       renderLoudRichView(step);
     } },
     { predicate: (step) => Boolean(step.lruCacheView), surface: "treeView", render: (step) => {
-      renderLruCacheView(step);
+      renderLruCache146Pictures(step);
     } },
     { predicate: (step) => Boolean(step.lfuCacheView), surface: "treeView", render: (step) => {
       renderLfuCacheView(step);
