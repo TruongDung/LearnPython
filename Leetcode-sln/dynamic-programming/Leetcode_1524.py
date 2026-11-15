@@ -1,15 +1,11 @@
 class Solution:
     def numOfSubarrays(self, arr):
         MOD = 10**9 + 7
-        even, odd = 1, 0
-        parity = 0
         answer = 0
-        for i, value in enumerate(arr):
-            parity = (parity + value) % 2
-            if parity:
-                answer = (answer + even) % MOD
-                odd += 1
-            else:
-                answer = (answer + odd) % MOD
-                even += 1
+        for left in range(len(arr)):
+            total = 0
+            for right in range(left, len(arr)):
+                total += arr[right]
+                if total % 2:
+                    answer = (answer + 1) % MOD
         return answer
