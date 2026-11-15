@@ -14,6 +14,49 @@ const armorCode=`class Solution:
                 shield_at = i
         saved = min(peak, armor)
         return total - saved + 1`.split('\n');
+const dungeonMemoCode=`from functools import lru_cache
+
+class Solution:
+    def calculateMinimumHP(self, dungeon):
+        m, n = len(dungeon), len(dungeon[0])
+
+        @lru_cache(None)
+        def dfs(i, j):
+            if i >= m or j >= n:
+                return float('inf')
+
+            if i == m - 1 and j == n - 1:
+                return max(1, 1 - dungeon[i][j])
+
+            down = dfs(i + 1, j)
+            right = dfs(i, j + 1)
+
+            return max(1, min(down, right) - dungeon[i][j])
+
+        return dfs(0, 0)`.split('\n');
+const dungeonPaddedCode=`from typing import List
+
+class Solution:
+    def calculateMinimumHP(self, dungeon: List[List[int]]) -> int:
+        m, n = len(dungeon), len(dungeon[0])
+
+        dp = [[float('inf')] * (n + 1) for _ in range(m + 1)]
+
+        dp[m][n - 1] = 1
+        dp[m - 1][n] = 1
+
+        for i in range(m - 1, -1, -1):
+            for j in range(n - 1, -1, -1):
+                down = dp[i + 1][j]
+                right = dp[i][j + 1]
+
+                dp[i][j] = max(
+                    1,
+                    min(down, right) - dungeon[i][j]
+                )
+
+        return dp[0][0]`.split('\n');
+const dungeonLabels=[bi('1. DP từ đích về đầu','1. Bottom-up DP'),bi('2. DFS + lru_cache','2. DFS + lru_cache'),bi('3. DP có viền ∞','3. DP with ∞ padding')];
 function parseDamage(input,params={}){
   let damage=input;
   try{if(typeof input==='string'){const s=input.trim();damage=s.startsWith('[')?JSON.parse(s):s.split(',').map(x=>x.trim()?Number(x):NaN);}}catch{damage=null;}
@@ -63,10 +106,62 @@ function buildDungeon(input){
     const delta=active?grid[active[0]][active[1]]:null,rawNeed=active&&nextNeed!==null?nextNeed-delta:null;
     if(phase==='write')writes.push({cell:[...active],need:dp[active[0]][active[1]],step:index});
     if(final){active=[0,0];phase='result';}
-    const view={id:174,kind:'dungeon',grid,rows,cols,dp,rawDP,computed:computed.map(r=>[...r]),active,neighbors,nextNeed,delta,rawNeed,
+    const view={id:174,kind:'dungeon',method:1,grid,rows,cols,dp,rawDP,computed:computed.map(r=>[...r]),active,neighbors,nextNeed,delta,rawNeed,
       required:phase==='write'?dp[active[0]][active[1]]:null,writes:structuredClone(writes),phase,line,source:code[line-1].trim(),branch:e.branch,
       answer:final?native.answer:null,path:final?dungeonPath(dp):[],trace:native.trace,final};
     return {arr:[],codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
+  });return {original:grid,answer:native.answer,steps};
+}
+function buildDungeonMemo(input){
+  const grid=parseDungeon(input),rows=grid.length,cols=grid[0].length,code=dungeonMemoCode,native=runTrace({code:code.join('\n'),method:'calculateMinimumHP',args:[grid]});
+  const memo=grid.map(row=>row.map(()=>null)),cached=new Map(),writes=[];let cacheHits=0;
+  const inside=cell=>cell&&cell[0]>=0&&cell[0]<rows&&cell[1]>=0&&cell[1]<cols;
+  const steps=native.events.map((e,index)=>{
+    const x=e.locals,line=e.line,final=index===native.events.length-1,cell=e.scope==='dfs'?[x.i,x.j]:null;
+    const stack=e.frames.filter(f=>f.name==='dfs').map(f=>({cell:[f.locals.i,f.locals.j],down:f.locals.down??null,right:f.locals.right??null}));
+    let active=inside(cell)?cell:null,phase=cell?(inside(cell)?'call':'outside'):'init',cacheHit=null;
+    if(cell&&e.returning){
+      cached.set(cell.join(':'),e.returned);
+      if(active){memo[x.i][x.j]=e.returned;writes.push({cell:[...active],need:e.returned,step:index});phase='write';}
+    }else if(cell&&(line===15||line===16)){
+      const target=line===15?[x.i+1,x.j]:[x.i,x.j+1],previous=native.events[index-1];
+      const expanded=previous?.returning&&previous.scope==='dfs'&&previous.locals.i===target[0]&&previous.locals.j===target[1];
+      if(!expanded){
+        const need=line===15?x.down:x.right;
+        if(cached.get(target.join(':'))!==need)throw Error('174: cached return does not match the native DFS trace.');
+        cacheHits++;cacheHit={cell:target,need};phase='cache-hit';
+      }else phase='choose';
+    }
+    const goal=active&&x.i===rows-1&&x.j===cols-1;
+    const neighbors=active&&!goal?[[[x.i+1,x.j],'down'],[[x.i,x.j+1],'right']].map(([next,direction])=>({cell:next,direction,need:cached.get(next.join(':'))??null})):[];
+    const nextNeed=goal&&(line===12&&e.branch||phase==='write')?1:active&&(line===16||phase==='write')&&neighbors.every(n=>n.need!==null)?Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need)):null;
+    const delta=active?grid[x.i][x.j]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
+    if(final){active=[0,0];phase='result';}
+    const view={id:174,kind:'dungeon',method:2,grid,rows,cols,dp:structuredClone(memo),computed:memo.map(row=>row.map(n=>n!==null)),active,neighbors,nextNeed,delta,rawNeed,
+      required:phase==='write'?e.returned:null,writes:structuredClone(writes),stack,cacheHits,cacheHit,outside:cell&&!inside(cell)?cell:null,returned:e.returning?e.returned:null,
+      phase,line,source:code[line-1].trim(),branch:e.branch,answer:final?native.answer:null,path:final?dungeonPath(memo):[],trace:native.trace,final};
+    return {arr:[],codeBlock:2,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
+  });return {original:grid,answer:native.answer,steps};
+}
+function buildDungeonPadded(input){
+  const grid=parseDungeon(input),rows=grid.length,cols=grid[0].length,code=dungeonPaddedCode,native=runTrace({code:code.join('\n'),method:'calculateMinimumHP',args:[grid]});
+  const computed=grid.map(row=>row.map(()=>false)),writes=[];
+  const steps=native.events.map((e,index)=>{
+    const x=e.locals,line=e.line,final=index===native.events.length-1,rawDP=x.dp?structuredClone(x.dp):null;
+    let active=null,dpActive=null,phase='init';
+    if(line===9||line===10){dpActive=line===9?[rows,cols-1]:[rows-1,cols];phase='base';}
+    if(line===13&&e.branch||[14,15,17,18,19].includes(line)){active=[x.i,x.j];dpActive=active;phase='choose';}
+    if(active&&typeof rawDP?.[x.i][x.j]==='number'&&!computed[x.i][x.j]){
+      computed[x.i][x.j]=true;phase='write';writes.push({cell:[...active],need:rawDP[x.i][x.j],step:index});
+    }
+    const dp=rawDP?grid.map((row,r)=>row.map((_,c)=>computed[r][c]?rawDP[r][c]:null)):null;
+    const neighbors=active?[{cell:[x.i+1,x.j],direction:'down',need:rawDP[x.i+1][x.j]},{cell:[x.i,x.j+1],direction:'right',need:rawDP[x.i][x.j+1]}]:[];
+    const nextNeed=active&&line>=15?Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need)):null,delta=active?grid[x.i][x.j]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
+    if(final){active=[0,0];dpActive=active;phase='result';}
+    const view={id:174,kind:'dungeon',method:3,grid,rows,cols,dp,rawDP,paddedDP:rawDP,computed:computed.map(row=>[...row]),active,dpActive,neighbors,nextNeed,delta,rawNeed,
+      required:phase==='write'?rawDP[active[0]][active[1]]:null,writes:structuredClone(writes),phase,line,source:code[line-1].trim(),branch:e.branch,
+      answer:final?native.answer:null,path:final?dungeonPath(dp):[],trace:native.trace,final};
+    return {arr:[],codeBlock:3,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
   });return {original:grid,answer:native.answer,steps};
 }
 module.exports={
@@ -81,6 +176,10 @@ module.exports={
     complexity:{time:'O(n)',space:'O(1)'},code:armorCode,debugMode:'line-by-line',visualizationLimits:{maxDamage:24,completeTrace:true},builder:buildArmor,
     liveArgs:(input,params)=>{const p=parseDamage(input,params);return[p.damage,p.armor];}},
   174:{...dungeonBase,inputLabel:bi('dungeon · JSON hoặc hàng cách ; · tối đa 6×6','dungeon · JSON or semicolon rows · up to 6×6'),
-    approach:[bi('dp[r][c] là HP tối thiểu cần khi vào ô. Tính từ đích về đầu, chọn ô kế cần ít HP hơn, rồi trừ giá trị ô hiện tại.','dp[r][c] is the health required upon entering a cell. Work backward, choose the cheaper next requirement, then subtract the current room value.'),bi('Luôn chặn dưới ở 1 vì HP = 0 cũng là thua.','Clamp at 1: health equal to zero also loses.')],
-    debugMode:'line-by-line',visualizationLimits:{maxRows:6,maxColumns:6,completeTrace:true},builder:buildDungeon,liveArgs:input=>[parseDungeon(input)]},
+    extraParams:[{key:'approach',type:'select',default:'1',label:bi('Cách giải','Approach'),options:dungeonLabels.map((label,i)=>({value:String(i+1),label}))}],
+    codeLabel:dungeonLabels[0],code2:dungeonMemoCode,code2Label:dungeonLabels[1],code3:dungeonPaddedCode,code3Label:dungeonLabels[2],
+    complexity2:{time:'O(m × n)',space:'O(m × n)',note:bi('Mỗi ô tính một lần; lời gọi lặp dùng kết quả từ lru_cache. Stack sâu tối đa m + n.','Each room is evaluated once; repeated calls use lru_cache. Stack depth is at most m + n.')},
+    complexity3:{time:'O(m × n)',space:'O(m × n)',note:bi('Bảng (m+1) × (n+1) khởi tạo ∞; hai ô cạnh đích bằng 1.','Initialize an (m+1) × (n+1) table with ∞; the two cells beside the exit are 1.')},
+    approach:[bi('1. DP: tính HP cần khi vào từng ô từ đích về đầu; luôn chặn dưới ở 1.','1. Bottom-up DP: work backward to find each room’s required entry HP, clamped at 1.'),bi('2. DFS + lru_cache: gọi xuống/phải, trả kết quả về và tái sử dụng ô đã tính.','2. DFS + lru_cache: recurse down/right, return each requirement, and reuse cached cells.'),bi('3. DP có đệm: thêm hàng/cột ∞, đặt hai ô cạnh đích bằng 1 để dùng chung một công thức.','3. Padded DP: add an ∞ row/column and set the two cells beside the exit to 1 for a single recurrence.')],
+    debugMode:'line-by-line',visualizationLimits:{maxRows:6,maxColumns:6,completeTrace:true},builder:buildDungeon,builder2:buildDungeonMemo,builder3:buildDungeonPadded,liveArgs:input=>[parseDungeon(input)]},
 };

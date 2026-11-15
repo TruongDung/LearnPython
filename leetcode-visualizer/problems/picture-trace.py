@@ -219,12 +219,24 @@ def picture_trace(payload):
                 node = queue.popleft()
                 tree_nodes.append(node)
                 queue.extend(child for child in (node.left, node.right) if child is not None)
+    random_state = None
     try:
+        if 'randomSeed' in payload:
+            import random
+            random_state = random.getstate()
+            random.seed(payload['randomSeed'])
         sys.settrace(trace)
-        answer = getattr(scope['Solution'](), payload['method'])(*args)
+        instance = scope['Solution'](*payload.get('constructorArgs', []))
+        if 'calls' in payload:
+            answer = [getattr(instance, call.get('method', payload['method']))(*call.get('args', []))
+                      for call in payload['calls']]
+        else:
+            answer = getattr(instance, payload['method'])(*args)
     finally:
         sys.settrace(None)
         pending.clear()
+        if random_state is not None:
+            random.setstate(random_state)
     if truncated:
         # Retaining the real entry frame lets the bounded replay finish with its actual return state.
         state = local(entry)
