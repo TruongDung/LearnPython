@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.requestedNodeView || step.logger359View || step.shortestWay1055View || step.knightPictureView || step.diskKv9011View), surface: "treeView", render: (step) => { renderRequestedNodePictures(step); } },
     { predicate: (step) => Boolean(step.oddSubarrayPictureView), surface: "treeView", render: (step) => { renderOddSubarrayPictures1524(step); } },
     { predicate: (step) => Boolean(step.randomSquarePictureView), surface: "treeView", render: (step) => { renderRandomSquarePictures(step); } },
     { predicate: (step) => Boolean(step.gridPathPictureView), surface: "treeView", render: (step) => { renderGridPathPictures(step); } },
@@ -1730,9 +1731,11 @@ const ORDERED_RENDERER_REGISTRY = [
     } },
     { predicate: (step) => Boolean(step.reversePairsSegmentTreeView), surface: "treeView", render: (step) => {
       renderReversePairsSegmentTreeView(step);
+      renderRequestedPairExtras(step);
     } },
     { predicate: (step) => Boolean(step.reversePairsView), surface: "treeView", render: (step) => {
       renderReversePairsView(step);
+      renderRequestedPairExtras(step);
     } },
     { predicate: (step) => Boolean(step.sortedArrayCostView), surface: "treeView", render: (step) => {
       renderSortedArrayCostView(step);

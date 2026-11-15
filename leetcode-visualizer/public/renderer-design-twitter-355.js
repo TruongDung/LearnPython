@@ -9,7 +9,7 @@ function renderDesignTwitter355Pictures(step) {
   const eligible = new Set(v.eligibleIds), following = v.actor === null ? [] : v.following[v.actor] || [];
   const operationLabel = operation => operation.name === "postTweet" ? `U${operation.args[0]} + t${operation.args[1]}`
     : operation.name === "getNewsFeed" ? `☰ U${operation.args[0]}` : `U${operation.args[0]} ${operation.name === "follow" ? "→" : "⇢"} U${operation.args[1]}${operation.name === "unfollow" ? " ×" : ""}`;
-  const rail = v.operations.map((operation, i) => `<span class="tw355p-op ${i === v.activeIndex ? "active" : i < v.activeIndex ? "done" : "future"}" title="${esc(operation.label)}"><small>${i + 1}</small><b>${esc(operationLabel(operation))}</b></span>`).join("");
+  const rail = v.operations.map((operation, i) => `<button type="button" data-twitter-operation="${i}" class="tw355p-op ${i === v.activeIndex ? "active" : i < v.activeIndex ? "done" : "future"}" title="${esc(operation.label)}"><small>${i + 1}</small><b>${esc(operationLabel(operation))}</b></button>`).join("");
   const links = following.filter(uid => uid !== v.actor).map(uid => avatar(uid, v.action?.kind === "follow" && uid === v.action.to ? "added" : "")).join("");
   const removedLink = v.action?.kind === "unfollow" && v.action.to !== v.actor ? avatar(v.action.to, "removed") : "";
   const graph = v.actor === null ? '<code>following = { }</code>' : `<small>following</small>${avatar(v.actor)}<b>→</b>${links || !removedLink ? links || '<span class="tw355p-empty">∅</span>' : ""}${removedLink}${following.includes(v.actor) ? '<b class="tw355p-self">↺</b>' : ""}`;
@@ -78,4 +78,5 @@ function renderDesignTwitter355Pictures(step) {
     if (container && current) container.scrollTop = Math.max(0, current.offsetTop - container.clientHeight / 2);
   }
   for (const selector of [".tw355p-feed-scroll", ".tw355p-history"]) { const container = host.querySelector(selector); if (container) container.scrollTop = container.scrollHeight; }
+  if (typeof renderRequestedTwitterExtras === "function") renderRequestedTwitterExtras(step);
 }

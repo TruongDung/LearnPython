@@ -35,7 +35,7 @@ const DP=`class Solution:
             if value % 2:
                 odd, even = even + 1, odd
             else:
-                odd, even = odd, even + 1
+                even += 1
             answer = (answer + odd) % MOD
         return answer`.split('\n');
 const LABELS=[bi('1. Brute Force · O(n²)','1. Brute Force · O(n²)'),bi('2. Prefix Sum + Counting · O(n)','2. Prefix Sum + Counting · O(n)'),bi('3. Dynamic Programming · O(n)','3. Dynamic Programming · O(n)')];

@@ -7,6 +7,6 @@ class Solution:
             if value % 2:
                 odd, even = even + 1, odd
             else:
-                odd, even = odd, even + 1
+                even += 1
             answer = (answer + odd) % MOD
         return answer
