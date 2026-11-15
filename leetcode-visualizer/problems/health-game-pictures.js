@@ -113,14 +113,19 @@ function buildDungeon(input){
   });return {original:grid,answer:native.answer,steps};
 }
 function buildDungeonMemo(input){
-  const grid=parseDungeon(input),rows=grid.length,cols=grid[0].length,code=dungeonMemoCode,native=runTrace({code:code.join('\n'),method:'calculateMinimumHP',args:[grid]});
+  const grid=parseDungeon(input),rows=grid.length,cols=grid[0].length,code=dungeonMemoCode,native=runTrace({code:code.join('\n'),method:'calculateMinimumHP',args:[grid],traceCalls:['dfs']});
   const memo=grid.map(row=>row.map(()=>null)),cached=new Map(),writes=[];let cacheHits=0;
   const inside=cell=>cell&&cell[0]>=0&&cell[0]<rows&&cell[1]>=0&&cell[1]<cols;
   const steps=native.events.map((e,index)=>{
     const x=e.locals,line=e.line,final=index===native.events.length-1,cell=e.scope==='dfs'?[x.i,x.j]:null;
-    const stack=e.frames.filter(f=>f.name==='dfs').map(f=>({cell:[f.locals.i,f.locals.j],down:f.locals.down??null,right:f.locals.right??null}));
-    let active=inside(cell)?cell:null,phase=cell?(inside(cell)?'call':'outside'):'init',cacheHit=null;
-    if(cell&&e.returning){
+    const stack=e.frames.filter(f=>f.name==='dfs').map((f,i,frames)=>({cell:[f.locals.i,f.locals.j],line:f.line,down:f.locals.down??null,right:f.locals.right??null,status:i===frames.length-1?'active':'waiting'}));
+    let active=inside(cell)?cell:null,phase=cell?(inside(cell)?'guard':'outside'):'init',cacheHit=null,pendingCall=null,received=null;
+    if(e.event==='call'){
+      const target=line===20?[0,0]:line===15?[x.i+1,x.j]:[x.i,x.j+1];
+      pendingCall={cell:target,variable:line===15?'down':line===16?'right':null,cached:cached.has(target.join(':'))};phase='call';
+      if(stack.length)stack.at(-1).status='calling';
+    }else if(cell&&e.returning){
+      if(stack.length)stack.at(-1).status='returning';
       cached.set(cell.join(':'),e.returned);
       if(active){memo[x.i][x.j]=e.returned;writes.push({cell:[...active],need:e.returned,step:index});phase='write';}
     }else if(cell&&(line===15||line===16)){
@@ -130,15 +135,17 @@ function buildDungeonMemo(input){
         const need=line===15?x.down:x.right;
         if(cached.get(target.join(':'))!==need)throw Error('174: cached return does not match the native DFS trace.');
         cacheHits++;cacheHit={cell:target,need};phase='cache-hit';
-      }else phase='choose';
+      }else phase='receive';
+      received={cell:target,variable:line===15?'down':'right',need:line===15?x.down:x.right,cached:!expanded};
     }
     const goal=active&&x.i===rows-1&&x.j===cols-1;
-    const neighbors=active&&!goal?[[[x.i+1,x.j],'down'],[[x.i,x.j+1],'right']].map(([next,direction])=>({cell:next,direction,need:cached.get(next.join(':'))??null})):[];
-    const nextNeed=goal&&(line===12&&e.branch||phase==='write')?1:active&&(line===16||phase==='write')&&neighbors.every(n=>n.need!==null)?Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need)):null;
+    const neighbors=active&&!goal?[[[x.i+1,x.j],'down'],[[x.i,x.j+1],'right']].map(([next,direction])=>({cell:next,direction,need:x[direction]??null})):[];
+    const requirementsReady=active&&(goal?phase==='write':x.down!==undefined&&x.right!==undefined);
+    const nextNeed=phase==='write'?(goal?1:Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need))):null;
     const delta=active?grid[x.i][x.j]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
     if(final){active=[0,0];phase='result';}
     const view={id:174,kind:'dungeon',method:2,grid,rows,cols,dp:structuredClone(memo),computed:memo.map(row=>row.map(n=>n!==null)),active,neighbors,nextNeed,delta,rawNeed,
-      required:phase==='write'?e.returned:null,writes:structuredClone(writes),stack,cacheHits,cacheHit,outside:cell&&!inside(cell)?cell:null,returned:e.returning?e.returned:null,
+      required:phase==='write'?e.returned:null,requirementsReady:Boolean(requirementsReady),writes:structuredClone(writes),stack,cacheHits,cacheHit,pendingCall,received,execution:{event:e.event,timing:e.timing,scope:e.scope},outside:cell&&!inside(cell)?cell:null,returned:e.returning?e.returned:null,
       phase,line,source:code[line-1].trim(),branch:e.branch,answer:final?native.answer:null,path:final?dungeonPath(memo):[],trace:native.trace,final};
     return {arr:[],codeBlock:2,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
   });return {original:grid,answer:native.answer,steps};
