@@ -76,6 +76,9 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.oddSubarrayPictureView), surface: "treeView", render: (step) => { renderOddSubarrayPictures1524(step); } },
+    { predicate: (step) => Boolean(step.randomSquarePictureView), surface: "treeView", render: (step) => { renderRandomSquarePictures(step); } },
+    { predicate: (step) => Boolean(step.gridPathPictureView), surface: "treeView", render: (step) => { renderGridPathPictures(step); } },
     { predicate: (step) => Boolean(step.healthGameView), surface: "treeView", render: (step) => { renderHealthGamePictures(step); } },
     { predicate: (step) => Boolean(step.minPathCost2304View), surface: "treeView", render: (step) => { renderMinimumPathCost2304(step); } },
     { predicate: (step) => Boolean(step.windowDecisionView || step.sameTreeView || step.equalSubarrays3505View || step.vowelSubstrings3306View || step.occurrenceLookupView || step.randomPickView), surface: "treeView", render: (step) => { renderWindowDecisionPictures(step); } },

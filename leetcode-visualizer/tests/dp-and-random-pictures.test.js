@@ -1,0 +1,49 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
+const {SUPPORTED:P}=require('../problems'),{runTrace}=require('../problems/wasm-picture-trace');
+const build=(id,input=P[id].defaultInput,params={},method=1)=>P[id][method===1?'builder':'builder'+method](input,params);
+function routes(grid){const out=[],path=[];function walk(r,c,sum,min){path.push([r,c]);sum+=grid[r][c];min=Math.min(min,sum);if(r===grid.length-1&&c===grid[0].length-1)out.push({path:path.map(c=>[...c]),sum,hp:1-min});else{if(r+1<grid.length)walk(r+1,c,sum,min);if(c+1<grid[0].length)walk(r,c+1,sum,min);}path.pop();}walk(0,0,0,0);return out;}
+const grids=[[[5]],[[-5]],[[-2,-3,3],[-5,-10,1],[10,30,-5]],[[-1,-100],[100,-1]],[[1,-5,3]],[[1],[-5],[3]],[[0,0],[0,0]]];
+let seed=174;const rand=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};for(let i=0;i<12;i++){const m=1+rand(4),n=1+rand(4);grids.push(Array.from({length:m},()=>Array.from({length:n},()=>rand(15)-7)));}
+test('all three 174 methods agree with exhaustive path health and reveal only completed requirements',()=>{
+ for(const grid of grids)for(const method of[1,2,3]){const r=build(174,grid,{},method),best=Math.min(...routes(grid).map(p=>p.hp));assert.equal(r.answer,best);const last=r.steps.at(-1).healthGameView;assert.equal(last.writes.length,grid.length*grid[0].length);assert.equal(new Set(last.writes.map(w=>w.cell.join(':'))).size,last.writes.length);assert.ok(last.computed.flat().every(Boolean));
+  for(const st of r.steps){const v=st.healthGameView;assert.equal(v.source,(method===1?P[174].code:P[174]['code'+method])[v.line-1].trim());assert.equal(v.trace.truncated,false);if(v.dp)for(let a=0;a<v.rows;a++)for(let b=0;b<v.cols;b++){assert.equal(v.dp[a][b]===null,!v.computed[a][b]);if(v.computed[a][b])assert.equal(v.dp[a][b],Math.min(...routes(grid.slice(a).map(row=>row.slice(b))).map(p=>p.hp)));}if(v.phase==='write')assert.equal(v.required,Math.max(1,v.nextNeed-v.delta));}
+ }
+});
+test('174 memo cache hits reuse completed values without rerunning DFS; padded boundaries stay ∞ except the two exits',()=>{
+ const r=build(174,undefined,{},2),last=r.steps.at(-1).healthGameView;assert.equal(last.cacheHits,4);for(const st of r.steps){const v=st.healthGameView;if(v.cacheHit){const[a,b]=v.cacheHit.cell;assert.equal(v.dp[a][b],v.cacheHit.need);assert.equal(v.phase,'cache-hit');}if(v.outside)assert.equal(v.active,null);}
+ const padded=build(174,undefined,{},3);for(const st of padded.steps){const v=st.healthGameView;if(!v.paddedDP)continue;assert.equal(v.paddedDP.length,v.rows+1);assert.equal(v.paddedDP[0].length,v.cols+1);for(let a=0;a<=v.rows;a++)for(let b=0;b<=v.cols;b++)if(a===v.rows||b===v.cols){const base=a===v.rows&&b===v.cols-1||a===v.rows-1&&b===v.cols;assert.ok(v.paddedDP[a][b]==='∞'||base&&v.paddedDP[a][b]===1);}}const v=padded.steps.at(-1).healthGameView;assert.equal(v.paddedDP[v.rows][v.cols-1],1);assert.equal(v.paddedDP[v.rows-1][v.cols],1);
+});
+test('62, 64 and 2435 match exhaustive right/down routes, including single rows, columns and remainder zero',()=>{
+ for(const[m,n]of[[1,1],[1,8],[8,1],[3,7],[8,8]]){const r=build(62,[m],{n}),zero=Array.from({length:m},()=>Array(n).fill(0));assert.equal(r.answer,routes(zero).length);}
+ for(const signed of grids){const grid=signed.map(row=>row.map(Math.abs)),all=routes(grid);assert.equal(build(64,grid).answer,Math.min(...all.map(p=>p.sum)));for(const k of[1,2,3,6]){const r=build(2435,grid,{k}),v=r.steps.at(-1).gridPathPictureView,expected=all.filter(p=>p.sum%k===0);assert.equal(r.answer,expected.length);assert.equal(v.paths.length,expected.length);for(let a=0;a<grid.length;a++)for(let b=0;b<grid[0].length;b++)for(let rem=0;rem<k;rem++)assert.equal(v.counts[a][b][rem],routes(grid.slice(0,a+1).map(row=>row.slice(0,b+1))).filter(p=>p.sum%k===rem).length);}}
+});
+test('grid path snapshots use real source lines and do not expose uncomputed cells',()=>{
+ for(const id of[62,64,2435]){const r=build(id);for(const st of r.steps){const v=st.gridPathPictureView;assert.equal(v.source,P[id].code[v.line-1].trim());assert.equal(v.trace.truncated,false);if(v.counts)for(let a=0;a<v.rows;a++)for(let b=0;b<v.cols;b++)for(let t=0;t<v.k;t++)assert.equal(v.counts[a][b][t]===null,!v.known[a][b][t]);}}
+});
+test('2501 handles duplicate values, maximum chains and missing squares',()=>{for(const[nums,expected]of[[[4,3,6,16,8,2],3],[[2,3,5,6,7],-1],[[2,2],-1],[[2,4,16,256,65536],5],[[100000,100000],-1],[[3,9,81,6561],4]]){const r=build(2501,nums);assert.equal(r.answer,expected);assert.equal(r.steps.at(-1).randomSquarePictureView.trace.truncated,false);}});
+test('random classes execute real seeded Python draws and return only eligible values',()=>{
+ for(const id of[398,710,497])for(const seed of[0,1,17,42]){const r=build(id,undefined,{seed,draws:8}),v=r.steps.at(-1).randomSquarePictureView;assert.equal(r.answer.length,8);assert.equal(v.samples.length,8);assert.deepEqual(r.answer,build(id,undefined,{seed,draws:8}).answer);for(const sample of v.samples){if(id===398)assert.equal(v.nums[sample.value],v.target);if(id===710)assert.ok(sample.value>=0&&sample.value<v.n&&!v.blacklist.includes(sample.value));if(id===497){const[x,y]=sample.value;assert.ok(v.rects.some(([a,b,c,d])=>x>=a&&x<=c&&y>=b&&y<=d));}assert.deepEqual(r.steps[sample.step].randomSquarePictureView.samples.at(-1).value,sample.value);}}
+});
+test('710 mapping is a bijection from uniform tickets onto every allowed value, including an empty blacklist',()=>{
+ for(const[n,blacklist]of[[7,[2,3,5]],[5,[]],[4,[0,1,2]],[1,[]],[12,[0,4,8,11]]]){const r=build(710,blacklist,{n,seed:9}),v=r.steps.at(-1).randomSquarePictureView,actual=Array.from({length:v.self.bound},(_,i)=>v.mapping[i]??i).sort((a,b)=>a-b),expected=Array.from({length:n},(_,i)=>i).filter(i=>!blacklist.includes(i));assert.deepEqual(actual,expected);}
+});
+test('497 ticket weights count boundary points and every ticket maps to exactly one distinct integer point',()=>{
+ for(const rects of[[[0,0,1,1]],[[-2,-2,1,1],[2,2,4,6]],[[0,0,1,1],[3,0,6,3]]]){const r=build(497,rects,{seed:17}),v=r.steps.at(-1).randomSquarePictureView,points=[];let before=0;rects.forEach(([a,b,c,d],i)=>{const count=(c-a+1)*(d-b+1);before+=count;assert.equal(v.self.prefix[i],before);for(let off=0;off<count;off++)points.push([a+off%(c-a+1),b+Math.floor(off/(c-a+1))].join(':'));});assert.equal(v.self.total,points.length);assert.equal(new Set(points).size,points.length);}
+});
+test('all added picture renderers accept frozen recorded frames in VI and EN; unique-path ranks enumerate distinct legal paths',()=>{
+ const host={innerHTML:'',dataset:{},querySelector:()=>null,querySelectorAll:()=>[]},ctx={lang:'vi',$:()=>host};vm.createContext(ctx);for(const name of['health-game-pictures','grid-path-pictures','random-and-square-pictures','cherry-pickup-741'])vm.runInContext(fs.readFileSync(require.resolve('../public/renderer-'+name+'.js'),'utf8'),ctx);
+ const jobs=[[174,2],[174,3],[62,1],[64,1],[2435,1],[2501,1],[398,1],[710,1],[497,1],[741,1]];function freeze(x){if(x&&typeof x==='object'&&!Object.isFrozen(x)){Object.freeze(x);Object.values(x).forEach(freeze);}return x;}
+ for(const[id,method]of jobs){const r=freeze(build(id,undefined,{seed:17},method)),original=JSON.stringify(r);ctx.steps=r.steps;for(const locale of['vi','en']){ctx.lang=locale;r.steps.forEach((st,i)=>{ctx.stepIndex=i;if(id===174)ctx.renderHealthGamePictures(st);else if([62,64,2435].includes(id))ctx.renderGridPathPictures(st);else if(id===741)ctx.renderCherryPickup741View(st);else ctx.renderRandomSquarePictures(st);assert.doesNotMatch(host.innerHTML,/undefined|NaN|Infinity|object Object/);});}assert.equal(JSON.stringify(r),original);}
+ const paths=Array.from({length:252},(_,rank)=>JSON.stringify(ctx.gpUnrank(6,6,rank)));assert.equal(new Set(paths).size,252);for(const p of paths){const path=JSON.parse(p);assert.deepEqual(path[0],[0,0]);assert.deepEqual(path.at(-1),[5,5]);assert.equal(path.length,11);}
+});
+test('displayed Python is runnable independently and random design live-args construct the proper class',()=>{
+ const payload={code:P[2435].code.join('\n'),memo:P[174].code2.join('\n'),padded:P[174].code3.join('\n')};const script="import json,sys,math\np=json.load(sys.stdin)\nfor key in ['memo','padded']:\n ns={};exec(p[key],ns);assert ns['Solution']().calculateMinimumHP([[-1]*100 for _ in range(100)])==200\nns={};exec(p['code'],ns);assert ns['Solution']().numberOfPaths([[0]*250 for _ in range(200)],1)==math.comb(448,199)%(10**9+7)\nprint('ok')";
+ const r=spawnSync('python3',['-c',script],{input:JSON.stringify(payload),encoding:'utf8'});assert.equal(r.status,0,r.stderr);for(const id of[398,710,497]){const d=P[id].prepareLiveDesign(P[id].defaultInput,{});assert.equal(d.className,'Solution');assert.equal(d.operations.length,4);assert.ok(d.operations.every(op=>op.name==='pick'));}
+});
+test('seeded design tracing restores the worker RNG and ordinary methods keep their existing invocation',()=>{
+ const code='import random\nclass Solution:\n    def state(self):\n        return repr(random.getstate())';const before=runTrace({code,method:'state',args:[]}).answer;build(398,undefined,{seed:12345});const after=runTrace({code:code+'\n# another uncached probe',method:'state',args:[]}).answer;assert.equal(after,before);assert.equal(runTrace({code:'class Solution:\n    def add(self, x):\n        return x+1',method:'add',args:[41]}).answer,42);
+});
+test('new lesson inputs reject malformed grids, invalid random domains and overlapping integer points',()=>{
+ for(const[id,input,params]of[[62,[0],{}],[62,[2],{n:9}],[64,[[1],[]],{}],[2435,[[0]],{k:0}],[2501,[1,1],{}],[398,[1,2],{target:3}],[710,[1,1],{n:3}],[710,[0],{n:1}],[497,[[0,0,2,2],[1,1,3,3]],{}],[497,[[0,0,0,1]],{}]])assert.throws(()=>build(id,input,params),new RegExp(String(id)));
+});

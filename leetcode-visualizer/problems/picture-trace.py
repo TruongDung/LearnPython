@@ -1,4 +1,4 @@
-"""Record completed source statements. Only bundled lesson code enters here."""
+"""Record bundled lesson statements, with optional before-call transitions."""
 import ast
 import collections
 import itertools
@@ -77,8 +77,12 @@ def picture_trace(payload):
     # Execute bundled lesson code so its real statements can be traced.
     exec(compile(code, filename, 'exec'), scope)  # pylint: disable=exec-used
     branches = {}
+    call_names = set(payload.get('traceCalls', []))
+    call_lines = set()
     comprehension_targets = {}
     for node in ast.walk(ast.parse(code)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in call_names:
+            call_lines.add(node.lineno)
         if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
             names = {n.id for generator in node.generators for n in ast.walk(generator.target) if isinstance(n, ast.Name)}
             comprehension_targets.setdefault(node.lineno, set()).update(names)
@@ -169,6 +173,19 @@ def picture_trace(payload):
     events, pending = [], {}
     entry, truncated = None, False
     event_limit = payload.get('maxEvents')
+
+    def frame_stack(frame, line):
+        cursor, outer, frames = frame, frame, []
+        while cursor:
+            if cursor.f_code.co_filename == filename and not cursor.f_code.co_name.startswith('<'):
+                outer = cursor
+                state = {'name': cursor.f_code.co_name, 'locals': local(cursor, cursor is not frame)}
+                if call_names:
+                    state['line'] = line if cursor is frame else pending.get(cursor, cursor.f_lineno)
+                frames.append(state)
+            cursor = cursor.f_back
+        return outer, list(reversed(frames))
+
     def trace(frame, event, arg):
         nonlocal entry, truncated
         if frame.f_code.co_filename != filename or frame.f_code.co_name.startswith('<'):
@@ -187,20 +204,27 @@ def picture_trace(payload):
                     sys.settrace(None)
                     return None
                 line = pending.pop(frame)
-                cursor, outer, frames = frame, frame, []
-                while cursor:
-                    if cursor.f_code.co_filename == filename and not cursor.f_code.co_name.startswith('<'):
-                        outer = cursor
-                        frames.append({'name': cursor.f_code.co_name, 'locals': local(cursor, cursor is not frame)})
-                    cursor = cursor.f_back
+                outer, frames = frame_stack(frame, line)
                 events.append({'line': line, 'scope': frame.f_code.co_name, 'locals': local(frame),
-                               'outer': local(outer, outer is not frame), 'frames': list(reversed(frames)),
+                               'outer': local(outer, outer is not frame), 'frames': frames,
                                'returned': encode(arg) if event == 'return' else None,
                                'returning': event == 'return',
                                'branch': (frame.f_lineno in branches[line]) if line in branches else None,
+                               **({'event': 'return' if event == 'return' else 'statement', 'timing': 'after'}
+                                  if call_names else {}),
                                **tree_state()})
             if event == 'line':
                 pending[frame] = frame.f_lineno
+                if frame.f_lineno in call_lines:
+                    if event_limit and len(events) >= event_limit:
+                        truncated = True
+                        sys.settrace(None)
+                        return None
+                    outer, frames = frame_stack(frame, frame.f_lineno)
+                    events.append({'line': frame.f_lineno, 'scope': frame.f_code.co_name,
+                                   'locals': local(frame), 'outer': local(outer, outer is not frame),
+                                   'frames': frames, 'returned': None, 'returning': False, 'branch': None,
+                                   'event': 'call', 'timing': 'before', **tree_state()})
         return trace
 
     args = list(payload['args'])
@@ -219,12 +243,24 @@ def picture_trace(payload):
                 node = queue.popleft()
                 tree_nodes.append(node)
                 queue.extend(child for child in (node.left, node.right) if child is not None)
+    random_state = None
     try:
+        if 'randomSeed' in payload:
+            import random
+            random_state = random.getstate()
+            random.seed(payload['randomSeed'])
         sys.settrace(trace)
-        answer = getattr(scope['Solution'](), payload['method'])(*args)
+        instance = scope['Solution'](*payload.get('constructorArgs', []))
+        if 'calls' in payload:
+            answer = [getattr(instance, call.get('method', payload['method']))(*call.get('args', []))
+                      for call in payload['calls']]
+        else:
+            answer = getattr(instance, payload['method'])(*args)
     finally:
         sys.settrace(None)
         pending.clear()
+        if random_state is not None:
+            random.setstate(random_state)
     if truncated:
         # Retaining the real entry frame lets the bounded replay finish with its actual return state.
         state = local(entry)
