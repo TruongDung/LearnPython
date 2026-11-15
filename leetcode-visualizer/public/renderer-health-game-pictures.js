@@ -1,0 +1,88 @@
+'use strict';
+function hgText(vi,en){return typeof lang!=='undefined'&&lang==='vi'?vi:en;}
+function hgEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function hgNumber(value){return value===null||value===undefined?'…':String(value);}
+function hgSigned(value){return value>0?'+'+value:String(value);}
+function hgCard(title,body,cls=''){return `<section class="hg-card ${cls}"><header>${title}</header>${body}</section>`;}
+function hgMetric(label,value,cls=''){const shown=hgNumber(value);return `<span class="${cls}"><small>${label}</small><b style="--hg-digits:${shown.length}">${shown}</b></span>`;}
+function hgShield(spent=false){return `<svg class="hg-shield ${spent?'spent':''}" viewBox="0 0 44 50" aria-label="${hgText('Giáp dùng một lần','One-use armor')}" role="img"><path d="M22 3L40 10V25C40 35 31 43 22 47C13 43 4 35 4 25V10Z"/><path class="mark" d="${spent?'M14 18L30 34M30 18L14 34':'M12 25L19 32L32 17'}"/></svg>`;}
+function hgSimulate(deltas,start){
+  let hp=start,alive=start>0,death=start>0?null:-1;
+  const rows=deltas.map((delta,i)=>{if(!alive)return null;const before=hp;hp+=delta;alive=hp>0;if(!alive)death=i;return {index:i,before,delta,after:hp,alive};});
+  return {rows,death,last:rows.reduce((last,row,i)=>row?i:last,-1),start};
+}
+function hgPlan(v,choice,trial){
+  if(v.id===2214){const index=Number.isInteger(choice)&&choice>=0&&choice<v.damage.length?choice:v.shieldIndex??0,saved=Math.min(v.armor,v.damage[index]),required=v.damage.reduce((a,b)=>a+b,0)-saved+1,deltas=v.damage.map((hit,i)=>-hit+(i===index?saved:0));return {index,saved,required,deltas,labels:v.damage.map((hit,i)=>`${i}: −${hit}`),simulation:hgSimulate(deltas,required-(trial?1:0))};}
+  const deltas=v.path.map(([r,c])=>v.grid[r][c]);return {index:null,saved:null,required:v.answer,deltas,labels:v.path.map(cell=>`[${cell.join(',')}]`),simulation:hgSimulate(deltas,v.answer-(trial?1:0))};
+}
+function hgBattle(v,plan,cursor,trial){
+  const sim=plan.simulation,row=cursor>=0?sim.rows[cursor]:null,hp=row?.after??sim.start,alive=hp>0,scale=Math.max(1,sim.start,...sim.rows.filter(Boolean).map(r=>r.after));
+  const spent=v.id===2214&&cursor>=plan.index&&sim.rows[plan.index]!==null;
+  const hud=`<div class="hg-hud ${alive?'alive':'dead'}"><div class="hg-heart">${alive?'♥':'×'}<b data-hg-hp="${hp}">${hp}</b></div><div class="hg-hp-track"><small>HP &gt; 0 · start ${sim.start}</small><div><i style="width:${100*Math.max(0,hp)/scale}%"></i></div></div>${v.id===2214?`<div class="hg-armor-status">${hgShield(spent)}<small>${spent?'1/1 ✓':'0/1'}</small></div>`:''}</div>`;
+  const before=cursor===-1?sim.start:row.before,change=cursor===-1?null:row.delta;
+  const action=change===null?`<div class="hg-current-step">${v.id===174?hgText('Trước ô đầu','Before the first room'):hgText('Trước đòn đầu','Before the first hit')}</div>`:`<div class="hg-current-step"><span>${before}</span><i>${change>=0?'＋':'−'}</i><b class="${change>=0?'heal':'hurt'}">${Math.abs(change)}</b><i>＝</i><strong>${hp}</strong><small>${plan.labels[cursor]}</small></div>`;
+  const tiles=`<div class="hg-scroll"><div class="hg-life-route"><button type="button" data-hg-visit="-1" class="${cursor===-1?'selected':''}"><small>start</small><b>${sim.start}</b></button>${plan.deltas.map((delta,i)=>{const log=sim.rows[i],blocked=v.id===2214&&i===plan.index;return `<i>→</i><button type="button" data-hg-visit="${i}" data-health-after="${log?.after??''}" class="${cursor===i?'selected':''} ${log?(log.alive?'alive':'dead'):'unreached'}" ${log?'':'disabled'}><small>${v.id===174?plan.labels[i]:'#'+i}</small><em class="${delta>=0?'heal':'hurt'}">${hgSigned(delta)}${blocked?' ⛨':''}</em><b>${log?log.after:'·'}</b></button>`;}).join('')}</div></div>`;
+  const controls=`<nav class="hg-life-controls"><button type="button" data-hg-visit="-1" data-hg-life-control="first" aria-label="${hgText('Máu trước khi bắt đầu','Health before starting')}" ${cursor===-1?'disabled':''}>↤</button><button type="button" data-hg-visit="${cursor-1}" data-hg-life-control="previous" ${cursor<=-1?'disabled':''}>←</button><span>HP · ${cursor+1}/${plan.deltas.length}</span><button type="button" data-hg-visit="${cursor+1}" data-hg-life-control="next" ${cursor>=sim.last?'disabled':''}>→</button><button type="button" data-hg-visit="${sim.last}" data-hg-life-control="last" ${cursor===sim.last?'disabled':''}>↦</button><button type="button" data-hg-trial aria-pressed="${trial}" class="${trial?'trial':''}">${trial?hgText('Dùng HP đủ','Use enough HP'):'HP − 1'}</button></nav>`;
+  const chosen=v.id===2214?`<div class="hg-proof-title"><span>⛨ #${plan.index} · ${hgText('chặn','block')} ${plan.saved}</span><strong>${hgText('Cần','Need')} ♥ ${plan.required}</strong></div>`:'';
+  return hgCard(v.id===174?hgText('Đi qua từng ô','Walk through the rooms'):hgText('Thử từng đòn','Try the hits'),chosen+hud+action+tiles+controls,'hg-battle');
+}
+function hgArmorBars(v,chosen){
+  const peak=Math.max(1,...v.damage),saved=v.saved;
+  return `<div class="hg-scroll"><div class="hg-hits">${v.damage.map((hit,i)=>{const blocked=v.final&&i===chosen?Math.min(hit,v.armor):0,optimal=v.final&&Math.min(hit,v.armor)===saved;
+    return `<button type="button" class="hg-hit ${i===v.active?'active':''} ${i===chosen&&v.final?'selected':''} ${i>=v.processed?'unseen':''}" data-hg-shield-at="${i}" data-damage="${hit}" data-blocked="${blocked}" data-optimal="${optimal}"><small>#${i} ${optimal?'★':''}</small><b>${hit}</b><div class="hg-hit-track"><div style="height:${100*hit/peak}%"><i class="loss" style="height:${hit?100*(hit-blocked)/hit:0}%"></i><i class="block" style="height:${hit?100*blocked/hit:0}%">${blocked?'⛨':''}</i></div></div><em>${blocked?'⛨ '+blocked:'　'}</em><strong>−${hit-blocked}</strong></button>`;
+  }).join('')}</div></div>`;
+}
+function hgArmor(v,plan){
+  const metrics=`<div class="hg-metrics">${hgMetric('Σ damage',v.total)}${hgMetric('max damage',v.peak)}${hgMetric('armor · 1×',v.armor,'armor')}</div>`;
+  const shield=hgCard('min(max damage, armor)',`<div class="hg-equation"><span class="hurt"><b>${hgNumber(v.peak)}</b><small>max</small></span><i>∩</i><span class="armor">${hgShield()}<b>${v.armor}</b></span><i>→</i><strong>${hgNumber(v.saved)}</strong></div>`);
+  const formula=v.saved!==null?hgCard(hgText('HP nhỏ nhất · phải còn ít nhất 1','Minimum HP · at least 1 must remain'),`<div class="hg-equation"><b>${v.total}</b><i>−</i><span class="armor"><b>${v.saved}</b><small>${hgText('chặn','blocked')}</small></span><i>＋</i><span class="heal"><b>♥1</b></span><i>＝</i><strong data-hg-answer="${v.answer??''}">${hgNumber(v.answer)}</strong></div>`):'';
+  return metrics+hgCard(v.final?hgText('Bấm chọn đòn dùng giáp · ★ cùng mức tối ưu','Choose the shielded hit · ★ also optimal'):hgText('Quét từng đòn · giáp chỉ chặn một đòn','Scan the hits · armor blocks only one hit'),hgArmorBars(v,plan?.index??v.shieldIndex))+shield+formula;
+}
+function hgDungeonBoard(v,cursor,zoom){
+  const width=Math.max(260,v.cols*92+40),height=Math.max(190,v.rows*110+40),point=([r,c])=>({x:v.cols===1?width/2:50+c*(width-100)/(v.cols-1),y:v.rows===1?height/2:55+r*(height-110)/(v.rows-1)}),key=cell=>cell.join(':');
+  const route=new Set(v.path.map(key)),active=v.final&&cursor>=0?v.path[cursor]:v.active,activeKey=active?key(active):null;
+  const arrows=[];
+  function arrow(from,to,kind){const a=point(from),b=point(to),dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy);if(!length)return;arrows.push(`<path class="${kind}" d="M${a.x+dx/length*40},${a.y+dy/length*40}L${b.x-dx/length*45},${b.y-dy/length*45}" marker-end="url(#hg-${kind})"/>`);}
+  if(v.final)for(let i=1;i<v.path.length;i++)arrow(v.path[i-1],v.path[i],'walk');else if(v.active)for(const neighbor of v.neighbors)if(neighbor.need!==null)arrow(neighbor.cell,v.active,'reverse');
+  const cells=v.grid.flatMap((row,r)=>row.map((delta,c)=>{const p=point([r,c]),need=v.dp?.[r][c]??null,neighbor=v.neighbors.some(n=>key(n.cell)===key([r,c]));return `<button type="button" class="hg-room ${need!==null?'computed':''} ${key([r,c])===activeKey?'active':''} ${neighbor?'dependency':''} ${route.has(key([r,c]))?'route':''}" style="left:${100*p.x/width}%;top:${100*p.y/height}%;width:${100*80/width}%;height:${100*80/height}%" data-hg-room="${r}:${c}" data-room-value="${delta}" data-room-need="${need??''}" aria-label="[${r},${c}] ${hgSigned(delta)}, HP ${hgNumber(need)}"><small>[${r},${c}]</small><b class="${delta>=0?'heal':'hurt'}">${hgSigned(delta)}</b><em>♥ ${need??'·'}</em></button>`;})).join('');
+  return `<div class="hg-scroll"><div class="hg-dungeon-board ${zoom?'zoom':''}" style="--hg-board-width:${width}px;--hg-room-value-size:${2300/width}cqw;--hg-room-need-size:${1400/width}cqw;--hg-room-label-size:${1000/width}cqw;aspect-ratio:${width}/${height}"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${hgText('Ô mất máu / hồi máu và HP cần khi vào','Damage / healing rooms and required entry health')}"><defs>${['reverse','walk'].map(kind=>`<marker id="hg-${kind}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10Z"/></marker>`).join('')}</defs>${arrows.join('')}</svg><div class="hg-room-layer">${cells}</div></div></div>`;
+}
+function hgDungeon(v,cursor,zoom){
+  const progress=v.computed.flat().filter(Boolean).length;
+  const overview=`<div class="hg-metrics"><span><small>DP ↖</small><b>${progress}/${v.rows*v.cols}</b></span>${v.final?`<span class="heal"><small>${hgText('HP ban đầu nhỏ nhất','Minimum initial HP')}</small><b data-hg-answer="${v.answer}">♥ ${v.answer}</b></span>`:''}</div>`;
+  let calculation='';
+  if(!v.final&&v.active&&v.nextNeed!==null){
+    const options=v.neighbors.length?v.neighbors.map(n=>`<span class="${n.need===v.nextNeed?'chosen':''}"><small>${n.direction==='right'?'→':'↓'} [${n.cell.join(',')}]</small><b>♥ ${n.need}</b></span>`).join('<i>vs</i>'):'<span><small>exit</small><b>♥ 1</b></span>';
+    calculation=hgCard(hgText('Chọn HP cần ít hơn ở ô kế','Choose the lower next-room requirement'),`<div class="hg-next-needs">${options}<i>→</i><strong>${v.nextNeed}</strong></div><div class="hg-equation"><b>${v.nextNeed}</b><i>−</i><span class="${v.delta>=0?'heal':'hurt'}"><b>(${hgSigned(v.delta)})</b><small>${hgText('ô hiện tại','current room')}</small></span><i>＝</i><b>${v.rawNeed}</b></div><div class="hg-clamp"><span>max(♥1, ${v.rawNeed})</span><i>→</i><strong>${hgNumber(v.required)}</strong></div>`);
+  }
+  return overview+hgCard(`<b>${v.final?'→ ↓':'← ↑'}</b><small>${hgText('số lớn: mất/hồi · ♥: HP cần khi vào','large number: damage/heal · ♥: required entry HP')}</small><button type="button" data-hg-zoom aria-pressed="${zoom}" aria-label="${hgText('Phóng to / thu gọn','Enlarge / fit')}">${zoom?'−':'＋'}</button>`,hgDungeonBoard(v,cursor,zoom))+calculation;
+}
+const HG_PRESETS={
+  2214:[{input:[2,7,4,3],armor:4,label:['Ví dụ 13','Example 13']},{input:[1,2,3],armor:10,label:['Giáp lớn hơn đòn','Armor exceeds the hit']},{input:[5],armor:5,label:['Chặn hết vẫn cần HP1','Full block still needs HP1']}],
+  174:[{input:[[-2,-3,3],[-5,-10,1],[10,30,-5]],label:['Ví dụ 7','Example 7']},{input:[[5]],label:['Ô hồi máu','Healing room']},{input:[[-1,-100],[100,-1]],label:['HP0 không hồi sinh','HP0 cannot revive']}],
+};
+function renderHealthGamePictures(step){
+  const host=$('treeView'),v=step.healthGameView;if(!host||!v)return;
+  const timeline=typeof steps!=='undefined'?steps:[step],at=typeof stepIndex==='number'?stepIndex:0,key=JSON.stringify([v.id,v.damage,v.armor,v.grid]);
+  const open=host.querySelector?.('.hg-details')?.open;
+  if(host.dataset.hgKeyState!==key){host.dataset.hgKeyState=key;delete host.dataset.hgArmorState;delete host.dataset.hgTrialState;delete host.dataset.hgCursorState;delete host.dataset.hgZoomState;}
+  const choice=host.dataset.hgArmorState===undefined?v.shieldIndex:Number(host.dataset.hgArmorState),trial=host.dataset.hgTrialState==='1',plan=v.final?hgPlan(v,choice,trial):null;
+  const cursor=plan?host.dataset.hgCursorState===undefined?plan.simulation.last:Math.max(-1,Math.min(plan.simulation.last,Number(host.dataset.hgCursorState))):-1;
+  const zoom=host.dataset.hgZoomState==='1',button=(i,role,label,icon)=>`<button type="button" data-hg-go="${i}" data-hg-control="${role}" aria-label="${label}" ${i<0||i>=timeline.length||i===at?'disabled':''}>${icon}</button>`;
+  const controls=`<nav class="hg-play">${button(0,'first',hgText('Về đầu','First step'),'↤')}${button(at-1,'previous',hgText('Bước trước','Previous step'),'←')}<span>${at+1}/${timeline.length}</span>${button(at+1,'next',hgText('Bước tiếp','Next step'),'→')}${button(timeline.length-1,'last',hgText('Tới kết quả','Go to result'),'↦')}</nav>`;
+  const stages=v.id===174?`<nav class="hg-stages"><button type="button" data-hg-stage="reverse">DP ↖</button><button type="button" data-hg-stage="walk">HP → ↓</button></nav>`:'';
+  host.innerHTML=`<section class="hg-viz" data-health-problem="${v.id}"><header class="hg-heading"><strong>${v.id===2214?hgText('Một chiếc giáp · giữ lại một tim','One shield · keep one heart'):hgText('Tính HP ngược · đi thử xuôi','Compute HP backward · walk forward')}</strong><small>#${v.id}</small></header>${controls}${stages}${v.id===2214?hgArmor(v,plan):hgDungeon(v,cursor,zoom)}${plan?hgBattle(v,plan,cursor,trial):''}<details class="hg-details" ${open?'open':''}><summary>${hgText('Dòng đang chạy / biến','Current line / variables')}</summary><code>L${v.line} · ${hgEscape(v.source)}</code><div class="hg-vars">${step.vars.map(x=>`<span>${hgEscape(x.name)}: <b>${hgEscape(hgNumber(x.value))}</b></span>`).join('')}</div></details><nav class="hg-presets">${HG_PRESETS[v.id].map((p,i)=>`<button type="button" data-hg-preset="${i}">${hgText(...p.label)}</button>`).join('')}</nav></section>`;
+  const stop=()=>{if(typeof stopPlay==='function')stopPlay();};
+  const redraw=selector=>{stop();renderHealthGamePictures(step);host.querySelector(selector)?.focus({preventScroll:true});};
+  const go=(index,selector)=>{if(index<0||index>=timeline.length)return;stop();stepIndex=index;renderStep();(host.querySelector(selector+':not(:disabled)')||host.querySelector('[data-hg-control="next"]'))?.focus({preventScroll:true});};
+  host.querySelectorAll?.('button,summary').forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}));
+  host.querySelectorAll?.('[data-hg-go]').forEach(el=>el.addEventListener('click',()=>go(Number(el.dataset.hgGo),`[data-hg-control="${el.dataset.hgControl}"]`)));
+  host.querySelectorAll?.('[data-hg-visit]').forEach(el=>el.addEventListener('click',()=>{host.dataset.hgCursorState=el.dataset.hgVisit;redraw(el.dataset.hgLifeControl?`[data-hg-life-control="${el.dataset.hgLifeControl}"]`:`[data-hg-visit="${el.dataset.hgVisit}"]`);}));
+  host.querySelector?.('[data-hg-trial]')?.addEventListener('click',()=>{host.dataset.hgTrialState=trial?'0':'1';delete host.dataset.hgCursorState;redraw('[data-hg-trial]');});
+  host.querySelectorAll?.('[data-hg-shield-at]').forEach(el=>el.addEventListener('click',()=>{host.dataset.hgArmorState=el.dataset.hgShieldAt;delete host.dataset.hgCursorState;go(timeline.length-1,`[data-hg-shield-at="${el.dataset.hgShieldAt}"]`);}));
+  host.querySelectorAll?.('[data-hg-room]').forEach(el=>el.addEventListener('click',()=>{const [r,c]=el.dataset.hgRoom.split(':').map(Number);go(timeline.findIndex(s=>{const a=s.healthGameView;return a?.id===174&&a.phase==='write'&&a.active[0]===r&&a.active[1]===c;}),`[data-hg-room="${r}:${c}"]`);}));
+  host.querySelectorAll?.('[data-hg-stage]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.hgStage==='walk'?timeline.length-1:timeline.findIndex(s=>s.healthGameView?.phase==='write'),`[data-hg-stage="${el.dataset.hgStage}"]`)));
+  host.querySelector?.('[data-hg-zoom]')?.addEventListener('click',()=>{host.dataset.hgZoomState=zoom?'0':'1';redraw('[data-hg-zoom]');});
+  host.querySelectorAll?.('[data-hg-preset]').forEach(el=>el.addEventListener('click',async()=>{stop();const p=HG_PRESETS[v.id][Number(el.dataset.hgPreset)];$('arrInput').value=v.id===174?JSON.stringify(p.input):p.input.join(',');if(v.id===2214)$('param-armor').value=p.armor;await runViz();}));
+  for(const selector of ['.hg-hits .active, .hg-hits .selected','.hg-life-route .selected']){const focus=host.querySelector?.(selector),scroll=focus?.closest('.hg-scroll');if(scroll){const a=scroll.getBoundingClientRect(),b=focus.getBoundingClientRect();scroll.scrollLeft+=b.left-a.left-(a.width-b.width)/2;}}
+}
