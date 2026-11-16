@@ -16,6 +16,7 @@
   --lc2218-src: #c58cff;
   --lc2218-dst: #ff5fd2;
   --lc2218-neg: #5a6b7d;
+  --lc2218-memo: #6aa8ff;
   --lc2218-on-coin: #1d1405;
   --lc2218-line: #2a4560;
   container: lc2218 / inline-size;
@@ -47,6 +48,7 @@
   --lc2218-src: #8a4fe0;
   --lc2218-dst: #e0309f;
   --lc2218-neg: #b8c3cf;
+  --lc2218-memo: #3557e0;
   --lc2218-on-coin: #2a1a04;
   --lc2218-line: #fff3cf;
 }
@@ -587,6 +589,155 @@
 .lc2218-legend .lg-win {
   color: var(--lc2218-green);
   font-weight: 700;
+}
+
+/* Approach 3 (DFS + lru_cache): memo grid states, call-stack chips, memo hits and −∞ dead ends. */
+.lc2218-cell.is-empty:not(.is-dst):not(.is-src):not(.is-hit):not(.is-stack) {
+  fill: none;
+  stroke: var(--lc2218-border);
+  stroke-dasharray: 1 3;
+}
+
+.lc2218-svg .lc2218-cell-label.is-empty {
+  fill: var(--lc2218-muted);
+  font-weight: 400;
+}
+
+.lc2218-cell.is-dead {
+  fill: color-mix(in srgb, var(--lc2218-red) 14%, var(--lc2218-panel));
+}
+
+.lc2218-cell.is-dead:not(.is-dst):not(.is-src):not(.is-hit):not(.is-stack) {
+  stroke: var(--lc2218-red);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.lc2218-cell.is-dead.is-new {
+  fill: color-mix(in srgb, var(--lc2218-red) 32%, var(--lc2218-panel));
+}
+
+.lc2218-svg .lc2218-cell-label.is-dead {
+  fill: var(--lc2218-red);
+}
+
+.lc2218-cell.is-stack {
+  stroke: var(--lc2218-muted);
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+}
+
+.lc2218-cell.is-hit {
+  fill: color-mix(in srgb, var(--lc2218-memo) 32%, var(--lc2218-panel));
+  stroke: var(--lc2218-memo);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.lc2218-arrow.is-hit {
+  stroke: var(--lc2218-memo);
+}
+
+.lc2218-arrow.is-stack {
+  stroke: var(--lc2218-muted);
+  stroke-width: 1.6;
+}
+
+.lc2218-arrowhead.is-hit {
+  fill: var(--lc2218-memo);
+}
+
+.lc2218-arrowhead.is-stack {
+  fill: var(--lc2218-muted);
+}
+
+.lc2218-svg .lc2218-ch-head.is-base {
+  fill: var(--lc2218-green);
+}
+
+.lc2218-svg .lc2218-ch-head.is-dead {
+  fill: var(--lc2218-red);
+}
+
+.lc2218-chip {
+  fill: var(--lc2218-soft);
+  stroke: var(--lc2218-border);
+  stroke-width: 1.5;
+}
+
+.lc2218-chip.is-wait {
+  stroke: var(--lc2218-muted);
+}
+
+.lc2218-chip.is-top {
+  stroke: var(--lc2218-dst);
+  stroke-width: 2.5;
+}
+
+.lc2218-chip.is-call {
+  fill: none;
+  stroke: var(--lc2218-src);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.lc2218-chip.is-hit {
+  fill: color-mix(in srgb, var(--lc2218-memo) 32%, var(--lc2218-panel));
+  stroke: var(--lc2218-memo);
+  stroke-width: 2.5;
+}
+
+.lc2218-chip.is-dead {
+  fill: color-mix(in srgb, var(--lc2218-red) 22%, var(--lc2218-panel));
+  stroke: var(--lc2218-red);
+  stroke-dasharray: 4 3;
+}
+
+.lc2218-chip.is-base {
+  fill: color-mix(in srgb, var(--lc2218-green) 22%, var(--lc2218-panel));
+}
+
+.lc2218-svg .lc2218-chip-label.is-wait {
+  fill: var(--lc2218-muted);
+}
+
+.lc2218-svg .lc2218-chip-label.is-call {
+  fill: var(--lc2218-src);
+}
+
+.lc2218-svg .lc2218-chip-label.is-dead {
+  fill: var(--lc2218-red);
+}
+
+.lc2218-svg .eq-memo {
+  fill: var(--lc2218-memo);
+}
+
+.lc2218-formula .fx-memo {
+  border-radius: 999px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--lc2218-memo) 22%, transparent);
+  color: var(--lc2218-memo);
+}
+
+.lc2218-formula .fx-range {
+  color: var(--lc2218-muted);
+  font-weight: 400;
+}
+
+.lc2218-legend .lg-memo i {
+  background: var(--lc2218-memo);
+}
+
+.lc2218-legend .lg-stack i {
+  border: 2.5px solid var(--lc2218-muted);
+  border-radius: 3px;
+}
+
+.lc2218-legend .lg-dead i {
+  border: 1.5px dashed var(--lc2218-red);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--lc2218-red) 18%, transparent);
 }
 
 /* Current-line strip */

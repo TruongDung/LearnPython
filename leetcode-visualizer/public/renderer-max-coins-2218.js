@@ -37,6 +37,16 @@ const LC2218_COPY = Object.freeze({
     start: "bắt đầu",
     symbols1: [["i", "i chồng đầu"], ["j", "đúng j xu"], ["t", "lấy t xu trên cùng"], ["prefix[t]", "tổng t xu đó"]],
     symbols2: [["dp", "trước chồng này"], ["new_dp", "sau chồng này"], ["j", "đúng j xu"], ["t", "lấy t xu trên cùng"], ["prefix[t]", "tổng t xu đó"]],
+    picture3: "Chồng xu, memo và ngăn xếp gọi",
+    caption3: "memo[i][r] = dfs(i, r) · lru_cache",
+    stack: "ngăn xếp gọi (gốc → đỉnh)",
+    skipRow: "bỏ qua",
+    jumps3: [["line", "Dòng →"], ["call", "Lời gọi →"], ["result", "Kết quả ↠"]],
+    legend3: { coin: "xu", take: "đã cộng vào total", dst: "lời gọi hiện tại", src: "lời gọi con", memo: "trúng memo", stack: "đang chờ", dead: "−∞ ngõ cụt", empty: "· chưa tính", win: "giữ" },
+    hits: "trúng memo",
+    memoTag: "memo",
+    deadEnd: "ngõ cụt",
+    symbols3: [["i", "piles[i] là P(i+1)"], ["r", "remaining: số xu còn phải lấy"], ["t", "take: lấy t xu trên cùng"], ["prefix[t]", "= total sau t xu"], ["memo", "lru_cache"]],
   }),
   en: Object.freeze({
     picture: "Coin piles and DP table",
@@ -59,6 +69,16 @@ const LC2218_COPY = Object.freeze({
     start: "start",
     symbols1: [["i", "first i piles"], ["j", "exactly j coins"], ["t", "take top t coins"], ["prefix[t]", "sum of those t"]],
     symbols2: [["dp", "before this pile"], ["new_dp", "after this pile"], ["j", "exactly j coins"], ["t", "take top t coins"], ["prefix[t]", "sum of those t"]],
+    picture3: "Coin piles, memo and call stack",
+    caption3: "memo[i][r] = dfs(i, r) · lru_cache",
+    stack: "call stack (root → top)",
+    skipRow: "skip",
+    jumps3: [["line", "Line →"], ["call", "Next call →"], ["result", "Result ↠"]],
+    legend3: { coin: "coin", take: "added to total", dst: "current call", src: "child call", memo: "memo hit", stack: "waiting", dead: "−∞ dead end", empty: "· not computed", win: "kept" },
+    hits: "memo hits",
+    memoTag: "memo",
+    deadEnd: "dead end",
+    symbols3: [["i", "piles[i] is P(i+1)"], ["r", "remaining: coins still to take"], ["t", "take: top t coins"], ["prefix[t]", "= total after t coins"], ["memo", "lru_cache"]],
   }),
 });
 
@@ -291,7 +311,7 @@ function lc2218Arrow(L, from, to, cls) {
   const y1 = lc2218CellY(L, from[0]) + LC2218_CELL_H + 1;
   const x2 = lc2218CellX(to[1]) + (LC2218_CELL_W - 4) / 2;
   const y2 = lc2218CellY(L, to[0]) - 2;
-  return `<line class="lc2218-arrow${cls}" data-from="${from.join(",")}" data-to="${to.join(",")}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#lc2218-head${cls.includes("is-blocked") ? "-blocked" : cls.includes("is-path") ? "-path" : ""})"/>`;
+  return `<line class="lc2218-arrow${cls}" data-from="${from.join(",")}" data-to="${to.join(",")}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#lc2218-head${["blocked", "path", "hit", "stack"].map((name) => (cls.includes(`is-${name}`) ? `-${name}` : "")).join("")})"/>`;
 }
 
 function lc2218Table(state, L, copy, parts) {
@@ -462,10 +482,414 @@ function lc2218Picture(state, copy) {
   return `<svg class="lc2218-svg" width="${L.width}" height="${L.height}" viewBox="0 0 ${L.width} ${L.height}" role="img" aria-label="${lc2218Escape(label)}">${parts.join("")}</svg>`;
 }
 
+// ---------- Approach 3: top-down DFS with lru_cache ----------
+// Picture: the piles (current pile i, cut at `take`, +total underneath), the candidates of the current call
+// (best = max(...), kept one starred), the memo grid i × remaining (fills as calls return; a memo hit lights the cached
+// cell blue and is never entered), the call stack as a path through the grid plus one chip per frame, and one line of
+// arithmetic. Values: a number, "-inf" (−∞, a dead end) or null (not known yet / not computed).
+
+const LC2218_LINE_COUNT3 = 26;
+const LC2218_EVENTS3 = new Set([
+  "import", "class", "method", "n", "deco", "def", "call", "enter", "if-base", "if-end", "ret", "back", "hit", "total0",
+  "for-take", "add", "loop-end", "return",
+]);
+const LC2218_CHOICE3_STATES = new Set(["pending", "skip", "win", "lose"]);
+const LC2218_CHIP_W = 56;
+const LC2218_CHIP_GAP = 6;
+const LC2218_CHIP_H = 20;
+
+function lc2218V3(value) {
+  return value === "-inf" ? "-inf" : lc2218Val(value);
+}
+
+const lc2218G3 = (value) => (value === "-inf" ? "−∞" : value === null ? "?" : String(value));
+const lc2218Dfs = (cell, compact) => (cell ? (compact ? `dfs(${cell[0]},${cell[1]})` : `dfs(${cell[0]}, ${cell[1]})`) : "");
+
+function lc2218NormalizeA3(step, raw) {
+  const fallbackLine = step && Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const line = lc2218Int(raw.line, 1, LC2218_LINE_COUNT3) ?? lc2218Int(fallbackLine, 1, LC2218_LINE_COUNT3) ?? 1;
+  const piles = Array.isArray(raw.piles) && raw.piles.length >= 1 && raw.piles.length <= 7
+    && raw.piles.every((pile) => Array.isArray(pile) && pile.length >= 1 && pile.length <= 7 && pile.every((coin) => lc2218Int(coin, 1, 999) !== null))
+    ? raw.piles.map((pile) => pile.slice()) : [[1]];
+  const n = piles.length;
+  const total = piles.reduce((sum, pile) => sum + pile.length, 0);
+  const k = lc2218Int(raw.k, 1, Math.min(8, total)) ?? 1;
+  const rows = n + 1;
+  const cols = k + 1;
+  const cell = (value) => lc2218Cell(value, rows, cols);
+  const memo = Array.isArray(raw.memo) && raw.memo.length === rows
+    && raw.memo.every((row) => Array.isArray(row) && row.length === cols && row.every((v) => v === null || lc2218V3(v) !== null))
+    ? raw.memo.map((row) => row.slice()) : null;
+  const stack = Array.isArray(raw.stack) && raw.stack.length <= rows ? raw.stack.map(cell).filter(Boolean) : [];
+  const frame = cell(raw.frame);
+  const pileIndex = frame && frame[0] < n ? frame[0] : null;
+  const pileLen = pileIndex !== null ? piles[pileIndex].length : 0;
+  const choices = Array.isArray(raw.choices) && raw.choices.length <= 8
+    ? raw.choices.filter((c) => c && lc2218Int(c.t, 0, 7) !== null && LC2218_CHOICE3_STATES.has(c.state)).map((c) => ({
+      t: c.t,
+      gain: lc2218Val(c.gain),
+      sub: lc2218V3(c.sub),
+      sum: lc2218V3(c.sum),
+      state: c.state,
+    })) : [];
+  const finalFlag = raw.final === true || Boolean(step && step.final);
+  const picks = finalFlag && Array.isArray(raw.picks) && raw.picks.length === n && raw.picks.every((v, i) => lc2218Int(v, 0, piles[i].length) !== null)
+    ? raw.picks.slice() : null;
+  const path = finalFlag && Array.isArray(raw.path) && raw.path.length >= 1 && raw.path.length <= rows ? raw.path.map(cell).filter(Boolean) : null;
+  return {
+    approach: 3,
+    line,
+    event: typeof raw.event === "string" && LC2218_EVENTS3.has(raw.event) ? raw.event : "",
+    site: raw.site === "skip" || raw.site === "take" || raw.site === "root" ? raw.site : null,
+    condition: typeof raw.condition === "boolean" ? raw.condition : null,
+    effect: typeof raw.effect === "string" && raw.effect.length <= 90 ? raw.effect : "",
+    k,
+    n,
+    piles,
+    rows,
+    cols,
+    memo,
+    stack,
+    frame,
+    pileIndex,
+    best: lc2218V3(raw.best),
+    total: pileIndex !== null ? lc2218Val(raw.total) : null,
+    take: pileIndex !== null ? lc2218Int(raw.take, 1, Math.min(k, pileLen)) : null,
+    taken: pileIndex !== null ? lc2218Int(raw.taken, 0, pileLen) ?? 0 : 0,
+    call: cell(raw.call),
+    hit: raw.hit === true,
+    value: lc2218V3(raw.value),
+    old: lc2218V3(raw.old),
+    updated: typeof raw.updated === "boolean" ? raw.updated : null,
+    choices,
+    stored: cell(raw.stored),
+    hits: lc2218Int(raw.hits, 0, 9999) ?? 0,
+    answer: finalFlag ? lc2218Val(raw.answer) : null,
+    picks,
+    path: path && path.length ? path : null,
+    final: finalFlag,
+  };
+}
+
+// The current call is a base case (remaining == 0) or a dead end (i == n with remaining > 0).
+function lc2218Kind3(state) {
+  if (!state.frame) return "";
+  if (state.frame[1] === 0 && (state.line === 9 || state.line === 10)) return "base";
+  if (state.frame[0] === state.n && state.frame[1] > 0 && (state.line === 12 || state.line === 13)) return "dead";
+  return "";
+}
+
+function lc2218LayoutA3(state) {
+  const maxLen = Math.max(...state.piles.map((pile) => pile.length));
+  const chX = LC2218_PAD + state.n * LC2218_COL + LC2218_CH_GAP;
+  const footerY = LC2218_COIN_Y0 + maxLen * LC2218_COIN_STEP + 10;
+  const bandBottom = Math.max(footerY + 6, LC2218_CH_Y0 + (maxLen + 1) * LC2218_CH_ROW + 4);
+  const dpY = bandBottom + 10;
+  const headY = dpY + 30;
+  const gridY = dpY + 38;
+  const gridBottom = gridY + state.rows * (LC2218_CELL_H + LC2218_ROW_GAP) - LC2218_ROW_GAP;
+  const stackY = gridBottom + 20;
+  const chipY = gridBottom + 28;
+  const eqY = chipY + LC2218_CHIP_H + 22;
+  const gridW = LC2218_ROW_LABEL + state.cols * LC2218_CELL_W;
+  const chipsW = state.rows * (LC2218_CHIP_W + LC2218_CHIP_GAP) - LC2218_CHIP_GAP;
+  const width = Math.max(chX + LC2218_CH_W, LC2218_PAD + gridW, LC2218_PAD + chipsW, LC2218_PAD + 360) + LC2218_PAD;
+  return { maxLen, chX, footerY, dpY, headY, gridY, stackY, chipY, eqY, width, height: eqY + 10 };
+}
+
+function lc2218PilesA3(state, L, copy, parts) {
+  parts.push(`<text class="lc2218-caption" x="${LC2218_PAD}" y="${LC2218_CAP_Y}">${lc2218Escape(copy.topOnly)}</text>`);
+  state.piles.forEach((pile, p) => {
+    const x = lc2218PileX(p);
+    const cx = x + LC2218_COIN_W / 2;
+    const active = !state.final && state.pileIndex === p;
+    if (active) {
+      parts.push(`<rect class="lc2218-col" x="${LC2218_PAD + p * LC2218_COL + 1}" y="20" width="${LC2218_COL - 2}" height="${L.footerY + 4 - 20}" rx="8"/>`);
+    }
+    parts.push(`<text class="lc2218-pile-label${active ? " is-active" : ""}" x="${cx}" y="${LC2218_LABEL_Y}">P${p + 1}</text>`);
+    parts.push(`<path class="lc2218-up${active ? " is-active" : ""}" d="M${cx} 51 V41 M${cx - 4} 45 L${cx} 40 L${cx + 4} 45"/>`);
+    const pick = state.picks ? state.picks[p] : 0;
+    pile.forEach((coin, c) => {
+      let cls = "";
+      if (state.final && c < pick) cls = " is-chosen";
+      else if (state.final) cls = " is-left";
+      else if (active && c < state.taken) cls = " is-take";
+      else if (active && state.take !== null && c === state.take - 1) cls = " is-reading";
+      const y = lc2218CoinY(c);
+      parts.push(`<rect class="lc2218-coin${cls}" data-pile="${p}" data-coin="${c}" x="${x}" y="${y}" width="${LC2218_COIN_W}" height="${LC2218_COIN_H}" rx="10"/>`);
+      parts.push(`<text class="lc2218-coin-label${cls}" x="${cx}" y="${y + 14}">${coin}</text>`);
+    });
+    if (active && state.take !== null) {
+      const y = LC2218_COIN_Y0 + state.take * LC2218_COIN_STEP - 2;
+      parts.push(`<line class="lc2218-cut" data-cut="${state.take}" x1="${x - 3}" y1="${y}" x2="${x + LC2218_COIN_W + 3}" y2="${y}"/>`);
+    }
+    let foot = "";
+    let footCls = "";
+    if (state.final && state.picks) {
+      foot = `×${pick}`;
+      footCls = pick ? " is-chosen" : " is-left";
+    } else if (active && state.total !== null) {
+      foot = `+${state.total}`;
+      footCls = " is-take";
+    }
+    if (foot) parts.push(`<text class="lc2218-pile-foot${footCls}" x="${cx}" y="${L.footerY}">${lc2218Escape(foot)}</text>`);
+  });
+}
+
+// Right panel: best = max(...) for the current call. t = 0 is the skip call on line 15.
+function lc2218ChoicesA3(state, L, copy, parts) {
+  if (!state.frame || state.final) return;
+  const x = L.chX;
+  const kind = lc2218Kind3(state);
+  const name = lc2218Dfs(state.frame, true);
+  let header = `${name} = max`;
+  let headCls = "";
+  if (kind === "base") {
+    header = `${name} = 0`;
+    headCls = " is-base";
+  } else if (kind === "dead") {
+    header = `${name} = −∞ ✗`;
+    headCls = " is-dead";
+  } else if (state.event === "enter" || (state.event === "if-base" && state.condition === false)) {
+    header = `${name} = ?`;
+  }
+  parts.push(`<text class="lc2218-ch-head${headCls}" x="${x}" y="${LC2218_LABEL_Y}">${lc2218Escape(header)}</text>`);
+  if (kind) return;
+  const rows = state.choices.slice();
+  if (state.event === "call" && state.site === "skip") rows.push({ t: 0, gain: 0, sub: null, sum: null, state: "pending" });
+  const nowT = state.event === "call" || state.event === "back" || state.event === "hit"
+    ? (state.site === "skip" ? 0 : state.take)
+    : state.event === "for-take" || state.event === "add" ? state.take : null;
+  rows.forEach((c, r) => {
+    let text;
+    if (c.t === 0) text = `t=0 ${copy.skipRow}: ${lc2218G3(c.sub)}`;
+    else if (c.gain === null) text = `t=${c.t}: ?`;
+    else if (c.sub === null) text = `t=${c.t}: ${c.gain}+?`;
+    else if (c.sum === "-inf") text = `t=${c.t}: ${c.gain}+${lc2218G3(c.sub)}`;
+    else text = `t=${c.t}: ${c.gain}+${c.sub}=${c.sum}`;
+    const mark = c.state === "win" ? "★" : c.state === "skip" ? "✗" : "";
+    const cls = ` is-${c.state}${nowT === c.t ? " is-now" : ""}`;
+    const y = LC2218_CH_Y0 + r * LC2218_CH_ROW;
+    parts.push(`<rect class="lc2218-choice${cls}" data-t="${c.t}" x="${x}" y="${y}" width="${LC2218_CH_W}" height="${LC2218_CH_ROW - 2}" rx="5"/>`);
+    parts.push(`<text class="lc2218-choice-label${cls}" x="${x + 6}" y="${y + 13}">${lc2218Escape(text)}</text>`);
+    if (mark) parts.push(`<text class="lc2218-choice-mark${cls}" x="${x + LC2218_CH_W - 12}" y="${y + 13}">${mark}</text>`);
+  });
+}
+
+function lc2218MemoA3(state, L, copy, parts) {
+  parts.push(`<text class="lc2218-caption" x="${LC2218_PAD}" y="${L.dpY + 11}">${lc2218Escape(copy.caption3)}</text>`);
+  parts.push(`<text class="lc2218-head-label" x="${LC2218_PAD + LC2218_ROW_LABEL / 2}" y="${L.headY}">r</text>`);
+  for (let c = 0; c < state.cols; c++) {
+    parts.push(`<text class="lc2218-head-label" x="${lc2218CellX(c) + (LC2218_CELL_W - 4) / 2}" y="${L.headY}">${c}</text>`);
+  }
+  if (!state.memo) return;
+  const same = (a, b) => Boolean(a && b && a[0] === b[0] && a[1] === b[1]);
+  const onStack = new Set(state.stack.map((cell) => cell.join(",")));
+  const pathSet = new Set((state.path || []).map((cell) => cell.join(",")));
+  const showCall = !state.final && state.call && (state.event === "call" || state.event === "back" || state.event === "hit");
+  state.memo.forEach((row, r) => {
+    const y = lc2218CellY(L, r);
+    parts.push(`<text class="lc2218-row-label" x="${LC2218_PAD + LC2218_ROW_LABEL / 2}" y="${y + 16}">i=${r}</text>`);
+    row.forEach((value, c) => {
+      const key = `${r},${c}`;
+      const here = [r, c];
+      let cls = value === null ? " is-empty" : value === "-inf" ? " is-dead" : "";
+      if (state.final) {
+        if (pathSet.has(key)) cls += " is-path";
+        if (r === 0 && c === state.k) cls += " is-answer";
+      } else {
+        if (same(state.frame, here)) cls += state.event === "ret" ? " is-dst is-new" : " is-dst";
+        else if (onStack.has(key)) cls += " is-stack";
+        if (showCall && same(state.call, here)) cls += state.event === "hit" ? " is-hit" : " is-src";
+      }
+      parts.push(`<rect class="lc2218-cell${cls}" data-cell="${key}" x="${lc2218CellX(c)}" y="${y}" width="${LC2218_CELL_W - 4}" height="${LC2218_CELL_H}" rx="5"/>`);
+      parts.push(`<text class="lc2218-cell-label${cls}" x="${lc2218CellX(c) + (LC2218_CELL_W - 4) / 2}" y="${y + 16}">${value === null ? "·" : lc2218G3(value)}</text>`);
+    });
+  });
+  if (state.final && state.path) {
+    for (let s = 0; s + 1 < state.path.length; s++) parts.push(lc2218Arrow(L, state.path[s], state.path[s + 1], " is-path"));
+    return;
+  }
+  for (let s = 0; s + 1 < state.stack.length; s++) parts.push(lc2218Arrow(L, state.stack[s], state.stack[s + 1], " is-stack"));
+  if (showCall && state.frame) {
+    const cls = state.event === "hit" ? " is-hit" : state.event === "back" && state.value === "-inf" ? " is-blocked" : "";
+    parts.push(lc2218Arrow(L, state.frame, state.call, cls));
+  }
+}
+
+// One chip per frame, root first; a pending call (dashed) or a memo hit (blue) is drawn after the top frame.
+function lc2218StackA3(state, L, copy, parts) {
+  if (state.final || (!state.stack.length && !state.call)) return;
+  parts.push(`<text class="lc2218-caption" x="${LC2218_PAD}" y="${L.stackY}">${lc2218Escape(copy.stack)}</text>`);
+  const chips = state.stack.map((cell, s) => {
+    let cls = s === state.stack.length - 1 ? " is-top" : " is-wait";
+    const kind = s === state.stack.length - 1 ? lc2218Kind3(state) : "";
+    if (kind) cls += ` is-${kind}`;
+    return { cell, cls };
+  });
+  if (state.call && (state.event === "call" || state.event === "hit")) chips.push({ cell: state.call, cls: state.event === "hit" ? " is-hit" : " is-call" });
+  chips.forEach((chip, s) => {
+    const x = LC2218_PAD + s * (LC2218_CHIP_W + LC2218_CHIP_GAP);
+    parts.push(`<rect class="lc2218-chip${chip.cls}" data-frame="${chip.cell.join(",")}" x="${x}" y="${L.chipY}" width="${LC2218_CHIP_W}" height="${LC2218_CHIP_H}" rx="6"/>`);
+    parts.push(`<text class="lc2218-chip-label${chip.cls}" x="${x + LC2218_CHIP_W / 2}" y="${L.chipY + 14}">${lc2218Escape(lc2218Dfs(chip.cell, true))}</text>`);
+  });
+}
+
+function lc2218EquationA3(state, copy) {
+  const span = (cls, text) => `<tspan class="${cls}">${lc2218Escape(text)}</tspan>`;
+  const g = lc2218G3;
+  if (state.final && state.answer !== null) {
+    const parts = state.picks ? state.picks.map((pick, p) => (pick ? `P${p + 1}×${pick}` : "")).filter(Boolean) : [];
+    return `${span("eq-take", parts.join(" + "))}${span("eq-op", " → ")}${span("eq-win", `${copy.answer} ${state.answer}`)}`;
+  }
+  const me = lc2218Dfs(state.frame, true);
+  const child = lc2218Dfs(state.call, true);
+  if (state.event === "call") return `${span("eq-dst", me || copy.answerWord)}${span("eq-op", " → ")}${span("eq-src", `${child} ?`)}`;
+  if (state.event === "hit" || state.event === "back") {
+    const head = state.event === "hit" ? `${span("eq-memo", `${copy.memoTag} ${child} = ${g(state.value)}`)}${span("eq-op", " · ")}` : "";
+    if (state.site === "skip") return `${head}${span("eq-op", "best = ")}${span(state.value === "-inf" ? "eq-bad" : "eq-src", g(state.value))}`;
+    const sum = state.value === "-inf" ? "-inf" : (state.total ?? 0) + state.value;
+    const body = `${span("eq-take", String(state.total ?? 0))}${span("eq-op", " + ")}${span("eq-src", g(state.value))}${span("eq-op", " = ")}${span("eq-dst", g(sum))}`;
+    const tail = state.updated ? span("eq-win", " ✓") : `${span("eq-op", " ≤ ")}${span("eq-dst", g(state.old))}${span("eq-bad", " ✗")}`;
+    return `${head}${body}${tail}`;
+  }
+  if (state.event === "ret") {
+    const bad = state.value === "-inf";
+    return `${span("eq-dst", me)}${span("eq-op", " = ")}${span(bad ? "eq-bad" : "eq-win", g(state.value))}${span("eq-op", ` → memo[${state.frame[0]}][${state.frame[1]}]`)}${bad ? span("eq-bad", ` ${copy.deadEnd}`) : ""}`;
+  }
+  if (state.event === "add" && state.take !== null && state.total !== null) {
+    const coin = state.piles[state.pileIndex][state.take - 1];
+    return `${span("eq-op", `total = ${state.total - coin} + `)}${span("eq-take", String(coin))}${span("eq-op", ` = ${state.total}`)}`;
+  }
+  return "";
+}
+
+// The recurrence of the user's dfs, its base cases, a symbol key and this step filled in. Colors match the picture:
+// current call (pink), child call (purple), taken coins / total (cyan), memo hit (blue), kept value (green box).
+function lc2218FormulaA3(state, copy) {
+  const html = (tokens) => tokens.map(([cls, text]) => (cls ? `<span class="${cls}">${lc2218Escape(text)}</span>` : lc2218Escape(text))).join("");
+  const plain = (segs) => segs.map((seg) => seg.map((token) => token[1]).join("")).join(" ");
+  const row = (cls, segs, extra = "") => `<div class="${cls}"${extra}>${segs.map((seg) => `<span class="fx-seg">${html(seg)}</span>`).join(" ")}</div>`;
+  const general = [
+    [["fx-dst", "dfs(i, r)"], ["", " ="]],
+    [["", "max("], ["fx-src", "dfs(i+1, r)"], ["", ","]],
+    [["fx-take", "prefix[t]"], ["", " + "], ["fx-src", "dfs(i+1, r−t)"], ["", ")"]],
+    [["fx-range", "t = 1…min(len(piles[i]), r)"]],
+  ];
+  const kind = lc2218Kind3(state);
+  const base = [
+    [[kind === "base" ? "fx-now" : "", "dfs(i, 0) = 0"]],
+    [[kind === "dead" ? "fx-now fx-bad" : "", "dfs(n, r > 0) = −∞"]],
+    [[state.final ? "fx-now" : "", `${copy.answerWord} = dfs(0, k)`]],
+  ];
+  const symbols = copy.symbols3.map(([name, meaning]) => `<span><code>${lc2218Escape(name)}</code> ${lc2218Escape(meaning)}</span>`).join("");
+  const g = lc2218G3;
+  const d = (value) => (value === null ? "?" : String(value));
+  const me = lc2218Dfs(state.frame, false);
+  const child = lc2218Dfs(state.call, false);
+  const now = [];
+  let data = {};
+  const memoTag = state.hit ? [["fx-memo", `${copy.memoTag} ✓`]] : null;
+  if (state.final && state.answer !== null) {
+    data = { state: "dfs(0, " + state.k + ")", result: String(state.answer) };
+    now.push([["", `${copy.answerWord} = `], ["fx-dst", `dfs(0, ${state.k})`], ["", " = "], ["fx-win", String(state.answer)]]);
+  } else if (state.event === "call" && state.site === "root") {
+    data = { state: child };
+    now.push([["", `${copy.answerWord} = `], ["fx-src", child], ["", " = ?"]]);
+  } else if (state.event === "enter" || (state.event === "if-base" && !kind) || (state.event === "if-end" && !kind)) {
+    data = { state: me };
+    const [i, r] = state.frame;
+    now.push([["fx-dst", me], ["", " ="]]);
+    now.push([["", "max("], ["fx-src", `dfs(${i + 1}, ${r})`], ["", ", "], ["fx-take", "prefix[t]"], ["", " + "], ["fx-src", `dfs(${i + 1}, ${r}−t)`], ["", ")"]]);
+  } else if (kind) {
+    data = { state: me, result: kind === "base" ? "0" : "-inf" };
+    now.push([["fx-dst", me], ["", " = "], [kind === "base" ? "fx-win" : "fx-bad", kind === "base" ? "0" : `−∞ (${copy.deadEnd}) ✗`]]);
+  } else if ((state.event === "call" || state.event === "back" || state.event === "hit") && state.site === "skip") {
+    data = { state: me, call: child, sub: d(state.event === "call" ? null : state.value) };
+    now.push([["fx-dst", "best"], ["", " = "], ["fx-src", child]]);
+    if (state.event !== "call") {
+      data.result = d(state.value);
+      now.push([["", "= "], [`${state.value === "-inf" ? "fx-bad" : "fx-src"} fx-result`, g(state.value)], ...(memoTag ? [["", " "], ...memoTag] : [])]);
+    } else now.push([["", "= ?"]]);
+  } else if (state.event === "total0") {
+    now.push([["fx-take", "total"], ["", " = "], ["fx-take", "prefix[0]"], ["", " = 0"]]);
+  } else if (state.event === "for-take" && state.take !== null) {
+    data = { state: me, t: String(state.take), old: d(state.best) };
+    now.push([["", `t = ${state.take}: `], ["fx-dst", "best"], ["", " = max("], ["fx-dst", g(state.best)], ["", ", "], ["fx-take", `prefix[${state.take}]`], ["", " + "], ["fx-src", `dfs(${state.frame[0] + 1}, ${state.frame[1] - state.take})`], ["", ")"]]);
+  } else if (state.event === "add" && state.take !== null && state.total !== null) {
+    const coin = state.piles[state.pileIndex][state.take - 1];
+    data = { t: String(state.take), gain: String(state.total) };
+    now.push([["fx-take", `prefix[${state.take}]`], ["", " = "], ["fx-take", "total"], ["", ` = ${state.total - coin} + ${coin} = `], ["fx-take", String(state.total)]]);
+  } else if ((state.event === "call" || state.event === "back" || state.event === "hit") && state.site === "take") {
+    const gain = state.total ?? 0;
+    data = { state: me, call: child, t: String(state.take), gain: String(gain) };
+    now.push([["fx-dst", "best"], ["", " ="]]);
+    now.push([["", "max("], ["fx-dst", state.event === "call" ? g(state.best) : g(state.old)], ["", ", "], ["fx-take", String(gain)], ["", " + "], ["fx-src", child], ["", ")"]]);
+    if (state.event !== "call") {
+      const sum = state.value === "-inf" ? "-inf" : gain + state.value;
+      const won = state.updated === true;
+      Object.assign(data, { old: d(state.old), sub: d(state.value), sum: d(sum), result: d(won ? sum : state.old) });
+      now.push([["", "= max("], [`fx-dst${won ? "" : " fx-win"}`, g(state.old)], ["", ", "], [`fx-take${won ? " fx-win" : ""}`, String(gain)], ["", " + "],
+        [`${state.value === "-inf" ? "fx-bad" : "fx-src"}${won ? " fx-win" : ""}`, g(state.value)], ["", ")"]]);
+      now.push([["", "= "], ["fx-dst fx-result", g(won ? sum : state.old)], ["fx-mark", won ? " ✓" : ` (${copy.kept} ${g(state.old)})`], ...(memoTag ? [["", " "], ...memoTag] : [])]);
+    }
+  } else if (state.event === "loop-end") {
+    data = { state: me, result: d(state.best) };
+    now.push([["fx-dst", me], ["", " = "], ["fx-dst", "best"], ["", " = "], ["fx-dst fx-result", g(state.best)]]);
+  } else if (state.event === "ret") {
+    data = { state: me, result: d(state.value) };
+    now.push([["fx-dst", me], ["", " = "], ["fx-win", g(state.value)], ["", ` → memo[${state.frame[0]}][${state.frame[1]}]`]]);
+  }
+  const dataAttrs = Object.entries(data).map(([key, value]) => ` data-${key}="${lc2218Escape(value)}"`).join("");
+  const nowLabel = now.length ? `${copy.formulaNow}: ${plain(now)}` : copy.formulaNow;
+  const nowRow = now.length
+    ? row("lc2218-fx-now", [[["fx-tag", copy.formulaNow]], ...now], ` role="group" data-event="${lc2218Escape(state.event)}"${dataAttrs} aria-label="${lc2218Escape(nowLabel)}"`)
+    : `<div class="lc2218-fx-now is-empty" aria-hidden="true">&nbsp;</div>`;
+  const comparing = Boolean(state.frame) && !kind && !state.final;
+  return `<div class="lc2218-formula" role="group" aria-label="${lc2218Escape(`${copy.formula}: ${plain(general)}; ${plain(base)}`)}">`
+    + row(`lc2218-fx-general${comparing ? " is-active" : ""}`, [[["fx-tag", copy.formula]], ...general])
+    + row("lc2218-fx-base", base)
+    + `<div class="lc2218-fx-symbols">${symbols}</div>`
+    + nowRow
+    + "</div>";
+}
+
+function lc2218PictureA3(state, copy) {
+  const L = lc2218LayoutA3(state);
+  const parts = [];
+  const marker = (suffix, cls) => `<marker id="lc2218-head${suffix}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path class="lc2218-arrowhead${cls}" d="M0,0 L8,4 L0,8 z"/></marker>`;
+  parts.push(`<defs>${marker("", "")}${marker("-blocked", " is-blocked")}${marker("-path", " is-path")}${marker("-hit", " is-hit")}${marker("-stack", " is-stack")}</defs>`);
+  lc2218PilesA3(state, L, copy, parts);
+  lc2218ChoicesA3(state, L, copy, parts);
+  lc2218MemoA3(state, L, copy, parts);
+  lc2218StackA3(state, L, copy, parts);
+  const eq = lc2218EquationA3(state, copy);
+  if (eq) parts.push(`<text class="lc2218-eq" x="${LC2218_PAD}" y="${L.eqY}">${eq}</text>`);
+  const vi = lc2218IsVi();
+  const label = state.final && state.answer !== null
+    ? `${copy.answer}: ${state.answer}`
+    : vi ? `${state.n} ${copy.piles}, lấy đúng ${state.k} ${copy.coins}` : `${state.n} ${copy.piles}, take exactly ${state.k} ${copy.coins}`;
+  return `<svg class="lc2218-svg" width="${L.width}" height="${L.height}" viewBox="0 0 ${L.width} ${L.height}" role="img" aria-label="${lc2218Escape(label)}">${parts.join("")}</svg>`;
+}
+
+function lc2218LegendA3(copy) {
+  const G = copy.legend3;
+  return `<div class="lc2218-legend" aria-hidden="true">`
+    + `<span class="lg-coin"><i></i>${lc2218Escape(G.coin)}</span>`
+    + `<span class="lg-take"><i></i>${lc2218Escape(G.take)}</span>`
+    + `<span class="lg-dst"><i></i>${lc2218Escape(G.dst)}</span>`
+    + `<span class="lg-src"><i></i>${lc2218Escape(G.src)}</span>`
+    + `<span class="lg-memo"><i></i>${lc2218Escape(G.memo)}</span>`
+    + `<span class="lg-stack"><i></i>${lc2218Escape(G.stack)}</span>`
+    + `<span class="lg-dead"><i></i>${lc2218Escape(G.dead)}</span>`
+    + `<span class="lg-empty">${lc2218Escape(G.empty)}</span>`
+    + `<span class="lg-win">★ ${lc2218Escape(G.win)}</span></div>`;
+}
+
 // ---------- Current-line strip (source lives in the shared #codePanel) ----------
 
 function lc2218Code(state, copy) {
-  const badge = state.condition !== null && state.event === "check"
+  const badge = state.condition !== null && (state.event === "check" || state.event === "if-base" || state.event === "if-end")
     ? `<b class="lc2218-branch${state.condition ? " is-true" : " is-false"}">${state.condition ? "True" : "False"}</b>`
     : "";
   return `<header><b>${lc2218Escape(copy.code)}</b></header><div class="lc2218-now" data-code-line="${state.line}" aria-current="step"><span class="lc2218-lineno">L${state.line}</span>${state.effect ? `<code class="lc2218-effect">↳ ${lc2218Escape(state.effect)}</code>` : ""}${badge}</div>`;
@@ -480,6 +904,7 @@ function lc2218Next(kind) {
     if (index <= stepIndex || !view) return false;
     if (kind === "line") return true;
     if (kind === "pile") return view.event === "for-pile";
+    if (kind === "call") return view.event === "enter" || view.event === "hit";
     if (kind === "result") return Boolean(step.final);
     return false;
   });
@@ -516,6 +941,25 @@ function lc2218Bind(host) {
   });
 }
 
+function lc2218Presets(vi) {
+  return LC2218_CASES.map((preset, index) => `<button type="button" data-lc2218-case="${index}">${lc2218Escape(vi ? preset[2] : preset[3])}</button>`).join("");
+}
+
+function renderMaxCoins2218Memo(host, step, raw, copy, vi) {
+  const state = lc2218NormalizeA3(step, raw);
+  const heading = state.final && state.answer !== null ? `return ${state.answer}` : `maxValueOfCoins(piles, ${state.k})`;
+  const status = state.final ? `✓ ${state.answer} · ${copy.hits} ${state.hits}`
+    : state.frame ? `${lc2218Dfs(state.frame, false)} · ${copy.hits} ${state.hits}` : `k = ${state.k}`;
+  const jumps = copy.jumps3.map(([kind, label]) => `<button type="button" data-lc2218-jump="${kind}"${lc2218Next(kind) < 0 ? " disabled" : ""}>${lc2218Escape(label)}</button>`).join("");
+  host.innerHTML = `<article class="lc2218-viz is-memo${state.final ? " is-final" : ""}" data-problem-id="2218" data-approach="3" data-source-line="${state.line}" role="region" aria-label="LeetCode 2218 · ${vi ? "dòng" : "line"} ${state.line}">`
+    + `<header class="lc2218-head"><div><small>LEETCODE 2218 · K COINS · DFS + MEMO</small><h2><code>${lc2218Escape(heading)}</code></h2></div><span class="lc2218-status">${lc2218Escape(status)}</span></header>`
+    + `<nav class="lc2218-presets" aria-label="${lc2218Escape(copy.examples)}">${lc2218Presets(vi)}</nav>`
+    + `<section class="lc2218-card lc2218-picture-card" aria-label="${lc2218Escape(copy.picture3)}"><header><b>${lc2218Escape(copy.picture3)}</b></header>${lc2218PictureA3(state, copy)}${lc2218FormulaA3(state, copy)}${lc2218LegendA3(copy)}</section>`
+    + `<section class="lc2218-card lc2218-code-card" aria-label="${lc2218Escape(copy.code)}">${lc2218Code(state, copy)}</section>`
+    + `<footer class="lc2218-foot">${jumps}</footer></article>`;
+  lc2218Bind(host);
+}
+
 function renderMaxCoins2218View(step) {
   const host = typeof document !== "undefined" && document.getElementById
     ? document.getElementById("treeView")
@@ -523,6 +967,11 @@ function renderMaxCoins2218View(step) {
   if (!host) return;
   const vi = lc2218IsVi();
   const copy = LC2218_COPY[vi ? "vi" : "en"];
+  const raw = step && step.maxCoins2218View && typeof step.maxCoins2218View === "object" ? step.maxCoins2218View : {};
+  if (raw.approach === 3) {
+    renderMaxCoins2218Memo(host, step, raw, copy, vi);
+    return;
+  }
   const state = lc2218Normalize(step);
   const heading = state.final && state.answer !== null ? `return ${state.answer}` : `maxValueOfCoins(piles, ${state.k})`;
   const status = state.final ? `✓ ${state.answer}` : state.pileIndex !== null

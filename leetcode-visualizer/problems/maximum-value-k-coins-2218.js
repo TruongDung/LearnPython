@@ -1,5 +1,6 @@
 // LeetCode 2218 — Maximum Value of K Coins From Piles. Group knapsack over pile prefixes.
-// Approach 1: 2D dp[i][j]. Approach 2: 1D dp plus a fresh new_dp per pile.
+// Approach 1: 2D dp[i][j]. Approach 2: 1D dp plus a fresh new_dp per pile. Approach 3: the user's top-down DFS with
+// lru_cache, verbatim.
 // Each step is one executed Python line; the picture model lives in step.maxCoins2218View.
 
 const bi2218 = (vi, en) => ({ vi, en });
@@ -44,6 +45,36 @@ const SOURCE_2218_B = Object.freeze([
   "                        new_dp[j] = max(new_dp[j], dp[j - t] + prefix[t])",
   "            dp = new_dp",
   "        return dp[k]",
+]);
+
+// Approach 3 is the user's code, verbatim (blank lines included): top-down DFS memoized by lru_cache.
+const SOURCE_2218_C = Object.freeze([
+  "from functools import lru_cache",
+  "",
+  "class Solution:",
+  "    def maxValueOfCoins(self, piles, k):",
+  "        n = len(piles)",
+  "",
+  "        @lru_cache(None)",
+  "        def dfs(i, remaining):",
+  "            if remaining == 0:",
+  "                return 0",
+  "",
+  "            if i == n:",
+  "                return float('-inf')",
+  "",
+  "            best = dfs(i + 1, remaining)",
+  "",
+  "            total = 0",
+  "",
+  "            for take in range(1, min(len(piles[i]), remaining) + 1):",
+  "                total += piles[i][take - 1]",
+  "",
+  "                best = max(best,total + dfs(i + 1, remaining - take))",
+  "",
+  "            return best",
+  "",
+  "        return dfs(0, k)",
 ]);
 
 const DEFAULT_INPUT_2218 = "[[1,100,3],[7,8,9],[20,5,40]]";
@@ -487,6 +518,244 @@ function buildSteps2218OneDimensional(input, params = {}) {
   return { input: piles, k, answer: dp[k], selectedCounts: plan.picks, steps: rec.steps };
 }
 
+// Approach 3 values: JS -Infinity in the simulation, "-inf" in the view model (JSON has no −∞), null = unknown.
+const enc2218 = (value) => (value === undefined || value === null ? null : value === -Infinity ? "-inf" : value);
+const py2218 = (value) => (value === -Infinity ? "-inf" : String(value));
+const glyph2218 = (value) => (value === -Infinity ? "−∞" : String(value));
+const state2218 = (i, r) => `dfs(${i}, ${r})`;
+
+// Approach 3: one step per executed line of the user's memoized DFS. A call whose (i, remaining) is already in the
+// lru_cache memo is one "hit" step on the calling line; the DFS never steps into it again.
+function buildSteps2218Memo(input, params = {}) {
+  const piles = parsePiles2218(input);
+  const k = parseK2218(params, piles);
+  const n = piles.length;
+  const NAMES = ["n", "i", "remaining", "best", "total", "take"];
+  const steps = [];
+  const memo = new Map();
+  const stack = [];
+  let memoReady = false;
+  let nValue = "—";
+  let hits = 0;
+
+  function emit(o) {
+    const top = stack.at(-1) || null;
+    const final = Boolean(o.final);
+    const table = memoReady
+      ? Array.from({ length: n + 1 }, (_, i) => Array.from({ length: k + 1 }, (_, r) => (memo.has(`${i},${r}`) ? enc2218(memo.get(`${i},${r}`)) : null)))
+      : null;
+    const model = {
+      version: 1,
+      problemId: 2218,
+      approach: 3,
+      line: o.line,
+      event: o.event,
+      site: o.site || null,
+      condition: typeof o.condition === "boolean" ? o.condition : null,
+      effect: o.effect || "",
+      k,
+      n,
+      piles,
+      frame: top ? [top.i, top.r] : null,
+      stack: stack.map((f) => [f.i, f.r]),
+      best: top ? enc2218(top.best) : null,
+      total: top && top.total !== undefined ? top.total : null,
+      take: top && top.take !== undefined ? top.take : null,
+      taken: top ? top.taken : 0,
+      call: o.call || null,
+      hit: o.hit === true,
+      value: o.value === undefined ? null : enc2218(o.value),
+      old: o.old === undefined ? null : enc2218(o.old),
+      updated: typeof o.updated === "boolean" ? o.updated : null,
+      choices: top ? top.choices.map((c) => ({ ...c })) : [],
+      memo: table,
+      stored: o.stored || null,
+      hits,
+      answer: final ? o.answer : null,
+      picks: final ? o.picks : null,
+      path: final ? o.path : null,
+      final,
+    };
+    const locals = {
+      n: nValue,
+      i: top ? top.i : "—",
+      remaining: top ? top.r : "—",
+      best: top && top.best !== undefined ? py2218(top.best) : "—",
+      total: top && top.total !== undefined ? top.total : "—",
+      take: top && top.take !== undefined ? top.take : "—",
+    };
+    steps.push({
+      title: bi2218(o.effect, o.effect),
+      note: o.note,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [o.line],
+      codeBlock: 3,
+      final,
+      vars: NAMES.map((name) => ({ name, value: locals[name] })),
+      maxCoins2218View: JSON.parse(JSON.stringify(model)),
+    });
+  }
+
+  // A call site: a memo hit resolves on this line (one step); otherwise announce the call, run it, then resume here.
+  function call(line, site, i, r, resume) {
+    const key = `${i},${r}`;
+    if (memo.has(key)) {
+      hits++;
+      resume(memo.get(key), true);
+      return;
+    }
+    emit({ line, event: "call", site, call: [i, r], effect: `call ${state2218(i, r)}`, note: bi2218(`Gọi ${state2218(i, r)}.`, `Call ${state2218(i, r)}.`) });
+    resume(dfs(i, r), false);
+  }
+
+  function finish(f, line, value, note) {
+    memo.set(`${f.i},${f.r}`, value);
+    emit({ line, event: "ret", value, stored: [f.i, f.r], effect: `return ${py2218(value)} → memo[${f.i}][${f.r}]`, note });
+    stack.pop();
+    return value;
+  }
+
+  function dfs(i, r) {
+    const f = { i, r, best: undefined, total: undefined, take: undefined, taken: 0, choices: [] };
+    stack.push(f);
+    const s = state2218(i, r);
+    emit({ line: 8, event: "enter", effect: `enter ${s}`, note: bi2218(`Vào ${s}.`, `Enter ${s}.`) });
+    emit({
+      line: 9,
+      event: "if-base",
+      condition: r === 0,
+      effect: `remaining = ${r}`,
+      note: r === 0 ? bi2218("Đủ xu rồi: trả 0.", "No coins left to take.") : bi2218(`Còn phải lấy ${r} xu.`, `${r} coins still to take.`),
+    });
+    if (r === 0) return finish(f, 10, 0, bi2218(`${s} = 0.`, `${s} = 0.`));
+    emit({
+      line: 12,
+      event: "if-end",
+      condition: i === n,
+      effect: `i = ${i}, n = ${n}`,
+      note: i === n ? bi2218("Hết chồng: ngõ cụt.", "No piles left: dead end.") : bi2218(`Còn chồng P${i + 1}.`, `Pile P${i + 1} is next.`),
+    });
+    if (i === n) return finish(f, 13, -Infinity, bi2218(`${s} = −∞ ngõ cụt.`, `${s} = −∞ dead end.`));
+
+    call(15, "skip", i + 1, r, (value, hit) => {
+      f.best = value;
+      f.choices.push({ t: 0, gain: 0, sub: enc2218(value), sum: enc2218(value), state: value === -Infinity ? "skip" : "win" });
+      emit({
+        line: 15,
+        event: hit ? "hit" : "back",
+        site: "skip",
+        call: [i + 1, r],
+        hit,
+        value,
+        updated: true,
+        effect: `best = ${state2218(i + 1, r)} = ${py2218(value)}${hit ? " (memo)" : ""}`,
+        note: hit
+          ? bi2218(`Memo có ${state2218(i + 1, r)} = ${glyph2218(value)}.`, `Memo hit: ${state2218(i + 1, r)} = ${glyph2218(value)}.`)
+          : bi2218(`Bỏ P${i + 1}: best = ${glyph2218(value)}.`, `Skip P${i + 1}: best = ${glyph2218(value)}.`),
+      });
+    });
+    f.total = 0;
+    emit({ line: 17, event: "total0", effect: "total = 0", note: bi2218("Chưa lấy xu nào.", "No coins taken yet.") });
+    const limit = Math.min(piles[i].length, r);
+    for (let take = 1; take <= limit; take++) {
+      f.take = take;
+      f.choices.push({ t: take, gain: null, sub: null, sum: null, state: "pending" });
+      emit({ line: 19, event: "for-take", effect: `take = ${take}`, note: bi2218(`Thử lấy ${take} xu từ P${i + 1}.`, `Try ${take} from P${i + 1}.`) });
+      const before = f.total;
+      const coin = piles[i][take - 1];
+      f.total += coin;
+      f.taken = take;
+      f.choices.at(-1).gain = f.total;
+      emit({
+        line: 20,
+        event: "add",
+        effect: `total = ${before} + ${coin} = ${f.total}`,
+        note: bi2218(`total = ${before} + ${coin} = ${f.total}.`, `total = ${before} + ${coin} = ${f.total}.`),
+      });
+      call(22, "take", i + 1, r - take, (value, hit) => {
+        const old = f.best;
+        const sum = f.total + value;
+        const updated = sum > old;
+        const choice = f.choices.at(-1);
+        choice.sub = enc2218(value);
+        choice.sum = enc2218(sum);
+        if (updated) f.choices.forEach((c) => { if (c.state === "win") c.state = "lose"; });
+        choice.state = sum === -Infinity ? "skip" : updated ? "win" : "lose";
+        if (updated) f.best = sum;
+        const sub = state2218(i + 1, r - take);
+        let note;
+        if (hit) note = bi2218(`Memo có ${sub} = ${glyph2218(value)}.`, `Memo hit: ${sub} = ${glyph2218(value)}.`);
+        else if (updated) note = bi2218(`best = ${glyph2218(sum)} ✓`, `best = ${glyph2218(sum)} ✓`);
+        else if (sum === -Infinity) note = bi2218(`−∞: giữ best = ${glyph2218(old)}.`, `−∞: keep best = ${glyph2218(old)}.`);
+        else note = bi2218(`${sum} ≤ ${glyph2218(old)}: giữ best.`, `${sum} ≤ ${glyph2218(old)}: keep best.`);
+        emit({
+          line: 22,
+          event: hit ? "hit" : "back",
+          site: "take",
+          call: [i + 1, r - take],
+          hit,
+          value,
+          old,
+          updated,
+          effect: `best = max(${py2218(old)}, ${f.total} + ${py2218(value)}) = ${py2218(f.best)}${hit ? " (memo)" : ""}`,
+          note,
+        });
+      });
+    }
+    emit({ line: 19, event: "loop-end", effect: "range done", note: bi2218("Đã thử hết số xu lấy.", "Every take is tried.") });
+    return finish(f, 24, f.best, bi2218(`${s} = ${glyph2218(f.best)}: vào memo.`, `${s} = ${glyph2218(f.best)}: memo.`));
+  }
+
+  // Display-only: which take the code kept at each level (first maximum wins, skip first), read back from the memo.
+  function plan() {
+    const picks = Array(n).fill(0);
+    const path = [[0, k]];
+    let r = k;
+    for (let i = 0; i < n && r > 0; i++) {
+      const want = memo.get(`${i},${r}`);
+      let t = 0;
+      if (memo.get(`${i + 1},${r}`) !== want) {
+        let total = 0;
+        for (t = 1; t <= Math.min(piles[i].length, r); t++) {
+          total += piles[i][t - 1];
+          if (total + memo.get(`${i + 1},${r - t}`) === want) break;
+        }
+      }
+      picks[i] = t;
+      r -= t;
+      path.push([i + 1, r]);
+    }
+    return { picks, path };
+  }
+
+  emit({ line: 1, event: "import", effect: "lru_cache", note: bi2218("Nhập lru_cache.", "Import lru_cache.") });
+  emit({ line: 3, event: "class", effect: "Solution", note: NOTES_2218.class });
+  emit({ line: 4, event: "method", effect: `k = ${k}`, title: `maxValueOfCoins(piles, ${k})`, note: call2218(n, k) });
+  nValue = n;
+  emit({ line: 5, event: "n", effect: `n = ${n}`, note: bi2218(`n = ${n} chồng.`, `n = ${n} piles.`) });
+  memoReady = true;
+  emit({ line: 7, event: "deco", effect: "memo = {}", note: bi2218("Memo nhớ mọi lời gọi.", "Memo caches every call.") });
+  emit({ line: 8, event: "def", effect: "def dfs(i, remaining)", note: bi2218("Định nghĩa dfs(i, r).", "Define dfs(i, r).") });
+  emit({ line: 26, event: "call", site: "root", call: [0, k], effect: `call ${state2218(0, k)}`, note: bi2218(`Bắt đầu ${state2218(0, k)}.`, `Start at ${state2218(0, k)}.`) });
+  const answer = dfs(0, k);
+  const { picks, path } = plan();
+  emit({
+    line: 26,
+    event: "return",
+    call: [0, k],
+    value: answer,
+    effect: `return ${answer}`,
+    answer,
+    picks,
+    path,
+    final: true,
+    note: bi2218(`Đáp án = ${answer}.`, `Answer = ${answer}.`),
+  });
+  return { input: piles, k, answer, selectedCounts: picks, memoHits: hits, steps };
+}
+
 const complexity2218 = (space, vi, en) => ({ time: "O(k · Σ min(k, len(pile)))", space, note: bi2218(vi, en) });
 
 module.exports = {
@@ -519,6 +788,7 @@ module.exports = {
         options: [
           { value: "1", label: bi2218("Cách 1: DP 2D dp[i][j]", "Approach 1: 2D dp[i][j]") },
           { value: "2", label: bi2218("Cách 2: DP 1D dp / new_dp", "Approach 2: 1D dp / new_dp") },
+          { value: "3", label: bi2218("Cách 3: DFS + memo (lru_cache)", "Approach 3: DFS + memo (lru_cache)") },
         ],
       },
     ],
@@ -527,13 +797,24 @@ module.exports = {
       bi2218("dp[i][j] = giá trị lớn nhất khi lấy đúng j xu từ i chồng đầu (−∞ nếu không được).", "dp[i][j] = best value from exactly j coins of the first i piles (−∞ if impossible)."),
       bi2218("dp[i][j] = max theo t của dp[i−1][j−t] + prefix[t]; đáp án là dp[n][k].", "dp[i][j] = max over t of dp[i−1][j−t] + prefix[t]; the answer is dp[n][k]."),
       bi2218("Cách 2 chỉ giữ một hàng dp và chép sang new_dp cho mỗi chồng, nên mỗi chồng chỉ dùng một lần.", "Approach 2 keeps one dp row and copies it to new_dp per pile, so each pile is used once."),
+      bi2218("Cách 3 (code của bạn) đi từ trên xuống: dfs(i, r) = max(bỏ chồng i, lấy t xu trên cùng + dfs(i+1, r−t)); lru_cache nhớ mỗi (i, r) nên mỗi trạng thái chỉ tính một lần.", "Approach 3 (your code) works top-down: dfs(i, r) = max(skip pile i, top t coins + dfs(i+1, r−t)); lru_cache remembers each (i, r), so every state is computed once."),
     ],
     complexity: complexity2218("O(n · k)", "Bảng (n+1)×(k+1).", "An (n+1)×(k+1) table."),
     complexity2: complexity2218("O(k)", "Chỉ hai hàng dp và new_dp.", "Only the dp and new_dp rows."),
+    complexity3: {
+      time: "O(n · k · m)",
+      space: "O(n · k) + O(n)",
+      note: bi2218(
+        "m = chồng dài nhất. Memo có (n+1)×(k+1) trạng thái, mỗi trạng thái thử ≤ m cách lấy; ngăn xếp đệ quy sâu ≤ n+1.",
+        "m = longest pile. The memo holds (n+1)×(k+1) states, each tries ≤ m takes; the recursion stack is ≤ n+1 deep.",
+      ),
+    },
     code: [...SOURCE_2218_A],
     code2: [...SOURCE_2218_B],
+    code3: [...SOURCE_2218_C],
     codeLabel: bi2218("Cách 1 · DP 2D", "Approach 1 · 2D DP"),
     code2Label: bi2218("Cách 2 · DP 1D", "Approach 2 · 1D DP"),
+    code3Label: bi2218("Cách 3 · DFS + memo", "Approach 3 · DFS + memo"),
     debugMode: "line-by-line",
     liveArgs: (input, params = {}) => {
       const piles = parsePiles2218(input);
@@ -541,6 +822,7 @@ module.exports = {
     },
     builder: buildSteps2218,
     builder2: buildSteps2218OneDimensional,
+    builder3: buildSteps2218Memo,
   },
 };
 
@@ -552,6 +834,7 @@ Object.defineProperty(module.exports[2218], "__internals2218", {
     plan2218,
     SOURCE_2218_A,
     SOURCE_2218_B,
+    SOURCE_2218_C,
     DEFAULT_INPUT_2218,
     DEFAULT_K_2218,
     MAX_PILES_2218,
