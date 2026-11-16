@@ -115,7 +115,7 @@ module.exports = { 241: {
   title: bi('Different Ways to Add Parentheses', 'Different Ways to Add Parentheses'),
   titleVi: bi('Tất cả kết quả của các cách đặt ngoặc', 'All results from different parenthesizations'),
   statement: bi('Cho biểu thức chứa số nguyên 0–99 và toán tử +, -, *. Trả về kết quả của mọi cách đặt ngoặc, giữ các kết quả trùng nhau; thứ tự bất kỳ. Đề gốc dài 1–20 ký tự. Visualization hỗ trợ tối đa 4 toán tử để cây và từng bước dễ theo dõi.', 'Given an expression with integers 0–99 and +, -, *, return the results of every parenthesization, preserving duplicates; any order is valid. The original length limit is 1–20 characters. Visualization allows up to 4 operators to keep the tree and steps manageable.'),
-  inputKind: 'string', inputLabel: bi('expression — số 0–99; tối đa 20 ký tự, 4 toán tử', 'expression — numbers 0–99; up to 20 characters, 4 operators'), defaultInput: '2*3-4*5', extraParams: [], debugMode: 'line-by-line',
+  inputKind: 'string', inputLabel: bi('expression — số 0–99; tối đa 20 ký tự, 4 toán tử', 'expression — numbers 0–99; up to 20 characters, 4 operators'), defaultInput: '2-1-1', extraParams: [], debugMode: 'line-by-line',
   approach: [
     bi('Nếu đoạn chỉ là một số, trả về [số đó]. Không chia số có hai chữ số.', 'If a segment is a number, return [that number]. Never split a two-digit integer.'),
     bi('Chọn mỗi toán tử làm gốc, tức phép tính cuối cùng. Đệ quy để lấy tất cả kết quả bên trái và bên phải.', 'Choose each operator as the root, the last operation. Recursively get every left and right result.'),
