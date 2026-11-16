@@ -179,7 +179,9 @@ function lc2218Layout(state) {
   const dpY = bandBottom + 10;
   const headY = dpY + 30;
   const gridY = dpY + 38;
-  const gridBottom = gridY + state.rows * (LC2218_CELL_H + LC2218_ROW_GAP) - LC2218_ROW_GAP;
+  // Size from the rows actually drawn: approach 2 has one row except while new_dp exists.
+  const shownRows = state.table && state.table.length ? state.table.length : state.rows;
+  const gridBottom = gridY + shownRows * (LC2218_CELL_H + LC2218_ROW_GAP) - LC2218_ROW_GAP;
   const eqY = gridBottom + 22;
   const gridW = LC2218_ROW_LABEL + state.cols * LC2218_CELL_W;
   const width = Math.max(chX + LC2218_CH_W, LC2218_PAD + gridW, LC2218_PAD + 360) + LC2218_PAD;
@@ -233,7 +235,7 @@ function lc2218Piles(state, L, copy, parts) {
       foot = `Σ${state.prefix[state.prefix.length - 1]}`;
       footCls = " is-sum";
     }
-    if (foot) parts.push(`<text class="lc2218-foot${footCls}" x="${cx}" y="${L.footerY}">${lc2218Escape(foot)}</text>`);
+    if (foot) parts.push(`<text class="lc2218-pile-foot${footCls}" x="${cx}" y="${L.footerY}">${lc2218Escape(foot)}</text>`);
   });
 }
 

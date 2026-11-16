@@ -289,6 +289,29 @@ test('2218 picture: labels sit inside their coins, cells and rows; nothing overl
   }
 });
 
+test('2218 picture: no empty table row; the equation sits right under the last drawn row', () => {
+  const ui = renderer('vi');
+  for (const [input, k] of [...presetInputs(ui.cases), ...EXTREMES]) {
+    for (const [approach, build] of BUILDERS) {
+      const { steps } = build(input, { k });
+      const seen = new Set();
+      steps.forEach((step, index) => {
+        const html = ui.render(step, steps, index);
+        const { height, rects } = svgBoxes(html);
+        const cells = rects.filter((r) => r.kind === 'lc2218-cell');
+        if (!cells.length) return;
+        const at = `A${approach} ${input} k=${k} #${index}`;
+        const bottom = Math.max(...cells.map((r) => r.y + r.h));
+        assert.equal(height - bottom, 32, `${at}: ${height - bottom}px under the table`);
+        const view = step.maxCoins2218View;
+        if (view.event === 'commit' || step.final) seen.add(view.event === 'commit' ? 'commit' : 'final');
+        assert.doesNotMatch(html, /<text class="lc2218-foot/, `${at}: SVG pile footer has its own class`);
+      });
+      if (approach === 2) assert.deepEqual([...seen].sort(), ['commit', 'final'], `A2 ${input}: covers dp = new_dp and the final step`);
+    }
+  }
+});
+
 test('2218 picture colors differ from the status colors and each other in both themes; −∞ is dashed', () => {
   const hex = (block, name) => (block.match(new RegExp(`--lc2218-${name}: (#[0-9a-f]{6});`, 'i')) || [])[1];
   const rgb = (value) => [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));

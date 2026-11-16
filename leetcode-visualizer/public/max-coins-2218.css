@@ -264,19 +264,19 @@
   stroke-dasharray: 4 3;
 }
 
-.lc2218-svg .lc2218-foot.is-take {
+.lc2218-svg .lc2218-pile-foot.is-take {
   fill: var(--lc2218-take);
 }
 
-.lc2218-svg .lc2218-foot.is-sum {
+.lc2218-svg .lc2218-pile-foot.is-sum {
   fill: var(--lc2218-muted);
 }
 
-.lc2218-svg .lc2218-foot.is-chosen {
+.lc2218-svg .lc2218-pile-foot.is-chosen {
   fill: var(--lc2218-green);
 }
 
-.lc2218-svg .lc2218-foot.is-left {
+.lc2218-svg .lc2218-pile-foot.is-left {
   fill: var(--lc2218-muted);
 }
 
