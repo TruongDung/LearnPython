@@ -22,59 +22,6 @@ function requestedVizSet(html, summary, role = "img") {
   $("treeView").innerHTML = `<div class="requested-viz" role="${role}" aria-label="${requestedVizEsc(summary)}">${html}</div>`;
 }
 
-// ─── #2218: Maximum Value of K Coins From Piles ────────────────────────────
-function renderCoins2218View(step) {
-  const v=step.coins2218View,vi=lang==='vi',t=(a,b)=>vi?a:b;
-  const one=Number(v.approach)===2,final=v.phase==='done',state=v.phase==='state';
-  const active=Number.isInteger(v.pileIndex)?v.pileIndex:-1;
-  const take=final?null:Number.isInteger(v.take)?v.take:
-    v.phase==='pile'&&Number.isInteger(v.coinIndex)?v.coinIndex+1:Math.max(0,v.bestTake||0);
-  const coins=(values,cls='')=>values.slice(0,12).map(value=>`<span class="c2218-token ${cls}">${requestedVizEsc(value)}</span>`).join('')+(values.length>12?`<small>+${values.length-12}</small>`:'');
-  const slots=(count,cls='')=>Array.from({length:Math.min(count,12)},()=>`<i class="${cls}"></i>`).join('')+(count>12?`<small>+${count-12}</small>`:'');
-  const pileHtml=v.piles.map(p=>{
-    const selected=Array.isArray(v.selectedCounts)?v.selectedCounts[p.index]:p.index===active?take||0:0;
-    const selecting=final&&Array.isArray(v.selectedCounts);
-    const visible=p.coins.slice(0,12);
-    return `<article class="c2218-pile ${!final&&p.index===active?'active':''}">
-      <header><b>P${p.index+1}</b>${selected?`<span class="c2218-take">${selected} ×</span>`:''}</header>
-      <div class="c2218-down" aria-label="${t('Lấy từ trên xuống','Take from the top')}">↓</div>
-      <div class="c2218-stack">${visible.map((value,i)=>`<div class="c2218-coin ${i<selected?(selecting?'chosen':'trying'):selecting||selected?'remaining':''}" data-pile="${p.index}" data-coin="${i}" data-selected="${i<selected}" aria-label="P${p.index+1}, #${i+1}: ${value}"><b>${value}</b>${i<selected?`<span>${selecting?'✓':'→'}</span>`:''}</div>`).join('')}
-      ${p.coins.length>12?`<small>+${p.coins.length-12}</small>`:''}</div>
-      ${selected&&Number.isFinite(p.prefix[selected])?`<footer>Σ <b>${p.prefix[selected]}</b></footer>`:'<footer>·</footer>'}
-    </article>`;
-  }).join('');
-  const sourceRow=one?0:active,source=v.dp[sourceRow];
-  const previous=Number.isInteger(v.sourceCoins)&&source?source[v.sourceCoins]:null;
-  const prefix=active>=0&&v.piles[active]?v.piles[active].prefix[take]:null;
-  const ready=typeof previous==='number'&&typeof prefix==='number';
-  const comparing=state&&Number.isInteger(v.take);
-  const equation=comparing?`<section class="c2218-transfer ${v.reachable===false?'blocked':v.updated===false?'rejected':''}">
-    <div class="c2218-from"><small>${t('Trước đó','Earlier piles')}</small><div class="c2218-slots">${slots(v.sourceCoins,'source')}</div><b>${typeof previous==='number'?previous:'∅'}</b></div>
-    <em>+</em><div class="c2218-add"><small>P${active+1} · ${take} ×</small><div class="c2218-token-row">${take?coins(v.piles[active].coins.slice(0,take)):'<span class="c2218-zero">0</span>'}</div><b>${prefix??'·'}</b></div>
-    <em>→</em><div class="c2218-total"><small>${v.used} ${t('xu','coins')}</small><b>${ready?previous+prefix:'∅'}</b><span>${v.reachable===false||v.updated===false?'×':v.updated===true?'✓':'?'}</span></div>
-  </section>`:'';
-  const candidates=v.candidates||[],max=Math.max(1,...candidates.map(c=>c.total));
-  const choices=state?`<section class="c2218-choices"><header><b>${t('So sánh','Compare')}</b><small>${t('Lấy từ','Take from')} P${active+1}</small></header>${candidates.map(c=>`<div class="c2218-choice ${c.winner?'winner':''} ${c.take===v.take?'testing':''}" data-take="${c.take}" data-total="${c.total}">
-    <span class="c2218-choice-count">${c.take} ×</span><div class="c2218-choice-track"><div class="c2218-choice-bar" style="width:${Math.max(3,c.total/max*100)}%"></div><span>${c.previous} + ${c.pileValue}</span></div><b>${c.total}</b><span class="c2218-crown">${c.winner?'★':''}</span></div>`).join('')||'<div class="c2218-wait">…</div>'}</section>`:'';
-  const selectedCoins=Array.isArray(v.selectedCounts)?v.piles.flatMap(p=>p.coins.slice(0,v.selectedCounts[p.index])):[];
-  const basket=final?`<section class="c2218-basket"><div class="c2218-basket-icon" aria-hidden="true">✓</div><div><small>${t('Đúng','Exactly')} ${v.k} ${t('xu','coins')}</small><div class="c2218-token-row">${selectedCoins.length?coins(selectedCoins,'chosen'):`<div class="c2218-slots">${slots(v.k,'filled')}</div>`}</div></div><strong>${v.answer}</strong></section>`:'';
-  const currentRow=one?v.dp.length-1:active+1;
-  const dpHtml=`<div class="rv-dp-scroll"><table class="rv-dp-table"><thead><tr><th>${one?'dp':'P'} / j</th>${v.dp[0].map((_,j)=>`<th>${j}</th>`).join('')}</tr></thead><tbody>${v.dp.map((row,i)=>`<tr><th>${one?(v.dpRowLabels?.[i]||'dp'):i===0?'∅':`P1…P${i}`}</th>${row.map((value,j)=>{
-    const cls=final&&i===v.dp.length-1&&j===v.k?'answer':state&&i===currentRow&&j===v.used?'current':comparing&&i===sourceRow&&j===v.sourceCoins?'source':'';
-    return `<td class="${cls}">${requestedVizEsc(value)}</td>`;
-  }).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const stage=final?'✓':v.phase==='pile'?'Σ':state?'↗':v.phase==='copy'?'⇄':'↓';
-  const stageText=final?t('Tối ưu','Best'):v.phase==='pile'?t('Cộng từ trên','Sum from top'):state?`P${active+1} · j = ${v.used}`:v.phase==='copy'?'dp → new_dp':t('Chỉ lấy từ trên','Top coins only');
-  const recurrence=one?'new_dp[j] = max(new_dp[j], dp[j−x] + prefix[x])':'dp[i][j] = max(dp[i][j], dp[i−1][j−t] + prefix[t])';
-  const reference=`<section class="c2218-recurrence"><small>${t('Công thức DP · tham khảo','DP formula · reference')}</small><code>${recurrence}</code><div><span>${one?'dp → new_dp':t('i: số chồng','i: piles')}</span><span>${t('j: đúng j xu','j: exactly j coins')}</span><span>${one?'x':'t'}: ${t('lấy từ trên','take from top')}</span></div></section>`;
-  requestedVizSet(`<section class="c2218-viz" data-phase="${v.phase}" data-method="${one?2:1}">
-    <header class="c2218-heading"><div class="c2218-stage"><b>${stage}</b><span>${stageText}</span></div><div class="c2218-target"><small>k = ${v.k}</small><div class="c2218-slots">${slots(v.k,final?'filled':'')}</div></div>${final?`<strong class="c2218-answer">${v.answer}</strong>`:''}</header>
-    <div class="c2218-piles">${pileHtml}</div>${equation}${choices}${basket}
-    ${reference}<details class="c2218-dp" open><summary>${t('Bảng DP','DP table')} <span>↗</span></summary>${dpHtml}</details>
-    ${v.omitted?`<small class="c2218-condensed">${t('Bước rút gọn','Condensed steps')} · ✓ ${v.answer??''}</small>`:''}
-  </section>`,t(`Chọn đúng ${v.k} xu từ ${v.n} chồng`,`Take exactly ${v.k} coins from ${v.n} piles`),'group');
-}
-
 // ─── #9006: BFS shortest path ───────────────────────────────────────────────
 function requestedBfsGraph(view) {
   const nodes = view.nodes || [];

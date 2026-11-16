@@ -1,0 +1,592 @@
+/* LeetCode 2218 — Maximum Value of K Coins From Piles. Dark is the default; the app-wide toggle sets html[data-theme="light"]. */
+.lc2218-viz {
+  --lc2218-bg: #0f1a25;
+  --lc2218-panel: #152434;
+  --lc2218-soft: #1e3144;
+  --lc2218-border: #36506a;
+  --lc2218-text: #eaf3fb;
+  --lc2218-muted: #9fb3c6;
+  /* Status colors: True / new best / chosen (green), False / skip (red), line numbers (amber). */
+  --lc2218-green: #4fd69c;
+  --lc2218-red: #ff8f8f;
+  --lc2218-amber: #f5c451;
+  /* Picture colors, kept apart from the status colors above and from each other. */
+  --lc2218-coin: #b98a3e;
+  --lc2218-take: #2fd4e8;
+  --lc2218-src: #c58cff;
+  --lc2218-dst: #ff5fd2;
+  --lc2218-neg: #5a6b7d;
+  --lc2218-on-coin: #1d1405;
+  --lc2218-line: #2a4560;
+  container: lc2218 / inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--lc2218-border);
+  border-radius: 16px;
+  background: var(--lc2218-bg);
+  color: var(--lc2218-text);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .lc2218-viz {
+  --lc2218-bg: #f4f7fb;
+  --lc2218-panel: #ffffff;
+  --lc2218-soft: #e9eff7;
+  --lc2218-border: #c2d1e2;
+  --lc2218-text: #17283a;
+  --lc2218-muted: #55697e;
+  --lc2218-green: #08784f;
+  --lc2218-red: #b4232f;
+  --lc2218-amber: #9a6200;
+  --lc2218-coin: #e2b45a;
+  --lc2218-take: #1597b8;
+  --lc2218-src: #8a4fe0;
+  --lc2218-dst: #e0309f;
+  --lc2218-neg: #b8c3cf;
+  --lc2218-on-coin: #2a1a04;
+  --lc2218-line: #fff3cf;
+}
+
+.lc2218-viz,
+.lc2218-viz * {
+  box-sizing: border-box;
+}
+
+.lc2218-viz code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+}
+
+.lc2218-viz button {
+  border: 1px solid var(--lc2218-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--lc2218-panel);
+  color: var(--lc2218-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.lc2218-viz button:hover:not(:disabled) {
+  border-color: var(--lc2218-take);
+  background: var(--lc2218-soft);
+}
+
+.lc2218-viz button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.lc2218-viz :focus-visible {
+  outline: 3px solid var(--lc2218-take);
+  outline-offset: 2px;
+}
+
+/* Header */
+.lc2218-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lc2218-head > div {
+  min-width: 0;
+}
+
+.lc2218-head small {
+  color: var(--lc2218-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.lc2218-head h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.lc2218-head h2 code {
+  color: var(--lc2218-amber);
+}
+
+.lc2218-viz.is-final .lc2218-head h2 code {
+  color: var(--lc2218-green);
+}
+
+.lc2218-status {
+  border: 1px solid var(--lc2218-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: var(--lc2218-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lc2218-viz.is-final .lc2218-status {
+  border-color: var(--lc2218-green);
+  color: var(--lc2218-green);
+}
+
+.lc2218-presets,
+.lc2218-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* Cards */
+.lc2218-card {
+  min-width: 0;
+  border: 1px solid var(--lc2218-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--lc2218-panel);
+}
+
+.lc2218-card > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.lc2218-card > header > b {
+  color: var(--lc2218-muted);
+  font-weight: 700;
+}
+
+/* Picture */
+.lc2218-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.lc2218-svg text {
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  fill: var(--lc2218-text);
+  text-anchor: middle;
+}
+
+.lc2218-svg .lc2218-caption,
+.lc2218-svg .lc2218-ch-head,
+.lc2218-svg .lc2218-choice-label,
+.lc2218-svg .lc2218-eq {
+  text-anchor: start;
+}
+
+.lc2218-svg .lc2218-caption {
+  fill: var(--lc2218-muted);
+}
+
+/* Piles */
+.lc2218-col {
+  fill: var(--lc2218-soft);
+  stroke: var(--lc2218-border);
+}
+
+.lc2218-svg .lc2218-pile-label {
+  fill: var(--lc2218-muted);
+}
+
+.lc2218-svg .lc2218-pile-label.is-active {
+  fill: var(--lc2218-text);
+}
+
+.lc2218-up {
+  fill: none;
+  stroke: var(--lc2218-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lc2218-up.is-active {
+  stroke: var(--lc2218-take);
+  stroke-width: 2.2;
+}
+
+.lc2218-coin {
+  fill: var(--lc2218-coin);
+  stroke: color-mix(in srgb, var(--lc2218-coin) 60%, #000000);
+  stroke-width: 1.5;
+}
+
+.lc2218-coin.is-take {
+  fill: var(--lc2218-take);
+  stroke: var(--lc2218-text);
+  stroke-width: 2;
+}
+
+.lc2218-coin.is-reading {
+  stroke: var(--lc2218-take);
+  stroke-width: 3;
+}
+
+.lc2218-coin.is-summed {
+  stroke: var(--lc2218-take);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.lc2218-coin.is-chosen {
+  stroke: var(--lc2218-green);
+  stroke-width: 3.5;
+}
+
+.lc2218-coin.is-left {
+  opacity: 0.35;
+}
+
+.lc2218-svg .lc2218-coin-label {
+  fill: var(--lc2218-on-coin);
+}
+
+.lc2218-svg .lc2218-coin-label.is-left {
+  opacity: 0.5;
+}
+
+.lc2218-cut {
+  stroke: var(--lc2218-take);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
+}
+
+.lc2218-svg .lc2218-foot.is-take {
+  fill: var(--lc2218-take);
+}
+
+.lc2218-svg .lc2218-foot.is-sum {
+  fill: var(--lc2218-muted);
+}
+
+.lc2218-svg .lc2218-foot.is-chosen {
+  fill: var(--lc2218-green);
+}
+
+.lc2218-svg .lc2218-foot.is-left {
+  fill: var(--lc2218-muted);
+}
+
+/* Candidate list for the cell being filled */
+.lc2218-svg .lc2218-ch-head {
+  fill: var(--lc2218-dst);
+}
+
+.lc2218-choice {
+  fill: var(--lc2218-soft);
+  stroke: none;
+}
+
+.lc2218-choice.is-now {
+  stroke: var(--lc2218-take);
+  stroke-width: 1.5;
+}
+
+.lc2218-choice.is-win {
+  fill: color-mix(in srgb, var(--lc2218-green) 22%, var(--lc2218-panel));
+}
+
+.lc2218-choice.is-skip {
+  stroke: var(--lc2218-neg);
+  stroke-dasharray: 3 2;
+  fill: none;
+}
+
+.lc2218-svg .lc2218-choice-label.is-lose,
+.lc2218-svg .lc2218-choice-label.is-skip {
+  fill: var(--lc2218-muted);
+}
+
+.lc2218-svg .lc2218-choice-mark.is-win {
+  fill: var(--lc2218-green);
+}
+
+.lc2218-svg .lc2218-choice-mark.is-skip {
+  fill: var(--lc2218-red);
+}
+
+/* DP table */
+.lc2218-svg .lc2218-head-label,
+.lc2218-svg .lc2218-row-label {
+  fill: var(--lc2218-muted);
+}
+
+.lc2218-cell {
+  fill: var(--lc2218-soft);
+  stroke: var(--lc2218-border);
+  stroke-width: 1;
+}
+
+.lc2218-cell.is-neg {
+  fill: none;
+  stroke: var(--lc2218-neg);
+  stroke-dasharray: 3 2;
+}
+
+.lc2218-svg .lc2218-cell-label.is-neg {
+  fill: var(--lc2218-muted);
+  font-weight: 400;
+}
+
+.lc2218-cell.is-src {
+  stroke: var(--lc2218-src);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.lc2218-cell.is-dst {
+  stroke: var(--lc2218-dst);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.lc2218-cell.is-new {
+  fill: color-mix(in srgb, var(--lc2218-green) 30%, var(--lc2218-panel));
+}
+
+.lc2218-cell.is-path {
+  stroke: var(--lc2218-green);
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+}
+
+.lc2218-cell.is-answer {
+  fill: color-mix(in srgb, var(--lc2218-green) 30%, var(--lc2218-panel));
+  stroke: var(--lc2218-green);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.lc2218-arrow {
+  stroke: var(--lc2218-src);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.lc2218-arrow.is-blocked {
+  stroke: var(--lc2218-red);
+  stroke-dasharray: 4 3;
+}
+
+.lc2218-arrow.is-path {
+  stroke: var(--lc2218-green);
+}
+
+.lc2218-arrowhead {
+  fill: var(--lc2218-src);
+}
+
+.lc2218-arrowhead.is-blocked {
+  fill: var(--lc2218-red);
+}
+
+.lc2218-arrowhead.is-path {
+  fill: var(--lc2218-green);
+}
+
+/* Equation line */
+.lc2218-svg .lc2218-eq {
+  font-size: 12px;
+}
+
+.lc2218-svg .eq-src {
+  fill: var(--lc2218-src);
+}
+
+.lc2218-svg .eq-take {
+  fill: var(--lc2218-take);
+}
+
+.lc2218-svg .eq-dst {
+  fill: var(--lc2218-dst);
+}
+
+.lc2218-svg .eq-op {
+  fill: var(--lc2218-text);
+}
+
+.lc2218-svg .eq-win {
+  fill: var(--lc2218-green);
+}
+
+.lc2218-svg .eq-bad {
+  fill: var(--lc2218-red);
+}
+
+/* Legend */
+.lc2218-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 6px;
+  color: var(--lc2218-muted);
+  font-size: 11px;
+}
+
+.lc2218-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lc2218-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 5px;
+}
+
+.lc2218-legend .lg-coin i {
+  background: var(--lc2218-coin);
+}
+
+.lc2218-legend .lg-take i {
+  background: var(--lc2218-take);
+}
+
+.lc2218-legend .lg-src i {
+  border: 2.5px solid var(--lc2218-src);
+  border-radius: 3px;
+}
+
+.lc2218-legend .lg-dst i {
+  border: 2.5px solid var(--lc2218-dst);
+  border-radius: 3px;
+}
+
+.lc2218-legend .lg-neg i {
+  border: 1.5px dashed var(--lc2218-neg);
+  border-radius: 3px;
+}
+
+.lc2218-legend .lg-win {
+  color: var(--lc2218-green);
+  font-weight: 700;
+}
+
+/* Current-line strip */
+.lc2218-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--lc2218-amber);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--lc2218-amber) 18%, transparent);
+  font-size: 12.5px;
+}
+
+[data-theme="light"] .lc2218-now {
+  background: var(--lc2218-line);
+}
+
+.lc2218-lineno {
+  color: var(--lc2218-amber);
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.lc2218-now .lc2218-effect {
+  min-width: 0;
+  color: var(--lc2218-text);
+  font-weight: 700;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lc2218-branch {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.lc2218-branch.is-true {
+  background: color-mix(in srgb, var(--lc2218-green) 20%, transparent);
+  color: var(--lc2218-green);
+}
+
+.lc2218-branch.is-false {
+  background: color-mix(in srgb, var(--lc2218-red) 18%, transparent);
+  color: var(--lc2218-red);
+}
+
+/* 2218 step notes are a few words. */
+body:has(#treeView:not(.hidden) .lc2218-viz) #stepNote {
+  font-size: 13px;
+}
+
+/* 2218 shows the whole Python source at once: no height cap, so no vertical scrollbar.
+   Static instead of sticky so a panel taller than the viewport is not pinned with its bottom cut off. */
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel {
+  position: static;
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Long lines (the signature, the max update) wrap inside the panel instead of being cut off at its right edge. */
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line {
+  width: auto;
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  --lc2218-hang: 4ch;
+  padding-left: var(--lc2218-hang);
+  text-indent: calc(-1 * var(--lc2218-hang));
+}
+
+/* Hanging indent: a wrapped line continues 4 columns past its own indent, never at column 0. Each indent level is one
+   leading .indent-guide span (4ch, emitted first by renderCodeLineHtml), so the guide count gives the indent. */
+/* The guides are inline-blocks, which would inherit the negative text-indent for their own (blank) content. */
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt .indent-guide {
+  text-indent: 0;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(1)) {
+  --lc2218-hang: 8ch;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(2)) {
+  --lc2218-hang: 12ch;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(3)) {
+  --lc2218-hang: 16ch;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(4)) {
+  --lc2218-hang: 20ch;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(5)) {
+  --lc2218-hang: 24ch;
+}
+
+body:has(#treeView:not(.hidden) .lc2218-viz) #codePanel .code-line .txt:has(> .indent-guide:nth-child(6)) {
+  --lc2218-hang: 28ch;
+}
+
+@container lc2218 (max-width: 420px) {
+  .lc2218-head h2 {
+    font-size: 18px;
+  }
+}
