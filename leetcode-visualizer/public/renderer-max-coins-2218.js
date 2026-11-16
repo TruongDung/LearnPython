@@ -29,6 +29,14 @@ const LC2218_COPY = Object.freeze({
     answer: "Đáp án",
     jumps: [["line", "Dòng →"], ["pile", "Chồng →"], ["result", "Kết quả ↠"]],
     legend: { coin: "xu", take: "lấy t xu", src: "ô nguồn", dst: "ô đang tính", neg: "−∞ chưa đạt", win: "tốt nhất" },
+    formula: "Công thức DP",
+    formulaNow: "Bước này",
+    answerWord: "đáp án",
+    skip: "bỏ qua",
+    kept: "giữ",
+    start: "bắt đầu",
+    symbols1: [["i", "i chồng đầu"], ["j", "đúng j xu"], ["t", "lấy t xu trên cùng"], ["prefix[t]", "tổng t xu đó"]],
+    symbols2: [["dp", "trước chồng này"], ["new_dp", "sau chồng này"], ["j", "đúng j xu"], ["t", "lấy t xu trên cùng"], ["prefix[t]", "tổng t xu đó"]],
   }),
   en: Object.freeze({
     picture: "Coin piles and DP table",
@@ -43,6 +51,14 @@ const LC2218_COPY = Object.freeze({
     answer: "Answer",
     jumps: [["line", "Line →"], ["pile", "Next pile →"], ["result", "Result ↠"]],
     legend: { coin: "coin", take: "take t coins", src: "source cell", dst: "cell being filled", neg: "−∞ unreachable", win: "best" },
+    formula: "DP formula",
+    formulaNow: "This step",
+    answerWord: "answer",
+    skip: "skip",
+    kept: "kept",
+    start: "start",
+    symbols1: [["i", "first i piles"], ["j", "exactly j coins"], ["t", "take top t coins"], ["prefix[t]", "sum of those t"]],
+    symbols2: [["dp", "before this pile"], ["new_dp", "after this pile"], ["j", "exactly j coins"], ["t", "take top t coins"], ["prefix[t]", "sum of those t"]],
   }),
 });
 
@@ -134,6 +150,7 @@ function lc2218Normalize(step) {
     src: lc2218Cell(raw.src, rows, cols),
     dst: lc2218Cell(raw.dst, rows, cols),
     prev: lc2218Val(raw.prev),
+    old: lc2218Val(raw.old),
     gain: lc2218Val(raw.gain),
     total: lc2218Val(raw.total),
     updated: typeof raw.updated === "boolean" ? raw.updated : null,
@@ -346,6 +363,85 @@ function lc2218Equation(state, copy) {
   return "";
 }
 
+// The DP recurrence under the picture: the general formula (Python names of the shown approach), the base case and
+// answer, a symbol key, and the same formula filled in with this step's numbers. Terms are colored like the picture:
+// target cell (pink), source cell (purple), taken coins (cyan), kept/winning value (green). A segment never breaks
+// inside, so narrow cards wrap between segments.
+function lc2218Formula(state, copy) {
+  const a1 = state.approach === 1;
+  const html = (tokens) => tokens.map(([cls, text]) => (cls ? `<span class="${cls}">${lc2218Escape(text)}</span>` : lc2218Escape(text))).join("");
+  const plain = (segs) => segs.map((seg) => seg.map((token) => token[1]).join("")).join(" ");
+  const row = (cls, segs, extra = "") => `<div class="${cls}"${extra}>${segs.map((seg) => `<span class="fx-seg">${html(seg)}</span>`).join(" ")}</div>`;
+  const T = a1 ? "dp[i][j]" : "new_dp[j]";
+  const S = a1 ? "dp[i-1][j-t]" : "dp[j-t]";
+  const general = [[["fx-dst", T], ["", " ="]], [["", "max("], ["fx-dst", T], ["", ", "], ["fx-src", S], ["", " + "], ["fx-take", "prefix[t]"], ["", ")"]]];
+  const comparing = lc2218Comparing(state) && state.dst && state.t !== null;
+  const baseText = a1 ? "dp[0][0] = 0" : "dp[0] = 0";
+  const answerText = `${copy.answerWord} = ${a1 ? "dp[n][k]" : "dp[k]"}`;
+  const base = [[[state.event === "seed" ? "fx-now" : "", baseText]]];
+  if (!a1) base.push([[state.event === "copy" ? "fx-now" : "", "new_dp = dp[:] (t = 0)"]]);
+  base.push([[state.final ? "fx-now" : "", answerText]]);
+  const symbols = (a1 ? copy.symbols1 : copy.symbols2)
+    .map(([name, meaning]) => `<span><code>${lc2218Escape(name)}</code> ${lc2218Escape(meaning)}</span>`).join("");
+
+  // This step, filled in. data-* carry the raw numbers ("-inf" = −∞) so tests can check them against the DP.
+  const g = (value) => lc2218Glyph(value);
+  const d = (value) => (value === null ? "-inf" : String(value));
+  let now = [];
+  let data = {};
+  if (comparing) {
+    const [i, j] = state.dst;
+    const t = state.t;
+    const dst = a1 ? `dp[${i}][${j}]` : `new_dp[${j}]`;
+    const src = a1 ? `dp[${i - 1}][${j - t}]` : `dp[${j - t}]`;
+    const old = state.event === "update" ? state.old : state.best;
+    const gain = state.gain ?? 0;
+    data = { dst, src, t, old: d(old), prev: d(state.prev), gain };
+    now.push([["fx-dst", dst], ["", " ="]]);
+    now.push([["", "max("], ["fx-dst", g(old)], ["", ", "], ["fx-src", src], ["", " + "], ["fx-take", `prefix[${t}]`], ["", ")"]]);
+    if (state.prev === null) {
+      if (state.event === "check") now.push([["fx-bad", `${src} = −∞ → ${copy.skip} ✗`]]);
+    } else if (state.event !== "for-t") {
+      const total = state.prev + gain;
+      const won = state.event === "update" && state.updated === true;
+      const kept = state.event === "update" && state.updated === false;
+      data.total = total;
+      now.push([["", "= max("], [`fx-dst${kept ? " fx-win" : ""}`, g(old)], ["", ", "], [`fx-src${won ? " fx-win" : ""}`, String(state.prev)],
+        ["", " + "], [`fx-take${won ? " fx-win" : ""}`, String(gain)], ["", ")"]]);
+      if (state.event === "update") {
+        data.result = d(state.best);
+        now.push([["", "= "], ["fx-dst fx-result", g(state.best)], ["fx-mark", won ? " ✓" : ` (${copy.kept} ${g(old)})`]]);
+      }
+    }
+  } else if (state.event === "for-j" && state.dst) {
+    const j = state.dst[1];
+    if (a1) {
+      data = { dst: `dp[${state.dst[0]}][${j}]`, result: d(state.best) };
+      now.push([["fx-dst", data.dst], ["", ` = ${g(state.best)} (${copy.start})`]]);
+    } else {
+      data = { dst: `new_dp[${j}]`, prev: d(state.prev), result: d(state.best) };
+      now.push([["fx-dst", data.dst], ["", " = "], ["fx-src", `dp[${j}]`], ["", " = "], ["fx-src", g(state.prev)], ["", " (t = 0)"]]);
+    }
+  } else if (state.event === "seed") {
+    now.push([["fx-dst", a1 ? "dp[0][0]" : "dp[0]"], ["", " = "], ["fx-win", "0"]]);
+  } else if (state.final && state.answer !== null) {
+    const cell = a1 ? `dp[${state.n}][${state.k}]` : `dp[${state.k}]`;
+    data = { dst: cell, result: d(state.answer) };
+    now.push([["", `${copy.answerWord} = `], ["fx-dst", cell], ["", " = "], ["fx-win", String(state.answer)]]);
+  }
+  const dataAttrs = Object.entries(data).map(([key, value]) => ` data-${key}="${lc2218Escape(value)}"`).join("");
+  const nowLabel = now.length ? `${copy.formulaNow}: ${plain(now)}` : copy.formulaNow;
+  const nowRow = now.length
+    ? row("lc2218-fx-now", [[["fx-tag", copy.formulaNow]], ...now], ` role="group" data-event="${lc2218Escape(state.event)}"${dataAttrs} aria-label="${lc2218Escape(nowLabel)}"`)
+    : `<div class="lc2218-fx-now is-empty" aria-hidden="true">&nbsp;</div>`;
+  return `<div class="lc2218-formula" role="group" aria-label="${lc2218Escape(`${copy.formula}: ${plain(general)}; ${plain(base)}`)}">`
+    + row(`lc2218-fx-general${comparing ? " is-active" : ""}`, [[["fx-tag", copy.formula]], ...general])
+    + row("lc2218-fx-base", base)
+    + `<div class="lc2218-fx-symbols">${symbols}</div>`
+    + nowRow
+    + "</div>";
+}
+
 function lc2218Picture(state, copy) {
   const L = lc2218Layout(state);
   const parts = [];
@@ -446,7 +542,7 @@ function renderMaxCoins2218View(step) {
   host.innerHTML = `<article class="lc2218-viz${state.final ? " is-final" : ""}" data-problem-id="2218" data-approach="${state.approach}" data-source-line="${state.line}" role="region" aria-label="LeetCode 2218 · ${vi ? "dòng" : "line"} ${state.line}">`
     + `<header class="lc2218-head"><div><small>LEETCODE 2218 · K COINS · ${method}</small><h2><code>${lc2218Escape(heading)}</code></h2></div><span class="lc2218-status">${lc2218Escape(status)}</span></header>`
     + `<nav class="lc2218-presets" aria-label="${lc2218Escape(copy.examples)}">${presets}</nav>`
-    + `<section class="lc2218-card lc2218-picture-card" aria-label="${lc2218Escape(copy.picture)}"><header><b>${lc2218Escape(copy.picture)}</b></header>${lc2218Picture(state, copy)}${legend}</section>`
+    + `<section class="lc2218-card lc2218-picture-card" aria-label="${lc2218Escape(copy.picture)}"><header><b>${lc2218Escape(copy.picture)}</b></header>${lc2218Picture(state, copy)}${lc2218Formula(state, copy)}${legend}</section>`
     + `<section class="lc2218-card lc2218-code-card" aria-label="${lc2218Escape(copy.code)}">${lc2218Code(state, copy)}</section>`
     + `<footer class="lc2218-foot">${jumps}</footer></article>`;
   lc2218Bind(host);

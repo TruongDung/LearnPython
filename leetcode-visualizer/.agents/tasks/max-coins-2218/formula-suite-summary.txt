@@ -1,0 +1,5 @@
+﻿node --test --test-reporter=tap "tests/*.test.js" (DP formula change): 3428 tests, 3365 pass, 63 fail
+Compared with after-full.txt (ddd3e6b-era log):
+baseline 63 failing, after 63 failing
+new failures (0):
+no longer failing (0):

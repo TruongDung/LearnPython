@@ -426,6 +426,118 @@
   fill: var(--lc2218-red);
 }
 
+/* DP formula under the picture: general recurrence, base/answer, symbol key, and this step's numbers. */
+.lc2218-formula {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  border-top: 1px dashed var(--lc2218-border);
+  padding-top: 8px;
+  font: 700 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: var(--lc2218-text);
+}
+
+.lc2218-formula > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 7px;
+  min-width: 0;
+}
+
+/* Flex items: a segment moves to the next line whole; only a segment wider than the card wraps inside itself. */
+.lc2218-formula .fx-seg {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lc2218-formula .fx-tag {
+  border-radius: 999px;
+  padding: 0 7px;
+  background: var(--lc2218-soft);
+  color: var(--lc2218-muted);
+  font: 700 10.5px system-ui, sans-serif;
+  letter-spacing: 0.3px;
+}
+
+.lc2218-fx-general {
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.lc2218-fx-general.is-active {
+  background: color-mix(in srgb, var(--lc2218-dst) 9%, transparent);
+}
+
+.lc2218-fx-base,
+.lc2218-fx-symbols {
+  color: var(--lc2218-muted);
+  font-size: 11px;
+}
+
+.lc2218-fx-base .fx-seg + .fx-seg::before {
+  content: "· ";
+}
+
+.lc2218-fx-base .fx-now {
+  color: var(--lc2218-green);
+}
+
+.lc2218-fx-symbols {
+  font: 11px system-ui, sans-serif;
+  gap: 2px 12px;
+}
+
+.lc2218-fx-symbols code {
+  color: var(--lc2218-text);
+  font-weight: 700;
+}
+
+.lc2218-fx-now {
+  min-height: 26px;
+  border-left: 3px solid var(--lc2218-dst);
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--lc2218-soft);
+}
+
+.lc2218-fx-now.is-empty {
+  border-left-color: transparent;
+  background: none;
+}
+
+.lc2218-formula .fx-dst {
+  color: var(--lc2218-dst);
+}
+
+.lc2218-formula .fx-src {
+  color: var(--lc2218-src);
+}
+
+.lc2218-formula .fx-take {
+  color: var(--lc2218-take);
+}
+
+.lc2218-formula .fx-win {
+  border-radius: 4px;
+  padding: 0 2px;
+  box-shadow: inset 0 0 0 1.5px var(--lc2218-green);
+  background: color-mix(in srgb, var(--lc2218-green) 16%, transparent);
+}
+
+.lc2218-formula .fx-result {
+  text-decoration: underline 2px var(--lc2218-dst);
+  text-underline-offset: 3px;
+}
+
+.lc2218-formula .fx-mark {
+  color: var(--lc2218-green);
+}
+
+.lc2218-formula .fx-bad {
+  color: var(--lc2218-red);
+}
+
 /* Legend */
 .lc2218-legend {
   display: flex;

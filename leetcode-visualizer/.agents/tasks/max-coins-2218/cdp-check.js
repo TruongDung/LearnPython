@@ -57,6 +57,20 @@ const HTML_PROBE = `(() => { const viz = document.querySelector('.lc2218-viz'); 
   card.querySelectorAll('*').forEach((el) => { if (el.closest('svg') && el.tagName !== 'svg') return; const r = el.getBoundingClientRect(); if (r.width && (r.left < cr.left - 1 || r.right > cr.right + 1 || r.top < cr.top - 1 || r.bottom > cr.bottom + 1)) clipped++; }); });
   const vr = viz.getBoundingClientRect(); viz.querySelectorAll(':scope > *').forEach((el) => { const r = el.getBoundingClientRect(); if (r.left < vr.left - 1 || r.right > vr.right + 1) clipped++; });
   return clipped; })()`;
+// DP formula block: present and visible; no horizontal overflow; every segment inside the block and the card; segments
+// don't overlap each other; the block doesn't overlap the SVG picture or the legend; the step row is filled while comparing.
+const FORMULA_PROBE = `(() => { const f = document.querySelector('.lc2218-formula'); if (!f) return { exists: false };
+  const fr = f.getBoundingClientRect(); const card = f.closest('.lc2218-card').getBoundingClientRect();
+  const box = (el) => el.getBoundingClientRect(); const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  const segs = [...f.querySelectorAll('.fx-seg, .lc2218-fx-symbols > span')].map(box);
+  let segOverlap = 0; for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) if (hit(segs[i], segs[j])) segOverlap++;
+  const segClipped = segs.filter((r) => r.left < fr.left - 0.5 || r.right > fr.right + 0.5 || r.top < fr.top - 0.5 || r.bottom > fr.bottom + 0.5 || r.right > card.right + 0.5).length;
+  const svg = document.querySelector('.lc2218-svg'); const legend = document.querySelector('.lc2218-legend');
+  const now = f.querySelector('.lc2218-fx-now:not(.is-empty)');
+  const cs = getComputedStyle(f);
+  return { exists: true, visible: f.offsetParent !== null && fr.width > 0 && fr.height > 0 && cs.visibility !== 'hidden', hOverflow: f.scrollWidth > f.clientWidth + 1,
+    segClipped, segOverlap, overSvg: svg ? hit(fr, box(svg)) : false, overLegend: legend ? hit(fr, box(legend)) : false,
+    general: (f.querySelector('.lc2218-fx-general') || {}).textContent || '', now: now ? now.textContent : '', nowColor: now ? getComputedStyle(now.querySelector('.fx-dst') || now).color : null, height: fr.height }; })()`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
@@ -139,7 +153,7 @@ async function main() {
       for (const [name, input, k] of runs) {
         await load(PID, input, { k, approach });
         report.runs[`a${approach}-${name}-${theme}`] = await evaluate(`(() => { document.documentElement.dataset.theme = '${theme}';
-          const out = { steps: steps.length, approach: null, answer: null, lines: '', mismatches: [], emptyRow: 0, footCollision: 0, overlaps: 0, clipped: 0, labelOutside: 0, htmlClipped: 0, notFit: 0, minFontPx: 99, scale: 0, maxNote: 0, inViewSource: 0, codeScroll: 0, codeClipped: 0, hangBad: 0, hiddenOtherBlock: true };
+          const out = { fxMissing: 0, fxHidden: 0, fxOverflow: 0, fxClipped: 0, fxOverlap: 0, fxNowMissing: 0, fxGeneralBad: 0, fxMaxH: 0, steps: steps.length, approach: null, answer: null, lines: '', mismatches: [], emptyRow: 0, footCollision: 0, overlaps: 0, clipped: 0, labelOutside: 0, htmlClipped: 0, notFit: 0, minFontPx: 99, scale: 0, maxNote: 0, inViewSource: 0, codeScroll: 0, codeClipped: 0, hangBad: 0, hiddenOtherBlock: true };
           const seen = new Set();
           for (let i = 0; i < steps.length; i++) {
             stepIndex = i; renderStep();
@@ -156,6 +170,12 @@ async function main() {
               if (g.overlaps.length && !out.firstOverlap) out.firstOverlap = [i, g.overlaps[0]]; if (g.clipped.length && !out.firstClip) out.firstClip = [i, g.clipped[0]]; }
             else out.mismatches.push([i, 'no svg']);
             out.htmlClipped += ${HTML_PROBE};
+            const fx = ${FORMULA_PROBE};
+            if (!fx.exists) out.fxMissing++; else {
+              if (!fx.visible) out.fxHidden++; if (fx.hOverflow) out.fxOverflow++; out.fxClipped += fx.segClipped; out.fxOverlap += fx.segOverlap + (fx.overSvg ? 1 : 0) + (fx.overLegend ? 1 : 0);
+              const ev = steps[i].maxCoins2218View.event; if (['for-t', 'check', 'update'].includes(ev) && !fx.now) out.fxNowMissing++;
+              if (!fx.general.includes(block === 1 ? 'dp[i][j] = max(dp[i][j], dp[i-1][j-t] + prefix[t])' : 'new_dp[j] = max(new_dp[j], dp[j-t] + prefix[t])')) out.fxGeneralBad++;
+              out.fxMaxH = Math.max(out.fxMaxH, Math.round(fx.height)); if (ev === 'update' && !out.fxSample) out.fxSample = fx.now; }
             out.maxNote = Math.max(out.maxNote, document.getElementById('stepNote').textContent.length);
             out.inViewSource = Math.max(out.inViewSource, /def maxValueOfCoins|for coin in pile/.test(viz ? viz.textContent : '') ? 1 : 0);
             if (i % 7 === 0 || i === steps.length - 1) { const c = ${CODE_PROBE}; if (c.vScroll || c.hScroll) out.codeScroll++; out.codeClipped += c.clipped + c.hClipped; out.hangBad += c.hangBad.length; out.wrapped = c.wrapped; }
@@ -174,11 +194,12 @@ async function main() {
       await sleep(600);
       report[`code-a${approach}-${theme}`] = await evaluate(CODE_PROBE);
       // Narrow windows: more lines wrap; every continuation must start at its own indent + 4, never at column 0.
-      for (const width of [1100, 1000, 520]) {
+      for (const width of [1100, 1000, 520, 400]) {
         await send('Emulation.setDeviceMetricsOverride', { width, height: 1800, deviceScaleFactor: 1, mobile: false });
         await sleep(600);
         report[`code-a${approach}-w${width}-${theme}`] = await evaluate(CODE_PROBE);
-        report[`geometry-a${approach}-w${width}-${theme}`] = await evaluate(`(() => { const g = ${GEOMETRY_PROBE}; return { overlaps: g.overlaps.length, clipped: g.clipped.length, labelOutside: g.labelOutside, fitsCard: g.fitsCard, minFontPx: g.minFontPx, htmlClipped: ${HTML_PROBE} }; })()`);
+        report[`geometry-a${approach}-w${width}-${theme}`] = await evaluate(`(() => { const g = ${GEOMETRY_PROBE}; const fx = ${FORMULA_PROBE}; return { overlaps: g.overlaps.length, clipped: g.clipped.length, labelOutside: g.labelOutside, fitsCard: g.fitsCard, minFontPx: g.minFontPx, htmlClipped: ${HTML_PROBE},
+          fx: { exists: fx.exists, visible: fx.visible, hOverflow: fx.hOverflow, segClipped: fx.segClipped, segOverlap: fx.segOverlap, overSvg: fx.overSvg, overLegend: fx.overLegend, now: fx.now, height: fx.height } }; })()`);
       }
       await send('Emulation.clearDeviceMetricsOverride');
       await sleep(600);

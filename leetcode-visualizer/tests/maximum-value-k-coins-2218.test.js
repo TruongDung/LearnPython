@@ -373,6 +373,111 @@ test('2218 shows locals once, in the shared Variables panel, with Python scoping
   }
 });
 
+// Independent full DP table: rows[i][j] = best from exactly j coins of the first i piles (null = −∞).
+function dpRows(piles, k) {
+  const rows = [[0, ...Array(k).fill(null)]];
+  piles.forEach((pile, p) => {
+    const prefix = [0];
+    for (const coin of pile) prefix.push(prefix.at(-1) + coin);
+    rows.push(Array.from({ length: k + 1 }, (_, j) => {
+      let best = null;
+      for (let t = 0; t <= Math.min(j, pile.length); t++) {
+        const prev = rows[p][j - t];
+        if (prev !== null && (best === null || prev + prefix[t] > best)) best = prev + prefix[t];
+      }
+      return best;
+    }));
+  });
+  return rows;
+}
+
+const FX_GENERAL = { 1: 'dp[i][j] = max(dp[i][j], dp[i-1][j-t] + prefix[t])', 2: 'new_dp[j] = max(new_dp[j], dp[j-t] + prefix[t])' };
+const fxText = (html) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+
+test('2218 DP formula: general recurrence always shown; this step filled in with the real dp and prefix values', () => {
+  const inputs = [[problem.defaultInput, internals.DEFAULT_K_2218], ...randomInputs(60, 4242), ...EXTREMES];
+  for (const lang of ['vi', 'en']) {
+    const ui = renderer(lang);
+    for (const [input, k] of inputs) {
+      const piles = JSON.parse(input);
+      const rows = dpRows(piles, k);
+      const prefixes = piles.map((pile) => pile.reduce((acc, coin) => [...acc, acc.at(-1) + coin], [0]));
+      const g = (v) => (v === null ? '−∞' : String(v));
+      const d = (v) => (v === null ? '-inf' : String(v));
+      for (const [approach, build] of BUILDERS) {
+        const { steps } = build(input, { k });
+        const running = new Map();
+        let updates = 0;
+        steps.forEach((step, index) => {
+          const view = step.maxCoins2218View;
+          const html = ui.render(step, steps, index);
+          const at = `${lang} A${approach} ${input} k=${k} #${index} ${view.event}`;
+          const block = html.match(/<div class="lc2218-formula"[\s\S]*?<\/div><div class="lc2218-legend"/);
+          assert.ok(block, `${at}: formula block`);
+          const text = fxText(block[0]);
+          assert.ok(text.includes(FX_GENERAL[approach]), `${at}: general formula`);
+          assert.ok(text.includes(approach === 1 ? 'dp[0][0] = 0' : 'dp[0] = 0'), `${at}: base case`);
+          assert.ok(text.includes(approach === 1 ? '= dp[n][k]' : '= dp[k]'), `${at}: answer`);
+          assert.match(block[0], /^<div class="lc2218-formula" role="group" aria-label="(Công thức DP|DP formula): /);
+          const now = html.match(/<div class="lc2218-fx-now"([^>]*)>([\s\S]*?)<\/div><\/div><div class="lc2218-legend"/);
+          const attrs = now ? Object.fromEntries([...now[1].matchAll(/ data-([a-z]+)="([^"]*)"/g)].map((m) => [m[1], m[2]])) : {};
+          const nowText = now ? fxText(now[2]) : '';
+          if (!['for-t', 'check', 'update'].includes(view.event)) {
+            if (step.final) {
+              assert.equal(attrs.result, String(rows[piles.length][k]), at);
+              assert.ok(nowText.includes(`${approach === 1 ? `dp[${piles.length}][${k}]` : `dp[${k}]`} = ${rows[piles.length][k]}`), at);
+            }
+            if (approach === 2 && view.event === 'for-j') {
+              const [, j] = view.dst;
+              assert.equal(attrs.prev, d(rows[view.pileIndex][j]), at);
+              running.set(`${view.pileIndex},${j}`, rows[view.pileIndex][j]);
+            }
+            return;
+          }
+          const p = view.pileIndex;
+          const i = p + 1;
+          const j = view.dst[1];
+          const t = view.t;
+          const key = `${p},${j}`;
+          if (!running.has(key)) running.set(key, null);
+          const old = running.get(key);
+          const prev = rows[p][j - t];
+          const gain = prefixes[p][t];
+          const dst = approach === 1 ? `dp[${i}][${j}]` : `new_dp[${j}]`;
+          const src = approach === 1 ? `dp[${i - 1}][${j - t}]` : `dp[${j - t}]`;
+          assert.equal(attrs.dst, dst, at);
+          assert.equal(attrs.src, src, at);
+          assert.equal(attrs.old, d(old), at);
+          assert.equal(attrs.prev, d(prev), at);
+          assert.equal(attrs.gain, String(gain), at);
+          assert.ok(nowText.includes(`${dst} = max(${g(old)}, ${src} + prefix[${t}])`), `${at}: ${nowText}`);
+          if (prev === null) {
+            if (view.event === 'check') assert.ok(nowText.includes(`${src} = −∞ →`) && /fx-bad/.test(now[2]), `${at}: skipped`);
+            assert.equal(attrs.total, undefined, at);
+            return;
+          }
+          if (view.event === 'for-t') return;
+          assert.equal(attrs.total, String(prev + gain), at);
+          assert.ok(nowText.includes(`= max(${g(old)}, ${prev} + ${gain})`), `${at}: ${nowText}`);
+          if (view.event !== 'update') return;
+          const result = old === null || prev + gain > old ? prev + gain : old;
+          running.set(key, result);
+          updates++;
+          assert.equal(attrs.result, String(result), at);
+          assert.ok(nowText.includes(`= ${result}`), `${at}: ${nowText}`);
+          const winners = [...now[2].matchAll(/class="(fx-[a-z]+) fx-win">([^<]*)</g)].map((m) => [m[1], m[2]]);
+          const won = old === null || prev + gain > old;
+          assert.deepEqual(winners, won ? [['fx-src', String(prev)], ['fx-take', String(gain)]] : [['fx-dst', String(old)]], `${at}: winner`);
+        });
+        assert.ok(updates > 0, `A${approach} ${input}: has update steps`);
+        piles.forEach((_, p) => {
+          for (let j = approach === 1 ? 0 : 1; j <= k; j++) assert.equal(running.get(`${p},${j}`), rows[p + 1][j], `A${approach} ${input}: cell ${p + 1},${j}`);
+        });
+      }
+    }
+  }
+});
+
 test('2218 rejects inputs outside the visualizer limits', () => {
   const bad = [
     ['x', 1],
@@ -401,9 +506,9 @@ test('2218 rejects inputs outside the visualizer limits', () => {
 test('2218 assets are dedicated files, registered once; the shared requested-visualizations files no longer carry 2218', () => {
   const index = readFrontendIndex();
   const script = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
-  assert.match(index, /max-coins-2218\.css\?v=max-coins-2218-v1" data-problem-ids="2218"/);
-  assert.match(index, /renderer-max-coins-2218\.js\?v=max-coins-2218-v1" data-problem-ids="2218"/);
-  assert.match(index, /&lc2218=pictures-v1/);
+  assert.match(index, /max-coins-2218\.css\?v=max-coins-2218-v2" data-problem-ids="2218"/);
+  assert.match(index, /renderer-max-coins-2218\.js\?v=max-coins-2218-v2" data-problem-ids="2218"/);
+  assert.match(index, /&lc2218=formula-v2/);
   assert.match(readFrontendJavaScript(), /step\.maxCoins2218View\), surface: "treeView", render: \(step\) => \{\s*renderMaxCoins2218View\(step\)/);
   assert.doesNotMatch(script, /coins2218View|renderCoins2218View/);
   const shared = fs.readFileSync(require.resolve('../public/renderer-requested-visualizations.js'), 'utf8');

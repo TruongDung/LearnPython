@@ -1,6 +1,14 @@
 {
  "runs": {
   "a1-default-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 131,
    "approach": 1,
    "answer": 121,
@@ -22,9 +30,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-short-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 65,
    "approach": 1,
    "answer": 101,
@@ -46,9 +63,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-bottom700-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 440,
    "approach": 1,
    "answer": 706,
@@ -70,9 +96,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-wide-7x7-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 1077,
    "approach": 1,
    "answer": 7964,
@@ -94,9 +129,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-one-pile-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 113,
    "approach": 1,
    "answer": 6993,
@@ -118,9 +162,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a2-default-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 97,
    "approach": 2,
    "answer": 121,
@@ -142,9 +195,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 1) = 1 ✓",
    "lineCount": 17
   },
   "a2-short-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 48,
    "approach": 2,
    "answer": 101,
@@ -166,9 +228,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 1) = 1 ✓",
    "lineCount": 17
   },
   "a2-bottom700-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 299,
    "approach": 2,
    "answer": 706,
@@ -190,9 +261,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 100) = 100 ✓",
    "lineCount": 17
   },
   "a2-wide-7x7-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 896,
    "approach": 2,
    "answer": 7964,
@@ -214,9 +294,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 999) = 999 ✓",
    "lineCount": 17
   },
   "a2-one-pile-dark": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 95,
    "approach": 2,
    "answer": 6993,
@@ -238,9 +327,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 999) = 999 ✓",
    "lineCount": 17
   },
   "a1-default-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 131,
    "approach": 1,
    "answer": 121,
@@ -262,9 +360,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-short-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 65,
    "approach": 1,
    "answer": 101,
@@ -286,9 +393,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-bottom700-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 440,
    "approach": 1,
    "answer": 706,
@@ -310,9 +426,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-wide-7x7-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 1077,
    "approach": 1,
    "answer": 7964,
@@ -334,9 +459,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a1-one-pile-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 113,
    "approach": 1,
    "answer": 6993,
@@ -358,9 +492,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step dp[1][0] = max(−∞, dp[0][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
    "lineCount": 17
   },
   "a2-default-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 97,
    "approach": 2,
    "answer": 121,
@@ -382,9 +525,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 1) = 1 ✓",
    "lineCount": 17
   },
   "a2-short-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 48,
    "approach": 2,
    "answer": 101,
@@ -406,9 +558,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 1) = 1 ✓",
    "lineCount": 17
   },
   "a2-bottom700-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 299,
    "approach": 2,
    "answer": 706,
@@ -430,9 +591,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 100) = 100 ✓",
    "lineCount": 17
   },
   "a2-wide-7x7-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 896,
    "approach": 2,
    "answer": 7964,
@@ -454,9 +624,18 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 999) = 999 ✓",
    "lineCount": 17
   },
   "a2-one-pile-light": {
+   "fxMissing": 0,
+   "fxHidden": 0,
+   "fxOverflow": 0,
+   "fxClipped": 0,
+   "fxOverlap": 0,
+   "fxNowMissing": 0,
+   "fxGeneralBad": 0,
+   "fxMaxH": 122,
    "steps": 95,
    "approach": 2,
    "answer": 6993,
@@ -478,6 +657,7 @@
    "hangBad": 0,
    "hiddenOtherBlock": true,
    "wrapped": 2,
+   "fxSample": "This step new_dp[1] = max(−∞, dp[0] + prefix[1]) = max(−∞, 0 + 999) = 999 ✓",
    "lineCount": 17
   }
  },
@@ -543,7 +723,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 121.5
+  }
  },
  "code-a1-w1000-dark": {
   "maxHeight": "none",
@@ -566,7 +757,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 141.5
+  }
  },
  "code-a1-w520-dark": {
   "maxHeight": "none",
@@ -589,7 +791,52 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 10.799479166666666,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 141.5
+  }
+ },
+ "code-a1-w400-dark": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 488,
+  "clientH": 488,
+  "vScroll": false,
+  "visibleLines": 18,
+  "clipped": 0,
+  "scrollW": 329,
+  "clientW": 329,
+  "hScroll": false,
+  "hClipped": 0,
+  "wrapped": 6,
+  "hangBad": []
+ },
+ "geometry-a1-w400-dark": {
+  "overlaps": 0,
+  "clipped": 0,
+  "labelOutside": 0,
+  "fitsCard": true,
+  "minFontPx": 7.361979166666667,
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 196.5
+  }
  },
  "colors-a1-dark": {
   "bg": "rgb(15, 26, 37)",
@@ -635,7 +882,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 138.5
+  }
  },
  "code-a2-w1000-dark": {
   "maxHeight": "none",
@@ -658,7 +916,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 158.5
+  }
  },
  "code-a2-w520-dark": {
   "maxHeight": "none",
@@ -681,7 +950,52 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 10.799479166666666,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 158.5
+  }
+ },
+ "code-a2-w400-dark": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 470,
+  "clientH": 470,
+  "vScroll": false,
+  "visibleLines": 18,
+  "clipped": 0,
+  "scrollW": 329,
+  "clientW": 329,
+  "hScroll": false,
+  "hClipped": 0,
+  "wrapped": 4,
+  "hangBad": []
+ },
+ "geometry-a2-w400-dark": {
+  "overlaps": 0,
+  "clipped": 0,
+  "labelOutside": 0,
+  "fitsCard": true,
+  "minFontPx": 7.361979166666667,
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 214
+  }
  },
  "colors-a2-dark": {
   "bg": "rgb(15, 26, 37)",
@@ -727,7 +1041,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 121.5
+  }
  },
  "code-a1-w1000-light": {
   "maxHeight": "none",
@@ -750,7 +1075,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 141.5
+  }
  },
  "code-a1-w520-light": {
   "maxHeight": "none",
@@ -773,7 +1109,52 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 10.799479166666666,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 141.5
+  }
+ },
+ "code-a1-w400-light": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 488,
+  "clientH": 488,
+  "vScroll": false,
+  "visibleLines": 18,
+  "clipped": 0,
+  "scrollW": 329,
+  "clientW": 329,
+  "hScroll": false,
+  "hClipped": 0,
+  "wrapped": 6,
+  "hangBad": []
+ },
+ "geometry-a1-w400-light": {
+  "overlaps": 0,
+  "clipped": 0,
+  "labelOutside": 0,
+  "fitsCard": true,
+  "minFontPx": 7.361979166666667,
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step dp[3][0] = max(−∞, dp[2][0] + prefix[0]) = max(−∞, 0 + 0) = 0 ✓",
+   "height": 196.5
+  }
  },
  "colors-a1-light": {
   "bg": "rgb(244, 247, 251)",
@@ -819,7 +1200,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 138.5
+  }
  },
  "code-a2-w1000-light": {
   "maxHeight": "none",
@@ -842,7 +1234,18 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 11,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 158.5
+  }
  },
  "code-a2-w520-light": {
   "maxHeight": "none",
@@ -865,7 +1268,52 @@
   "labelOutside": 0,
   "fitsCard": true,
   "minFontPx": 10.799479166666666,
-  "htmlClipped": 0
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 158.5
+  }
+ },
+ "code-a2-w400-light": {
+  "maxHeight": "none",
+  "position": "static",
+  "scrollH": 470,
+  "clientH": 470,
+  "vScroll": false,
+  "visibleLines": 18,
+  "clipped": 0,
+  "scrollW": 329,
+  "clientW": 329,
+  "hScroll": false,
+  "hClipped": 0,
+  "wrapped": 4,
+  "hangBad": []
+ },
+ "geometry-a2-w400-light": {
+  "overlaps": 0,
+  "clipped": 0,
+  "labelOutside": 0,
+  "fitsCard": true,
+  "minFontPx": 7.361979166666667,
+  "htmlClipped": 0,
+  "fx": {
+   "exists": true,
+   "visible": true,
+   "hOverflow": false,
+   "segClipped": 0,
+   "segOverlap": 0,
+   "overSvg": false,
+   "overLegend": false,
+   "now": "This step new_dp[1] = max(7, dp[0] + prefix[1]) = max(7, 0 + 20) = 20 ✓",
+   "height": 214
+  }
  },
  "colors-a2-light": {
   "bg": "rgb(244, 247, 251)",
