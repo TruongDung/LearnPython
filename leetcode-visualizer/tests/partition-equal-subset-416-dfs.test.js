@@ -4,7 +4,7 @@ const p=require('../problems').SUPPORTED[416];
 const python=process.env.PYTHON||(process.platform==='win32'?'python':'python3');
 const cases=[[1,5,11,5],[1,2,3,5],[2,6],[1,1],[100],[2,2,3,5],[2,2,2,2],[1,2,5]];
 test('416 adds the supplied DFS with English comments, separate take and skip calls, and exponential complexity',()=>{
- assert.deepEqual(p.extraParams[0].options.map(o=>o.value),[1,2,3]);assert.equal(p.debugMode,'line-by-line');assert.equal(p.complexity3.time,'O(2^n)');assert.equal(p.complexity3.space,'O(n)');
+ assert.deepEqual(p.extraParams[0].options.map(o=>o.value),[1,2,3,4]);assert.equal(p.debugMode,'line-by-line');assert.equal(p.complexity3.time,'O(2^n)');assert.equal(p.complexity3.space,'O(n)');
  const code=p.code3.join('\n');assert.match(code,/take = dfs\(i \+ 1, remain - nums\[i\]\)/);assert.match(code,/skip = dfs\(i \+ 1, remain\)/);assert.match(code,/return take or skip/);assert.doesNotMatch(code,/cache|memo/);
  for(const line of p.code3.filter(s=>s.trim().startsWith('#')))assert.match(line,/^[\x00-\x7f]+$/);
 });

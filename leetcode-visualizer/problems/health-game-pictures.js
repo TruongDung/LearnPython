@@ -18,41 +18,41 @@ const dungeonMemoCode=`from functools import lru_cache
 
 class Solution:
     def calculateMinimumHP(self, dungeon):
-        m, n = len(dungeon), len(dungeon[0])
+        rows, cols = len(dungeon), len(dungeon[0])
 
         @lru_cache(None)
-        def dfs(i, j):
-            if i >= m or j >= n:
+        def dfs(row, col):
+            if row >= rows or col >= cols:
                 return float('inf')
 
-            if i == m - 1 and j == n - 1:
-                return max(1, 1 - dungeon[i][j])
+            if row == rows - 1 and col == cols - 1:
+                return max(1, 1 - dungeon[row][col])
 
-            down = dfs(i + 1, j)
-            right = dfs(i, j + 1)
+            down = dfs(row + 1, col)
+            right = dfs(row, col + 1)
 
-            return max(1, min(down, right) - dungeon[i][j])
+            return max(1, min(down, right) - dungeon[row][col])
 
         return dfs(0, 0)`.split('\n');
 const dungeonPaddedCode=`from typing import List
 
 class Solution:
     def calculateMinimumHP(self, dungeon: List[List[int]]) -> int:
-        m, n = len(dungeon), len(dungeon[0])
+        rows, cols = len(dungeon), len(dungeon[0])
 
-        dp = [[float('inf')] * (n + 1) for _ in range(m + 1)]
+        dp = [[float('inf')] * (cols + 1) for _ in range(rows + 1)]
 
-        dp[m][n - 1] = 1
-        dp[m - 1][n] = 1
+        dp[rows][cols - 1] = 1
+        dp[rows - 1][cols] = 1
 
-        for i in range(m - 1, -1, -1):
-            for j in range(n - 1, -1, -1):
-                down = dp[i + 1][j]
-                right = dp[i][j + 1]
+        for row in range(rows - 1, -1, -1):
+            for col in range(cols - 1, -1, -1):
+                down = dp[row + 1][col]
+                right = dp[row][col + 1]
 
-                dp[i][j] = max(
+                dp[row][col] = max(
                     1,
-                    min(down, right) - dungeon[i][j]
+                    min(down, right) - dungeon[row][col]
                 )
 
         return dp[0][0]`.split('\n');
@@ -95,9 +95,9 @@ function buildDungeon(input){
   const steps=native.events.map((e,index)=>{
     const x=e.locals,line=e.line,final=index===native.events.length-1;let active=null,phase='init';
     if(line===5){active=[rows-1,cols-1];phase='write';}
-    if((line===7&&e.branch)||line===8){active=[rows-1,x.j];phase=line===8?'write':'choose';}
-    if((line===10&&e.branch)||line===11){active=[x.i,cols-1];phase=line===11?'write':'choose';}
-    if((line===14&&e.branch)||line===15){active=[x.i,x.j];phase=line===15?'write':'choose';}
+    if((line===7&&e.branch)||line===8){active=[rows-1,x.col];phase=line===8?'write':'choose';}
+    if((line===10&&e.branch)||line===11){active=[x.row,cols-1];phase=line===11?'write':'choose';}
+    if((line===14&&e.branch)||line===15){active=[x.row,x.col];phase=line===15?'write':'choose';}
     if(phase==='write')computed[active[0]][active[1]]=true;
     const rawDP=Array.isArray(x.dp)?x.dp.map(r=>[...r]):null,dp=rawDP?rawDP.map((row,r)=>row.map((n,c)=>computed[r][c]?n:null)):null;
     const neighbors=[];
@@ -109,7 +109,7 @@ function buildDungeon(input){
     const view={id:174,kind:'dungeon',method:1,grid,rows,cols,dp,rawDP,computed:computed.map(r=>[...r]),active,neighbors,nextNeed,delta,rawNeed,
       required:phase==='write'?dp[active[0]][active[1]]:null,writes:structuredClone(writes),phase,line,source:code[line-1].trim(),branch:e.branch,
       answer:final?native.answer:null,path:final?dungeonPath(dp):[],trace:native.trace,final};
-    return {arr:[],codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
+    return {arr:[],codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['rows','cols','row','col'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
   });return {original:grid,answer:native.answer,steps};
 }
 function buildDungeonMemo(input){
@@ -117,20 +117,20 @@ function buildDungeonMemo(input){
   const memo=grid.map(row=>row.map(()=>null)),cached=new Map(),writes=[];let cacheHits=0;
   const inside=cell=>cell&&cell[0]>=0&&cell[0]<rows&&cell[1]>=0&&cell[1]<cols;
   const steps=native.events.map((e,index)=>{
-    const x=e.locals,line=e.line,final=index===native.events.length-1,cell=e.scope==='dfs'?[x.i,x.j]:null;
-    const stack=e.frames.filter(f=>f.name==='dfs').map((f,i,frames)=>({cell:[f.locals.i,f.locals.j],line:f.line,down:f.locals.down??null,right:f.locals.right??null,status:i===frames.length-1?'active':'waiting'}));
+    const x=e.locals,line=e.line,final=index===native.events.length-1,cell=e.scope==='dfs'?[x.row,x.col]:null;
+    const stack=e.frames.filter(f=>f.name==='dfs').map((f,i,frames)=>({cell:[f.locals.row,f.locals.col],line:f.line,down:f.locals.down??null,right:f.locals.right??null,status:i===frames.length-1?'active':'waiting'}));
     let active=inside(cell)?cell:null,phase=cell?(inside(cell)?'guard':'outside'):'init',cacheHit=null,pendingCall=null,received=null;
     if(e.event==='call'){
-      const target=line===20?[0,0]:line===15?[x.i+1,x.j]:[x.i,x.j+1];
+      const target=line===20?[0,0]:line===15?[x.row+1,x.col]:[x.row,x.col+1];
       pendingCall={cell:target,variable:line===15?'down':line===16?'right':null,cached:cached.has(target.join(':'))};phase='call';
       if(stack.length)stack.at(-1).status='calling';
     }else if(cell&&e.returning){
       if(stack.length)stack.at(-1).status='returning';
       cached.set(cell.join(':'),e.returned);
-      if(active){memo[x.i][x.j]=e.returned;writes.push({cell:[...active],need:e.returned,step:index});phase='write';}
+      if(active){memo[x.row][x.col]=e.returned;writes.push({cell:[...active],need:e.returned,step:index});phase='write';}
     }else if(cell&&(line===15||line===16)){
-      const target=line===15?[x.i+1,x.j]:[x.i,x.j+1],previous=native.events[index-1];
-      const expanded=previous?.returning&&previous.scope==='dfs'&&previous.locals.i===target[0]&&previous.locals.j===target[1];
+      const target=line===15?[x.row+1,x.col]:[x.row,x.col+1],previous=native.events[index-1];
+      const expanded=previous?.returning&&previous.scope==='dfs'&&previous.locals.row===target[0]&&previous.locals.col===target[1];
       if(!expanded){
         const need=line===15?x.down:x.right;
         if(cached.get(target.join(':'))!==need)throw Error('174: cached return does not match the native DFS trace.');
@@ -138,16 +138,16 @@ function buildDungeonMemo(input){
       }else phase='receive';
       received={cell:target,variable:line===15?'down':'right',need:line===15?x.down:x.right,cached:!expanded};
     }
-    const goal=active&&x.i===rows-1&&x.j===cols-1;
-    const neighbors=active&&!goal?[[[x.i+1,x.j],'down'],[[x.i,x.j+1],'right']].map(([next,direction])=>({cell:next,direction,need:x[direction]??null})):[];
+    const goal=active&&x.row===rows-1&&x.col===cols-1;
+    const neighbors=active&&!goal?[[[x.row+1,x.col],'down'],[[x.row,x.col+1],'right']].map(([next,direction])=>({cell:next,direction,need:x[direction]??null})):[];
     const requirementsReady=active&&(goal?phase==='write':x.down!==undefined&&x.right!==undefined);
     const nextNeed=phase==='write'?(goal?1:Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need))):null;
-    const delta=active?grid[x.i][x.j]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
+    const delta=active?grid[x.row][x.col]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
     if(final){active=[0,0];phase='result';}
     const view={id:174,kind:'dungeon',method:2,grid,rows,cols,dp:structuredClone(memo),computed:memo.map(row=>row.map(n=>n!==null)),active,neighbors,nextNeed,delta,rawNeed,
       required:phase==='write'?e.returned:null,requirementsReady:Boolean(requirementsReady),writes:structuredClone(writes),stack,cacheHits,cacheHit,pendingCall,received,execution:{event:e.event,timing:e.timing,scope:e.scope},outside:cell&&!inside(cell)?cell:null,returned:e.returning?e.returned:null,
       phase,line,source:code[line-1].trim(),branch:e.branch,answer:final?native.answer:null,path:final?dungeonPath(memo):[],trace:native.trace,final};
-    return {arr:[],codeBlock:2,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
+    return {arr:[],codeBlock:2,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['rows','cols','row','col','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
   });return {original:grid,answer:native.answer,steps};
 }
 function buildDungeonPadded(input){
@@ -157,18 +157,18 @@ function buildDungeonPadded(input){
     const x=e.locals,line=e.line,final=index===native.events.length-1,rawDP=x.dp?structuredClone(x.dp):null;
     let active=null,dpActive=null,phase='init';
     if(line===9||line===10){dpActive=line===9?[rows,cols-1]:[rows-1,cols];phase='base';}
-    if(line===13&&e.branch||[14,15,17,18,19].includes(line)){active=[x.i,x.j];dpActive=active;phase='choose';}
-    if(active&&typeof rawDP?.[x.i][x.j]==='number'&&!computed[x.i][x.j]){
-      computed[x.i][x.j]=true;phase='write';writes.push({cell:[...active],need:rawDP[x.i][x.j],step:index});
+    if(line===13&&e.branch||[14,15,17,18,19].includes(line)){active=[x.row,x.col];dpActive=active;phase='choose';}
+    if(active&&typeof rawDP?.[x.row][x.col]==='number'&&!computed[x.row][x.col]){
+      computed[x.row][x.col]=true;phase='write';writes.push({cell:[...active],need:rawDP[x.row][x.col],step:index});
     }
     const dp=rawDP?grid.map((row,r)=>row.map((_,c)=>computed[r][c]?rawDP[r][c]:null)):null;
-    const neighbors=active?[{cell:[x.i+1,x.j],direction:'down',need:rawDP[x.i+1][x.j]},{cell:[x.i,x.j+1],direction:'right',need:rawDP[x.i][x.j+1]}]:[];
-    const nextNeed=active&&line>=15?Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need)):null,delta=active?grid[x.i][x.j]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
+    const neighbors=active?[{cell:[x.row+1,x.col],direction:'down',need:rawDP[x.row+1][x.col]},{cell:[x.row,x.col+1],direction:'right',need:rawDP[x.row][x.col+1]}]:[];
+    const nextNeed=active&&line>=15?Math.min(...neighbors.map(n=>n.need==='∞'?Infinity:n.need)):null,delta=active?grid[x.row][x.col]:null,rawNeed=nextNeed===null?null:nextNeed-delta;
     if(final){active=[0,0];dpActive=active;phase='result';}
     const view={id:174,kind:'dungeon',method:3,grid,rows,cols,dp,rawDP,paddedDP:rawDP,computed:computed.map(row=>[...row]),active,dpActive,neighbors,nextNeed,delta,rawNeed,
       required:phase==='write'?rawDP[active[0]][active[1]]:null,writes:structuredClone(writes),phase,line,source:code[line-1].trim(),branch:e.branch,
       answer:final?native.answer:null,path:final?dungeonPath(dp):[],trace:native.trace,final};
-    return {arr:[],codeBlock:3,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['i','j','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
+    return {arr:[],codeBlock:3,codeLines:[line],title:bi(view.source,view.source),note:bi('',''),final,vars:['rows','cols','row','col','down','right'].map(name=>({name,value:x[name]??'—'})),healthGameView:view};
   });return {original:grid,answer:native.answer,steps};
 }
 module.exports={
@@ -185,8 +185,8 @@ module.exports={
   174:{...dungeonBase,inputLabel:bi('dungeon · JSON hoặc hàng cách ; · tối đa 6×6','dungeon · JSON or semicolon rows · up to 6×6'),
     extraParams:[{key:'approach',type:'select',default:'1',label:bi('Cách giải','Approach'),options:dungeonLabels.map((label,i)=>({value:String(i+1),label}))}],
     codeLabel:dungeonLabels[0],code2:dungeonMemoCode,code2Label:dungeonLabels[1],code3:dungeonPaddedCode,code3Label:dungeonLabels[2],
-    complexity2:{time:'O(m × n)',space:'O(m × n)',note:bi('Mỗi ô tính một lần; lời gọi lặp dùng kết quả từ lru_cache. Stack sâu tối đa m + n.','Each room is evaluated once; repeated calls use lru_cache. Stack depth is at most m + n.')},
-    complexity3:{time:'O(m × n)',space:'O(m × n)',note:bi('Bảng (m+1) × (n+1) khởi tạo ∞; hai ô cạnh đích bằng 1.','Initialize an (m+1) × (n+1) table with ∞; the two cells beside the exit are 1.')},
+    complexity2:{time:'O(rows × cols)',space:'O(rows × cols)',note:bi('Mỗi ô tính một lần; lời gọi lặp dùng kết quả từ lru_cache. Stack sâu tối đa rows + cols.','Each room is evaluated once; repeated calls use lru_cache. Stack depth is at most rows + cols.')},
+    complexity3:{time:'O(rows × cols)',space:'O(rows × cols)',note:bi('Bảng (rows+1) × (cols+1) khởi tạo ∞; hai ô cạnh đích bằng 1.','Initialize an (rows+1) × (cols+1) table with ∞; the two cells beside the exit are 1.')},
     approach:[bi('1. DP: tính HP cần khi vào từng ô từ đích về đầu; luôn chặn dưới ở 1.','1. Bottom-up DP: work backward to find each room’s required entry HP, clamped at 1.'),bi('2. DFS + lru_cache: gọi xuống/phải, trả kết quả về và tái sử dụng ô đã tính.','2. DFS + lru_cache: recurse down/right, return each requirement, and reuse cached cells.'),bi('3. DP có đệm: thêm hàng/cột ∞, đặt hai ô cạnh đích bằng 1 để dùng chung một công thức.','3. Padded DP: add an ∞ row/column and set the two cells beside the exit to 1 for a single recurrence.')],
     debugMode:'line-by-line',visualizationLimits:{maxRows:6,maxColumns:6,completeTrace:true},builder:buildDungeon,builder2:buildDungeonMemo,builder3:buildDungeonPadded,liveArgs:input=>[parseDungeon(input)]},
 };

@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const { spawnSync } = require("node:child_process");
 const problem = require("../problems").SUPPORTED[1463];
+const overview = input => problem.builder(input, {traceMode:2});
 const encode = grid => grid.map(row => row.join(",")).join(";");
 const samples = [
   [[3,1,1],[2,5,1],[1,5,5],[2,1,1]],
@@ -32,14 +33,14 @@ const cases = [...samples, ...Array.from({ length: 70 }, () => {
 })];
 
 test("1463 matches independent recursive DP and official examples", () => {
-  assert.equal(problem.builder(encode(samples[0])).answer, 24);
-  assert.equal(problem.builder(encode(samples[1])).answer, 28);
-  for (const grid of cases) assert.equal(problem.builder(encode(grid)).answer, oracle(grid)(0, 0, grid[0].length - 1));
+  assert.equal(overview(encode(samples[0])).answer, 24);
+  assert.equal(overview(encode(samples[1])).answer, 28);
+  for (const grid of cases) assert.equal(overview(encode(grid)).answer, oracle(grid)(0, 0, grid[0].length - 1));
 });
 
 test("1463 transition pictures use exact suffix values and count overlaps once", () => {
   for (const grid of samples) {
-    const visit = oracle(grid), run = problem.builder(encode(grid));
+    const visit = oracle(grid), run = overview(encode(grid));
     for (const step of run.steps) {
       const v = step.cherryPickup1463View;
       assert.equal(v.gain, grid[v.row][v.c1] + (v.c1 === v.c2 ? 0 : grid[v.row][v.c2]));
@@ -61,7 +62,7 @@ test("1463 transition pictures use exact suffix values and count overlaps once",
 
 test("1463 replay follows legal simultaneous moves and collects the reported optimum", () => {
   for (const grid of cases) {
-    const run = problem.builder(encode(grid)), path = run.steps.at(-1).cherryPickup1463View.path;
+    const run = overview(encode(grid)), path = run.steps.at(-1).cherryPickup1463View.path;
     assert.deepEqual([path[0].c1, path[0].c2], [0, grid[0].length - 1]);
     assert.equal(path.length, grid.length);
     let sum = 0;
@@ -79,15 +80,15 @@ test("1463 replay follows legal simultaneous moves and collects the reported opt
 
 test("1463 displayed typed Python and live arguments agree with the JS implementation", () => {
   const program = problem.code.join("\n") + "\nimport json,sys\nfor grid,expected in json.load(sys.stdin):\n    assert Solution().cherryPickup(grid)==expected\n";
-  const result = spawnSync("C:/Users/david.truong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe", ["-c", program], { encoding: "utf8", input: JSON.stringify(cases.map(grid => [grid, oracle(grid)(0,0,grid[0].length - 1)])) });
+  const result = spawnSync(process.env.PYTHON || "python3", ["-c", program], { encoding: "utf8", input: JSON.stringify(cases.map(grid => [grid, oracle(grid)(0,0,grid[0].length - 1)])) });
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(problem.liveArgs(encode(samples[0])), [samples[0]]);
-  for (const input of ["", "1,2", "1;2", "1,2;3", "1,;2,3", "-1,2;3,4", "1.5,2;3,4", "101,2;3,4", "1,2;3,4;"]) assert.throws(() => problem.builder(input), /1463:/);
+  for (const input of ["", "1,2", "1;2", "1,2;3", "1,;2,3", "-1,2;3,4", "1.5,2;3,4", "101,2;3,4", "1,2;3,4;"]) assert.throws(() => overview(input), /1463:/);
 });
 
 test("1463 accepts maximum constraints with a bounded visual trace", () => {
   const grid = Array.from({ length:70 }, () => Array(70).fill(100));
-  const run = problem.builder(encode(grid));
+  const run = overview(encode(grid));
   assert.equal(run.answer, 14000);
   assert.ok(run.steps.length < 300);
   assert.ok(JSON.stringify(run).length < 1000000);
@@ -105,7 +106,7 @@ test("1463 renders both languages from immutable JSON snapshots and restores Pre
   for (const language of ["vi", "en"]) {
     const host = { innerHTML: "" }, renderer = new Klass({ host, language });
     for (const grid of samples) {
-      const run = problem.builder(encode(grid));
+      const run = overview(encode(grid));
       for (const step of run.steps) { renderer.render(JSON.parse(JSON.stringify(step))); assert.match(host.innerHTML, /cp1463-viz/); assert.doesNotMatch(host.innerHTML, /undefined|NaN|Infinity/); }
       renderer.render(run.steps[0]); const first = host.innerHTML;
       renderer.render(run.steps.at(-1)); renderer.render(run.steps[0]); assert.equal(host.innerHTML, first);

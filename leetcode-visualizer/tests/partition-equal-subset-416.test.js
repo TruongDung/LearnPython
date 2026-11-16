@@ -43,8 +43,8 @@ test('416 keeps the DP learning category and supplies validated line-by-line Pyt
 
 test('416 bitset approach matches subset enumeration and exposes the shift-OR Python solution', () => {
   const approach = problem.extraParams.find(param => param.key === 'approach');
-  assert.equal(approach.default, 1);
-  assert.deepEqual(approach.options.map(option => option.value), [1, 2, 3]);
+  assert.equal(approach.default, 4);
+  assert.deepEqual(approach.options.map(option => option.value), [1, 2, 3, 4]);
   assert.equal(problem.builder2(problem.defaultInput, { approach: 2 }).answer, true);
   assert.match(problem.code2Label.vi, /Cách 2/);
   assert.match(problem.code2Label.en, /Approach 2/);

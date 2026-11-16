@@ -17,10 +17,10 @@ for grid in p['grids']:
   if event=='line' and frame.f_lineno in targets:
    stack=[];cursor=frame
    while cursor:
-    if cursor.f_code.co_filename==filename and cursor.f_code.co_name=='dfs':stack.append([cursor.f_locals['i'],cursor.f_locals['j'],cursor.f_lineno])
+    if cursor.f_code.co_filename==filename and cursor.f_code.co_name=='dfs':stack.append([cursor.f_locals['row'],cursor.f_locals['col'],cursor.f_lineno])
     cursor=cursor.f_back
    calls.append({'line':frame.f_lineno,'scope':frame.f_code.co_name,'target':list(eval(targets[frame.f_lineno],frame.f_globals,frame.f_locals)),'down':value(frame.f_locals.get('down')),'right':value(frame.f_locals.get('right')),'stack':stack[::-1]})
-  if event=='return' and frame.f_code.co_name=='dfs':returns.append({'cell':[frame.f_locals['i'],frame.f_locals['j']],'value':value(arg)})
+  if event=='return' and frame.f_code.co_name=='dfs':returns.append({'cell':[frame.f_locals['row'],frame.f_locals['col']],'value':value(arg)})
   return observe
  sys.settrace(observe)
  try:answer=ns['Solution']().calculateMinimumHP(grid)
