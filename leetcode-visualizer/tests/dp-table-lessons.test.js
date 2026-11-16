@@ -110,5 +110,5 @@ for id,code in p.items():
 print('ok')`;
  const python=spawnSync('python3',['-c',script],{input:JSON.stringify(payload),encoding:'utf8'});assert.equal(python.status,0,python.stderr);
  for(const id of [518,416,494])assert.equal(Number(P[id].extraParams.find(p=>p.key==='approach').default),blocks[id]);
- const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8');assert.match(html,/renderer-dp-table-lessons\.js[^>]+data-problem-ids="1277 1035 518 416 494"/);assert.match(fs.readFileSync(require.resolve('../public/script.js'),'utf8'),/dpTableLessonView/);
+ const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8');assert.match(html,/renderer-dp-table-lessons\.js[^>]+data-problem-ids="1277 1035 518 416 494(?: [0-9]+)*"/);assert.match(fs.readFileSync(require.resolve('../public/script.js'),'utf8'),/dpTableLessonView/);
 });

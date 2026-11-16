@@ -146,6 +146,8 @@ Object.assign(categories.dp, {2510: pathTripsPictures[2510]});
 Object.assign(categories.dp, require('./grid-choice-pictures'));
 Object.assign(categories.dp, require('./dp-table-lessons'));
 Object.assign(categories.dp, require('./reward-five-3181'));
+Object.assign(categories.array, require('./rectangle-bound-363'));
+for (const id of [523,525,974]) for (const category of Object.values(categories)) if (category[id]) category[id]=require('./prefix-collision-pictures').attach(category[id],id);
 Object.assign(categories['monotonic-stack'], require('./prime-operations-pictures-2818'));
 Object.assign(categories.math, require('./random-and-square-pictures'));
 Object.assign(categories.math, require('./triangular-sum-2221'));
