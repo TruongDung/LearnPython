@@ -146,6 +146,8 @@ Object.assign(categories.dp, {2510: pathTripsPictures[2510]});
 Object.assign(categories.dp, require('./grid-choice-pictures'));
 Object.assign(categories['monotonic-stack'], require('./prime-operations-pictures-2818'));
 Object.assign(categories.math, require('./random-and-square-pictures'));
+Object.assign(categories.math, require('./triangular-sum-2221'));
+Object.assign(categories.string, require('./digit-sum-string-2243'));
 Object.assign(categories.greedy, {2214: healthGamePictures[2214]});
 Object.assign(categories.math, require('./minimum-cost-required-items-3789'));
 Object.assign(categories.graph, require('./time-room-pictures'), require('./shortest-graph-pictures'));
