@@ -1,0 +1,60 @@
+feat(2218): picture-first K coins page (coin stacks, cut line, candidates, DP arrow; both approaches, line debugger, light/dark)
+
+Redesign of the LeetCode 2218 visualization so the idea reads at a glance:
+coin stacks with a "top coins only" cue, a dashed cut line under the top t coins
+of the current pile (+prefix[t] below it), the candidate list for the cell being
+filled (t=0..T, winner starred, -inf rows crossed), and the DP table with an
+arrow from the source cell dp[i-1][j-t] (purple) to the target dp[i][j] (pink).
+The final step marks the chosen coins per pile (xN), the backtrack path
+(approach 1) and the answer cell. One equation line under the table.
+
+Open point 1 (approaches): kept and redesigned both. Approach 1 = 2D dp[i][j],
+approach 2 = 1D dp + new_dp. They share the parser, recorder and renderer, so the
+second one cost little; dropping it would remove the O(k) lesson the page had.
+Open point 2 (files): moved 2218 into dedicated files, like 1970 and 3161:
+public/renderer-max-coins-2218.js and public/max-coins-2218.css.
+
+- problems/maximum-value-k-coins-2218.js: rewritten. Real runnable Python for
+  both approaches (18 lines each, one statement per line), one step per executed
+  line, view model step.maxCoins2218View, notes <= 28 chars (vi/en). Input:
+  piles JSON or "a,b;c,d"; params k and approach. Limits: 1-7 piles, 1-7 coins
+  each (1-999), k 1..min(8, total); errors start with "2218:". The old trace
+  truncation (MAX_TRACE_STEPS) is gone; every line is traced. Default example
+  [[1,100,3],[7,8,9],[20,5,40]], k=3 (answer 121). complexity2 added.
+- tests/maximum-value-k-coins-2218.test.js: rewritten (11 tests).
+
+Shared-file changes:
+- public/renderer-requested-visualizations.js: removed renderCoins2218View (the
+  #2218 block only). No other change.
+- public/requested-visualizations.css: removed the .c2218-* block (34 lines,
+  from "/* 2218: picture-first pile choices */" to just before "/* Legacy coin
+  styles ... */"). No other change. Cache query strings unchanged (tests pin them).
+- public/script.js: "renderCoins2218View" removed from
+  PHASE_FOUR_RENDERER_BUNDLES; the registry entry (same position) now matches
+  step.maxCoins2218View and calls renderMaxCoins2218View.
+- public/index.html: 1 CSS link and 1 script tag (data-problem-ids="2218",
+  ?v=max-coins-2218-v1) after the 1970 ones; &lc2218=pictures-v1 on the
+  script.js query.
+
+Verification:
+- Baseline at 5ac162d (fresh; the leftover baseline-full.txt was truncated at
+  test 374 with no summary, so it was not reused):
+  node --test --test-reporter=tap "tests/*.test.js" -> 3423 tests, 3360 pass, 63 fail.
+- After: 3426 tests, 3363 pass, 63 fail. Same failing names (0 new, 0 fixed),
+  no EACCES failures, none mention 2218.
+- node --test tests/maximum-value-k-coins-2218.test.js -> 11/11 pass, 0 skipped.
+  Both approaches equal a brute force (every take vector) on 3 presets + 300
+  random + 5 extreme inputs; both displayed Python codes ran in .venv CPython on
+  68 inputs and matched; every executable line walked by every preset, with
+  False and keep branches; notes <= 28; geometry, colors, aria, locals, bad
+  inputs and wiring (shared files carry no 2218 code).
+- Headless Chrome probe (cdp-check.js, server PORT 4218, Chrome 9218, stopped
+  afterwards): 5 inputs (3 presets, 7x7 k=8, one pile) x 2 approaches x 2 themes
+  = 20 runs, every step: 0 highlight mismatches (line and code block), other
+  code block hidden, 0 overlaps, 0 clipped, 0 labels outside, 0 HTML clipped,
+  0 code-panel scrollbars, 0 lines cut, 0 bad hanging indents (also at
+  1100/1000/520 px), min font 10.8 px, notes <= 24. Chip active in the dp
+  category (opened first), Recent and search; preset button sets piles and k.
+  Live editor (Pyodide) returns 121 for both approaches. 0 console errors.
+- Spot checks, every step rendered, 0 console errors: 542, 802, 684, 9006,
+  1162, 2050, 9017 (shared requested-visualizations renderer), 1970, 9025.
