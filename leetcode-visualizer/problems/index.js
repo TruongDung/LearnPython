@@ -36,6 +36,8 @@ const categories = {
 };
 
 
+Object.assign(categories.dp, require('./semi-palindromes-2911'));
+
 // Missing lessons from the requested sweep-line study lists, in study order.
 Object.assign(categories.array,
   require('./sweep-interval-lessons'),
