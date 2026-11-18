@@ -403,6 +403,7 @@ function baseXDigits(value, x) {
 function buildSteps964(input, params = {}) {
   const { x, target } = parseLeastOperators964Input(input, params);
   const originalDigits = baseXDigits(target, x);
+  let witness = null;
   const memo = new Map();
   const memoDetails = new Map();
   const stack = [];
@@ -471,6 +472,15 @@ function buildSteps964(input, params = {}) {
       mark,
       final,
       codeLines: [...codeLines],
+      leastOps964View: {
+        x, target, position, remaining, unitCost, quotient, remainder,
+        lowCost, carryCost, choice, phaseIndex, action, formula,
+        memoSize: memo.size,
+        stack: stack.map(frame => ({ ...frame })),
+        memo: [...memo.entries()].slice(-12).map(([key, cost]) => ({ key, cost })),
+        witness: final ? witness : null,
+        traceTruncated,
+      },
       vars: [
         { name: "x", value: x },
         { name: "target", value: target },
@@ -760,6 +770,31 @@ function buildSteps964(input, params = {}) {
 
   const signedTermCost = solve(0, target);
   finalAnswer = signedTermCost - 1;
+  // Follow the cached decisions to produce a legal, checkable expression.
+  // A state represents remaining * x^position; carry introduces negative terms.
+  function collectTerms(position, remaining) {
+    if (!remaining) return [];
+    if (remaining === 1) return [{ position, coefficient: 1 }];
+    const detail = memoDetails.get(`${position}:${remaining}`);
+    const carry = detail.choice === "carry";
+    const coefficient = carry ? detail.remainder - x : detail.remainder;
+    return [...(coefficient ? [{ position, coefficient }] : []),
+      ...collectTerms(position + 1, detail.quotient + (carry ? 1 : 0))];
+  }
+  const terms = collectTerms(0, target).sort((a, b) => b.position - a.position);
+  const tokens = [];
+  for (const { position, coefficient } of terms) {
+    for (let count = 0; count < Math.abs(coefficient); count++) {
+      if (tokens.length) tokens.push({ type: 'operator', value: coefficient < 0 ? '-' : '+' });
+      const operands = position === 0 ? 2 : position;
+      for (let i = 0; i < operands; i++) {
+        if (i) tokens.push({ type: 'operator', value: position === 0 ? '/' : '*' });
+        tokens.push({ type: 'operand', value: String(x) });
+      }
+    }
+  }
+  witness = { terms, tokens, expression: tokens.map(token => token.value).join(''),
+    operatorCount: tokens.filter(token => token.type === 'operator').length };
   emit({
     phaseIndex: 6,
     title: bi(`Đáp án = ${finalAnswer}`, `Answer = ${finalAnswer}`),
@@ -783,7 +818,7 @@ function buildSteps964(input, params = {}) {
     final: true,
   });
 
-  return { original: [x], answer: finalAnswer, steps };
+  return { original: [x], answer: finalAnswer, witness, steps };
 }
 
 // -----------------------------------------------------------------------------
@@ -1221,15 +1256,15 @@ module.exports = {
       { key: "target", type: "number", min: LEAST_OPS_964_LIMITS.minTarget, max: LEAST_OPS_964_LIMITS.maxTarget, default: 19, label: bi("target (số đích)", "target") },
     ],
     approach: [
-      bi("Xem target theo cơ số x; tại vị trí i, cost(0)=2 cho x/x và cost(i)=i cho x^i khi i>0.", "View target in base x; at position i, cost(0)=2 for x/x and cost(i)=i for x^i when i>0."),
-      bi("F(i,r) thử dùng số dư dương tại x^i (làm tròn xuống) hoặc dùng phần bù âm rồi nhớ 1 (làm tròn lên).", "F(i,r) tries the positive remainder at x^i (round down) or its negative complement plus a carry (round up)."),
-      bi("remaining=1 trả cost(i); remaining=0 trả 0; memo hóa mọi trạng thái (i,remaining).", "remaining=1 returns cost(i); remaining=0 returns 0; memoize every (i,remaining) state."),
-      bi("Chi phí số hạng có dấu đếm thừa một dấu trước số hạng đầu, nên đáp án là F(0,target)−1.", "The signed-term cost counts one extra sign before the first term, so the answer is F(0,target)−1."),
+      bi("Ghép target từ các khối 1 = x/x, x, x×x, x×x×x, … Ví dụ x=3: 19 = 9 + 9 + 1.", "Build target from blocks 1 = x/x, x, x×x, x×x×x, … For x=3: 19 = 9 + 9 + 1."),
+      bi("Ở mỗi cỡ khối, thử hai cách: cộng phần dư, hoặc lấy dư một khối lớn rồi trừ phần thừa. So sánh số dấu cần dùng.", "At each block size, try adding the remainder or taking one extra large block and subtracting the excess. Compare operator costs."),
+      bi("DFS giải tiếp với khối lớn hơn; cache lưu F(vị trí, phần còn lại) để tránh tính lại cùng một bài toán con.", "DFS continues with larger blocks; cache stores F(position, remaining) to avoid solving the same subproblem twice."),
+      bi("Tạm đếm cả dấu trước mỗi khối: +x tốn 1, +x×x tốn 2, +x/x tốn 2. Cuối cùng bỏ dấu + đầu tiên nên trừ 1.", "Temporarily count each block’s leading sign: +x costs 1, +x×x costs 2, +x/x costs 2. Remove the first + at the end, so subtract 1."),
     ],
     complexity: {
       time: "O(log_x(target)) memo states",
       space: "O(log_x(target))",
-      note: bi("Mỗi vị trí cơ số x có tối đa hai phần còn lại liên quan (không nhớ hoặc có nhớ); trace và nhóm memo đều bị chặn hiển thị.", "Each base-x position has at most two relevant remaining values (without or with carry); trace and memo groups are display-bounded."),
+      note: bi("Mỗi lần đệ quy tăng cỡ khối lên x lần; mỗi cỡ chỉ cần xét tối đa hai phần còn lại nhờ cache.", "Each recursive level multiplies the block size by x; caching leaves at most two remaining values per level."),
     },
     code: LEAST_OPS_964_CODE,
     debugMode: "line-by-line",

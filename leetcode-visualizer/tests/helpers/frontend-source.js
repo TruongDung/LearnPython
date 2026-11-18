@@ -4,6 +4,9 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-circular-subarray-918.js',
+  'renderer-delete-and-earn-740.js',
+  'renderer-least-operators-964.js',
   'renderer-beautiful-binary-2914.js',
   'renderer-palindrome-partitioning-1278.js',
   'renderer-semi-palindromes-2911.js',
@@ -237,6 +240,9 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'circular-subarray-918.css',
+  'delete-and-earn-740.css',
+  'least-operators-964.css',
   'beautiful-binary-2914.css',
   'palindrome-partitioning-1278.css',
   'semi-palindromes-2911.css',

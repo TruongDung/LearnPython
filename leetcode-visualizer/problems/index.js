@@ -38,6 +38,9 @@ const categories = {
 
 Object.assign(categories.dp, require('./semi-palindromes-2911'));
 Object.assign(categories.dp, require('./palindrome-partitioning-1278'));
+Object.assign(categories.dp, require('./delete-and-earn-740'));
+Object.assign(categories.dp, require('./least-operators-964'));
+Object.assign(categories.dp, require('./circular-subarray-918'));
 Object.assign(categories.string, require('./beautiful-binary-2914'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.
