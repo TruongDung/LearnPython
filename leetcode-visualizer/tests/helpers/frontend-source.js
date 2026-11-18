@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-beautiful-binary-2914.js',
   'renderer-palindrome-partitioning-1278.js',
   'renderer-semi-palindromes-2911.js',
   'renderer-advanced-stack-pictures.js',
@@ -236,6 +237,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'beautiful-binary-2914.css',
   'palindrome-partitioning-1278.css',
   'semi-palindromes-2911.css',
   'advanced-stack-pictures.css',

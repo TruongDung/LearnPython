@@ -223,6 +223,7 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.tradingStocks2291View), surface: "treeView", render: (step) => { renderTradingStocks2291View(step); } },
     { predicate: (step) => Boolean(step.semi2911View), surface: "treeView", render: (step) => { renderSemi2911View(step); } },
     { predicate: (step) => Boolean(step.palindrome1278View), surface: "treeView", render: (step) => { renderPalindrome1278View(step); } },
+    { predicate: (step) => Boolean(step.beautiful2914View), surface: "treeView", render: (step) => { renderBeautiful2914View(step); } },
     { predicate: (step) => Boolean(step.matchsticks473View), surface: "treeView", render: (step) => { renderMatchsticks473View(step); } },
     { predicate: (step) => Boolean(step.pictureView || step.daily739View), surface: "treeView", render: (step) => { renderPictureLesson(step); } },
     { predicate: (step) => Boolean(step.subarray560View), surface: "treeView", render: (step) => {
