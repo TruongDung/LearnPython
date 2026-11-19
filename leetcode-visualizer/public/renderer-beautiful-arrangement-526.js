@@ -1,0 +1,33 @@
+'use strict';
+function arrangement526Next(kind){
+  if(typeof steps==='undefined'||typeof stepIndex==='undefined')return -1;
+  for(let i=stepIndex+1;i<steps.length;i++){const v=steps[i].arrangement526PictureView;if(v&&(kind==='line'||kind==='solution'&&v.phase==='solution'||kind==='candidate'&&v.line===9||kind==='result'&&steps[i].final))return i;}return -1;
+}
+function renderArrangement526Pictures(step){
+  const v=step.arrangement526PictureView,p=v.pythonLocals,final=step.final;
+  const t=(vi,en)=>lang==='vi'?vi:en;
+  const esc=value=>String(value??'—').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const host=document.getElementById('treeView');let selected=0;
+  function draw(){
+    const path=final?v.solutions[selected]:v.path,used=final?path.reduce((mask,num)=>mask|(1<<(num-1)),0):v.used;
+    const slots=Array.from({length:v.n},(_,i)=>`<div class="a526-slot ${path[i]?'filled':''} ${!final&&v.position===i+1?'active':''}"><small>${t('ô','slot')} ${i+1}</small><b>${path[i]??'·'}</b><span>${path[i]?'✓':!final&&v.position===i+1?'↓':'·'}</span></div>`).join('');
+    const numbers=Array.from({length:v.n},(_,i)=>{const num=i+1,on=Boolean(used&(1<<i)),current=!final&&v.candidate===num;
+      return `<span class="a526-number ${on?'used':''} ${current?'current':''} ${current&&v.phase==='check'&&!v.check?.valid?'invalid':''}"><b>${num}</b><small>${on?'×':current?'↑':'·'}</small></span>`;}).join('');
+    const check=!final&&v.check?`<div class="a526-check ${v.check.valid?'valid':'invalid'}">${v.check.used?`<strong>✕ ${t('Đã dùng','Already used')}</strong>`:`<span>${v.candidate} % ${v.position}<b class="${v.check.numRemainder===0?'zero':''}">${v.check.numRemainder}</b></span><i>OR</i><span>${v.position} % ${v.candidate}<b class="${v.check.positionRemainder===0?'zero':''}">${v.check.positionRemainder}</b></span><strong>${v.check.valid?'✓':'✕'}</strong>`}</div>`:'';
+    const grid=`<div class="a526-matrix"><table><thead><tr><th>${t('ô ↓ / số →','slot ↓ / num →')}</th>${Array.from({length:v.n},(_,i)=>`<th>${i+1}</th>`).join('')}</tr></thead><tbody>${Array.from({length:v.n},(_,i)=>`<tr class="${!final&&v.position===i+1?'active':''}"><th>${i+1}</th>${Array.from({length:v.n},(_,j)=>{const num=j+1,pos=i+1,valid=num%pos===0||pos%num===0,picked=path[i]===num,focus=!final&&v.position===pos&&v.candidate===num;return `<td class="${valid?'yes':'no'} ${picked?'picked':''} ${focus?'focus':''}" title="${num} % ${pos} = ${num%pos}; ${pos} % ${num} = ${pos%num}">${picked?`<b>${num}</b>`:valid?'✓':'×'}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>`;
+    const effect=v.pending?`<div class="a526-effect"><small>${v.pending.kind==='condition'?t('Kiểm tra','Test'):v.pending.kind==='call'?t('Gọi DFS','Call DFS'):v.pending.kind==='return'?t('Trả về','Return'):t('Sắp ghi','Next write')}</small><code>${esc(v.pending.target)}</code><b>${v.pending.formula?esc(v.pending.formula):v.pending.kind==='condition'?v.pending.after?'True':'False':`${v.pending.before!==undefined?`${esc(v.pending.before)} → `:''}${esc(v.pending.after??'?')}`}</b></div>`:'';
+    host.innerHTML=`<section class="a526-viz" aria-label="526 · Beautiful Arrangement"><header class="a526-head"><div><small>526 · BEAUTIFUL ARRANGEMENT</small><h2>${t('Điền số đúng ô ✓','Match numbers to slots ✓')}</h2></div><output><strong>${v.found.toLocaleString('en-US')}</strong><span>${final?t('cách xếp','arrangements'):t('đã tìm','found')}</span></output></header>
+      <section class="a526-debug"><header><b>▶ L${v.line}</b><span>${final?t('Đã trả về','Returned'):t('Sắp chạy','Before execution')}</span><button type="button" data-a526-jump="line"${arrangement526Next('line')<0?' disabled':''}>${t('Dòng →','Line →')} F10</button></header><code>${esc(v.source.trim())}</code>${effect}</section>
+      ${!v.detailed?`<small class="a526-caption">${t('Trace rút gọn · n ≤ 5 để debug đủ từng dòng.','Shortened trace · use n ≤ 5 to debug every line.')}</small>`:''}
+      <div class="a526-slots" aria-label="${final?t('Một cách xếp hợp lệ','One valid arrangement'):t('Các ô đang điền','Current slots')}">${slots}</div>
+      ${v.backtracked&&!final?`<div class="a526-back">↶ <b>${v.backtracked.num}</b> ← ${t('ô','slot')} ${v.backtracked.position} <small>+${v.backtracked.count} ${t('cách','ways')}</small></div>`:'<div class="a526-arrow">↑</div>'}
+      <div class="a526-numbers" aria-label="${t('Số dùng rồi có dấu ×','Used numbers have an ×')}">${numbers}</div>${check}
+      <details class="a526-grid"${v.n<=5?' open':''}><summary>${t('✓ Chia hết một trong hai chiều','✓ Divides in either direction')}</summary>${grid}</details>
+      ${v.solutions.length?`<section class="a526-solutions"><header>✓ ${final?t('Ví dụ','Examples'):t('Đã tìm','Found')} ${v.solutions.length}${final&&v.answer>v.solutions.length?` / ${v.answer.toLocaleString('en-US')}`:''}</header><div>${v.solutions.map((solution,index)=>`<button type="button" data-a526-solution="${index}"${final?'':' disabled'} aria-pressed="${final&&selected===index}">${solution.map(num=>`<span>${num}</span>`).join('')}</button>`).join('')}</div></section>`:''}
+      <details class="a526-details"><summary>${t('Biến & bitmask','Variables & bitmask')}</summary><div class="a526-registers">${Object.entries(p).map(([key,value])=>`<span><small>${key}</small><b>${esc(value)}</b></span>`).join('')}</div><div class="a526-mask">${Array.from({length:v.n},(_,i)=>`<span class="${v.used&(1<<i)?'on':''}"><small>${i+1}</small><b>${v.used&(1<<i)?1:0}</b></span>`).join('')}</div></details>
+      <nav class="a526-controls">${[['candidate',t('Thử số →','Next test →')],['solution',t('Cách xếp tiếp →','Next arrangement →')],['result',t('Kết quả ↠','Result ↠')]].map(([kind,title])=>`<button type="button" data-a526-jump="${kind}"${arrangement526Next(kind)<0?' disabled':''}>${title}</button>`).join('')}</nav><nav class="a526-examples">${[1,2,3,4,5,15].map(n=>`<button type="button" data-a526-example="${n}">n = ${n}</button>`).join('')}</nav></section>`;
+    host.querySelectorAll('[data-a526-solution]').forEach(button=>button.addEventListener('click',()=>{selected=Number(button.dataset.a526Solution);draw();}));
+    host.querySelectorAll('[data-a526-jump]').forEach(button=>button.addEventListener('click',()=>{const next=arrangement526Next(button.dataset.a526Jump);if(next<0)return;if(typeof stopPlay==='function')stopPlay();stepIndex=next;renderStep();}));
+    host.querySelectorAll('[data-a526-example]').forEach(button=>button.addEventListener('click',()=>{document.getElementById('arrInput').value=button.dataset.a526Example;runViz();}));
+  }draw();
+}

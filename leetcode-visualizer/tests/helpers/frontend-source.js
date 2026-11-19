@@ -4,6 +4,9 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-minimum-score-2567.js',
+  'renderer-shortest-superstring-943.js',
+  'renderer-beautiful-arrangement-526.js',
   'renderer-circular-subarray-918.js',
   'renderer-delete-and-earn-740.js',
   'renderer-least-operators-964.js',
@@ -240,6 +243,9 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'minimum-score-2567.css',
+  'shortest-superstring-943.css',
+  'beautiful-arrangement-526.css',
   'circular-subarray-918.css',
   'delete-and-earn-740.css',
   'least-operators-964.css',
