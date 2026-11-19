@@ -41,7 +41,7 @@ test('1923 opts into true line-by-line debugging', () => {
   assert.ok(run.steps.every((step) => step.title.vi.startsWith(`Dòng ${step.codeLines[0]}:`)));
   assert.equal(run.steps.filter((step) => step.final).length, 1);
   assert.equal(run.steps.at(-1).final, true);
-  assert.equal(run.steps.at(-1).hardProblemView.answer, 2);
+  assert.equal(run.steps.at(-1).common1923View.answer, 2);
 });
 
 test('1923 highlights only the binary-search branch that executed', () => {
@@ -58,10 +58,10 @@ test('1923 highlights only the binary-search branch that executed', () => {
   assert.ok(!activeLines.has(commentLine), 'the debugger must not stop on a comment');
 
   for (const step of run.steps) {
-    if (step.hardProblemView.formula.en.startsWith('low = mid')) {
+    if (step.common1923View.pending?.target === 'low') {
       assert.ok([ifLine, lowLine].includes(step.codeLines[0]));
     }
-    if (step.hardProblemView.formula.en.startsWith('high = mid')) {
+    if (step.common1923View.pending?.target === 'high') {
       assert.ok([ifLine, highLine].includes(step.codeLines[0]));
     }
   }
