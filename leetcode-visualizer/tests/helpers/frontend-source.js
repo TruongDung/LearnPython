@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-shift-grid-1260.js',
   'renderer-flipping-image-832.js',
   'renderer-consecutive-elements-3041.js',
   'renderer-jump-game-iv-1345.js',
@@ -248,6 +249,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'shift-grid-1260.css',
   'flipping-image-832.css',
   'consecutive-elements-3041.css',
   'jump-game-iv-1345.css',
