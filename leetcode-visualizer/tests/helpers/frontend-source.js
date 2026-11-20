@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-reshape-matrix-566.js',
   'renderer-shift-grid-1260.js',
   'renderer-flipping-image-832.js',
   'renderer-consecutive-elements-3041.js',
@@ -249,6 +250,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'reshape-matrix-566.css',
   'shift-grid-1260.css',
   'flipping-image-832.css',
   'consecutive-elements-3041.css',

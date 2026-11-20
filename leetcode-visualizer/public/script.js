@@ -236,6 +236,7 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.consecutive3041View), surface: "treeView", render: (step) => { renderConsecutive3041Pictures(step); } },
     { predicate: (step) => Boolean(step.flip832View), surface: "treeView", render: (step) => { renderFlip832Pictures(step); } },
     { predicate: (step) => Boolean(step.shift1260View), surface: "treeView", render: (step) => { renderShift1260Pictures(step); } },
+    { predicate: (step) => Boolean(step.reshape566View), surface: "treeView", render: (step) => { renderReshape566Pictures(step); } },
     { predicate: (step) => Boolean(step.matchsticks473View), surface: "treeView", render: (step) => { renderMatchsticks473View(step); } },
     { predicate: (step) => Boolean(step.pictureView || step.daily739View), surface: "treeView", render: (step) => { renderPictureLesson(step); } },
     { predicate: (step) => Boolean(step.subarray560View), surface: "treeView", render: (step) => {

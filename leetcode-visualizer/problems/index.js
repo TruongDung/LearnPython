@@ -49,6 +49,7 @@ Object.assign(categories.graph, require('./jump-game-iv-1345'));
 Object.assign(categories.dp, require('./consecutive-elements-3041'));
 Object.assign(categories.array, require('./flipping-image-832'));
 Object.assign(categories.array, require('./shift-grid-1260'));
+Object.assign(categories.array, require('./reshape-matrix-566'));
 Object.assign(categories.string, require('./beautiful-binary-2914'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.
