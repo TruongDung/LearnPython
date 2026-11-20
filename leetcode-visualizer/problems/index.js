@@ -46,6 +46,7 @@ Object.assign(categories.dp, require('./shortest-superstring-943'));
 Object.assign(categories.greedy, require('./minimum-score-2567'));
 Object.assign(categories.dp, require('./minimum-sideway-jumps-1824'));
 Object.assign(categories.graph, require('./jump-game-iv-1345'));
+Object.assign(categories.dp, require('./consecutive-elements-3041'));
 Object.assign(categories.string, require('./beautiful-binary-2914'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.

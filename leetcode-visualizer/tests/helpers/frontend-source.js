@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-consecutive-elements-3041.js',
   'renderer-jump-game-iv-1345.js',
   'renderer-common-subpath-1923.js',
   'renderer-minimum-sideway-jumps-1824.js',
@@ -246,6 +247,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'consecutive-elements-3041.css',
   'jump-game-iv-1345.css',
   'common-subpath-1923.css',
   'minimum-sideway-jumps-1824.css',
