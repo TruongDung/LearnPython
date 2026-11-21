@@ -189,6 +189,7 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.letterCase784View), surface: "treeView", render: (step) => { renderLetterCase784Pictures(step); } },
     { predicate: (step) => Boolean(step.combinations77View), surface: "treeView", render: (step) => { renderCombinations77Pictures(step); } },
     { predicate: (step) => Boolean(step.descendantSum1973View?.debug), surface: "treeView", render: (step) => { renderDescendants1973Pictures(step); } },
+    { predicate: (step) => Boolean(step.subtree3331View), surface: "treeView", render: (step) => { renderSubtreeSizes3331(step); } },
     { predicate: (step) => Boolean(step.genetic2003View), surface: "treeView", render: (step) => { renderGenetic2003Pictures(step); } },
     { predicate: (step) => Boolean(step.path1971View), surface: "treeView", render: (step) => { renderPath1971Pictures(step); } },
     { predicate: (step) => Boolean(step.perimeter463View), surface: "treeView", render: (step) => { renderPerimeter463Pictures(step); } },
@@ -1217,6 +1218,7 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.nary429View), surface: "treeView", render: (step) => {
       renderNary429View(step);
     } },
+    { predicate: (step) => Boolean(step.negative1351View), surface: "treeView", render: (step) => { renderNegative1351Pictures(step); } },
     { predicate: (step) => Boolean(step.rotation1886View), surface: "treeView", render: (step) => {
       renderRotation1886View(step);
     } },

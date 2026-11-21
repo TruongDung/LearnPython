@@ -77,6 +77,7 @@ Object.assign(categories['monotonic-stack'], require('./visible-people-grid-2282
 Object.assign(categories['monotonic-stack'], require('./shortest-unsorted-581'));
 Object.assign(categories['monotonic-stack'], require('./chunk-partitions-768-769'));
 Object.assign(categories['monotonic-stack'], require('./advanced-stack-pictures'));
+Object.assign(categories.graph, require('./subtree-sizes-3331'));
 Object.assign(categories.string, require('./remove-k-digits-402'));
 Object.assign(categories.hashmap, require('./circular-next-greater-503'));
 Object.assign(categories.heap, require('./busiest-servers-1606'));

@@ -1,0 +1,70 @@
+.s3331-viz {
+  --s3331-bg: #171e30;
+  --s3331-border: #35425b;
+  --s3331-text: #e3ebfc;
+  --s3331-muted: #a6b4cc;
+  --s3331-active: #b9adff;
+  --s3331-add: #62e0b2;
+  --s3331-remove: #ffa483;
+  --s3331-sum: #88ceff;
+  display: grid;
+  gap: 12px;
+  color: var(--s3331-text);
+}
+[data-theme="light"] .s3331-viz {
+  --s3331-bg: #f8faff;
+  --s3331-border: #c9d5e7;
+  --s3331-text: #1f304a;
+  --s3331-muted: #4b5f7c;
+  --s3331-active: #5f43c2;
+  --s3331-add: #087453;
+  --s3331-remove: #a64420;
+  --s3331-sum: #116291;
+}
+.s3331-header, .s3331-phases, .s3331-legend, .s3331-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.s3331-header code, .s3331-phases span, .s3331-strip span {
+  padding: 4px 8px;
+  border: 1px solid var(--s3331-border);
+  border-radius: 7px;
+  background: var(--s3331-bg);
+}
+.s3331-header code, .s3331-phases [aria-current] {
+  border-color: var(--s3331-active);
+  color: var(--s3331-active);
+}
+.s3331-phases { font-size: .8rem; color: var(--s3331-muted); }
+.s3331-trees { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.s3331-card { min-width: 0; border: 1px solid var(--s3331-border); border-radius: 12px; background: var(--s3331-bg); }
+.s3331-card h4 { margin: 12px 12px 2px; font-size: .85rem; }
+.s3331-scroll { display: flex; overflow: auto; max-height: 370px; }
+.s3331-scroll svg { display: block; flex: none; margin: auto; }
+.s3331-edge { fill: none; stroke: var(--s3331-border); stroke-width: 2; }
+.s3331-edge.path { stroke: var(--s3331-active); }
+.s3331-edge.removed { stroke: var(--s3331-remove); stroke-dasharray: 5 4; }
+.s3331-edge.added { stroke: var(--s3331-add); stroke-width: 3; }
+.s3331-edge.transfer { stroke: var(--s3331-sum); stroke-width: 3; }
+#subtree3331-arrow { fill: var(--s3331-sum); }
+.s3331-node circle { fill: var(--s3331-bg); stroke: var(--s3331-border); stroke-width: 2; }
+.s3331-node.current circle { stroke: var(--s3331-active); stroke-width: 3; }
+.s3331-node.target circle { stroke: var(--s3331-add); stroke-width: 3; }
+.s3331-node text { text-anchor: middle; fill: var(--s3331-text); font: 700 15px ui-monospace, monospace; }
+.s3331-node .s3331-index { font-size: 10px; fill: var(--s3331-muted); }
+.s3331-node .s3331-size { font-size: 13px; fill: var(--s3331-sum); }
+.s3331-legend { color: var(--s3331-muted); font-size: .75rem; gap: 12px; }
+.s3331-legend i { display: inline-block; width: 16px; margin-right: 5px; vertical-align: middle; }
+.s3331-legend .removed { border-top: 2px dashed var(--s3331-remove); }
+.s3331-legend .added { border-top: 2px solid var(--s3331-add); }
+.s3331-legend .transfer { border-top: 2px solid var(--s3331-sum); }
+.s3331-strip { gap: 5px; }
+.s3331-strip span { display: grid; min-width: 2.1em; text-align: center; }
+.s3331-strip small { color: var(--s3331-muted); }
+.s3331-strip .target { border-color: var(--s3331-add); color: var(--s3331-add); }
+@media (max-width: 480px) {
+  .s3331-trees { gap: 6px; }
+  .s3331-card h4 { margin-inline: 8px; }
+}
