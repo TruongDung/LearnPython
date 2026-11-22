@@ -1,203 +1,176 @@
 'use strict';
 
-const bi = (vi, en) => ({ vi, en });
+const bi = (vi, en) => ({vi, en});
 const maxNodes = 31;
 const defaultInput = '[-1,0,0,1,1,1]';
 const defaultLabels = 'abaabc';
-
 const code = [
+  'from typing import List',
+  '',
   'class Solution:',
-  '    def findSubtreeSizes(self, parent, s):',
+  '    def findSubtreeSizes(',
+  '        self, parent: List[int], s: str',
+  '    ) -> List[int]:',
   '        n = len(parent)',
-  '        children = [[] for _ in range(n)]',
-  '        for u in range(1, n):',
-  '            children[parent[u]].append(u)',
-  '        new_parent = parent[:]',
-  '        path = {c: [] for c in s}',
-  '        order = []',
-  '        stack = [(0, False)]',
-  '        while stack:',
-  '            u, exiting = stack.pop()',
-  '            same = path[s[u]]',
-  '            if exiting:',
-  '                same.pop()',
-  '                continue',
-  '            if same:',
-  '                new_parent[u] = same[-1]',
-  '            same.append(u)',
-  '            order.append(u)',
-  '            stack.append((u, True))',
-  '            for v in reversed(children[u]):',
-  '                stack.append((v, False))',
+  '        graph = [[] for _ in range(n)]',
+  '',
+  '        for i in range(1, n):',
+  '            graph[parent[i]].append(i)',
+  '',
   '        size = [1] * n',
-  '        for u in reversed(order[1:]):',
-  '            p = new_parent[u]',
-  '            size[p] += size[u]',
+  '        last = {}',
+  '',
+  '        def dfs(x):',
+  '            c = s[x]',
+  '',
+  '            # Find closest ancestor with same character',
+  '            new_parent = last.get(c, parent[x])',
+  '',
+  '            # Save previous ancestor for backtracking',
+  '            prev = last.get(c)',
+  '            last[c] = x',
+  '',
+  '            for child in graph[x]:',
+  '                dfs(child)',
+  '',
+  '            # Restore ancestor state',
+  '            if prev is None:',
+  '                del last[c]',
+  '            else:',
+  '                last[c] = prev',
+  '',
+  '            # Accumulate subtree size into new parent',
+  '            if new_parent != -1:',
+  '                size[new_parent] += size[x]',
+  '',
+  '        dfs(0)',
   '        return size',
 ];
 
-function parse(input, { s = defaultLabels } = {}) {
+function parse(input, {s = defaultLabels} = {}) {
   let parent;
-  try {
-    parent = Array.isArray(input) ? [...input] : JSON.parse(
-      input.trim().startsWith('[') ? input : '[' + input + ']',
-    );
-  } catch {
-    throw new TypeError('parent: [-1,0,0,1,…]');
+  try { parent = Array.isArray(input) ? [...input] : JSON.parse(input.trim().startsWith('[') ? input : '[' + input + ']'); }
+  catch { throw new TypeError('3331 · parent: [-1,0,0,1,…]'); }
+  if (!Array.isArray(parent) || parent.length < 1 || parent.length > maxNodes || parent[0] !== -1 ||
+      !parent.slice(1).every(p => Number.isInteger(p) && p >= 0 && p < parent.length)) {
+    throw new RangeError(`3331 · parent: 1–${maxNodes} nodes, parent[0] = -1`);
   }
-  if (!Array.isArray(parent) || parent.length < 1 || parent.length > maxNodes ||
-      parent[0] !== -1 || !parent.slice(1).every(p => Number.isInteger(p) && p >= 0 && p < parent.length)) {
-    throw new RangeError(`parent: 1–${maxNodes} nodes, parent[0] = -1`);
-  }
-  if (typeof s !== 'string' || !/^[a-z]+$/.test(s) || s.length !== parent.length) {
-    throw new TypeError('s: a–z, len(s) = len(parent)');
-  }
+  if (typeof s !== 'string' || /[^a-z]/.test(s) || s.length !== parent.length) throw new TypeError('3331 · s: a–z, len(s) = len(parent)');
   const children = parent.map(() => []);
-  for (let u = 1; u < parent.length; u++) children[parent[u]].push(u);
+  for (let x = 1; x < parent.length; x++) children[parent[x]].push(x);
   const reachable = [0];
   for (let i = 0; i < reachable.length; i++) reachable.push(...children[reachable[i]]);
-  if (reachable.length !== parent.length) throw new RangeError('parent: tree rooted at 0');
-  return { parent, s };
+  if (reachable.length !== parent.length) throw new RangeError('3331 · parent: tree rooted at 0');
+  return {parent, s};
 }
 
 function build(input, params) {
-  const { parent, s } = parse(input, params);
+  const {parent, s} = parse(input, params);
   const n = parent.length;
   const steps = [];
-  let children, newParent, path, order, stack, size, u, v, p, exiting, same;
-  let phase = 'setup';
-  let current;
-  function emit(line, title, extra = {}) {
-    const locals = {
-      n, u, v, p, exiting,
-      same: same?.slice(),
-      new_parent: newParent?.slice(),
-      order: order?.slice(),
-      stack: stack?.slice(),
-      size: size?.slice(),
-    };
+  const globals = {n};
+  const frames = [];
+  const newParent = [...parent];
+  const decided = [];
+  const finished = [];
+  let graph;
+  let size;
+  let last;
+  let built = 0;
+  let buildCurrent = null;
+  const copy = value => JSON.parse(JSON.stringify(value));
+  const emit = (line, phase, title, extra = {}) => {
+    const frame = frames.at(-1);
+    const locals = {...globals, ...(graph ? {graph} : {}), ...(size ? {size} : {}), ...(last ? {last} : {}), ...frame};
     steps.push({
-      arr: [],
-      title: typeof title === 'string' ? bi(title, title) : title,
-      note: bi('', ''),
-      codeLines: [line],
-      codeBlock: 1,
-      final: line === 28,
-      vars: Object.entries(locals).filter(([, value]) => value !== undefined)
-        .map(([name, value]) => ({ name, value })),
+      arr: [], codeLines: [line], codeBlock: 1, title: typeof title === 'string' ? bi(title, title) : title,
+      note: bi('', ''), final: line === 40,
+      vars: Object.entries(locals).map(([name, value]) => ({name, value: copy(value)})),
       subtree3331View: {
-        line, phase, parent, s, current,
-        same: same?.slice() ?? [],
-        newParent: locals.new_parent ?? parent,
-        size: locals.size,
-        ...extra,
+        line, source: code[line - 1].trim(), phase, parent: [...parent], s, built,
+        current: frame?.x ?? buildCurrent,
+        frames: copy(frames), last: last ? {...last} : null,
+        newParent: [...newParent], decided: [...decided], finished: [...finished],
+        size: size ? [...size] : null,
+        condition: null, transfer: null, ...extra,
       },
     });
+  };
+  emit(7, 'setup', `n = ${n}`);
+  graph = Array.from({length: n}, () => []);
+  emit(8, 'setup', bi('Tạo graph của cây gốc', 'Create the original tree graph'));
+  for (let i = 1; i < n; i++) {
+    globals.i = i; buildCurrent = i;
+    emit(10, 'build', `i = ${i}`);
+    graph[parent[i]].push(i); built++;
+    emit(11, 'build', `${parent[i]} → ${i}`);
   }
-
-  emit(3, `n = ${n}`);
-  children = parent.map(() => []);
-  emit(4, 'children = [[], …]');
-  for (u = 1; u < n; u++) {
-    current = u;
-    emit(5, `u = ${u}`);
-    children[parent[u]].push(u);
-    emit(6, `${parent[u]} → ${u}`);
-  }
-  u = n > 1 ? n - 1 : undefined;
-  current = undefined;
-  emit(5, bi('Đã tạo các cạnh', 'Edges ready'));
-  newParent = parent.slice();
-  emit(7, 'new_parent = parent[:]');
-
-  phase = 'move';
-  path = new Map([...s].map(c => [c, []]));
-  emit(8, 'path = {…}');
-  order = [];
-  emit(9, 'order = []');
-  stack = [[0, false]];
-  emit(10, 'stack = [(0, False)]');
-  while (stack.length) {
-    emit(11, 'stack ≠ ∅');
-    [u, exiting] = stack.pop();
-    current = u;
-    emit(12, `${exiting ? '↑' : '↓'} ${u}`);
-    same = path.get(s[u]);
-    emit(13, `path['${s[u]}'] = [${same.join(', ')}]`, { match: exiting ? undefined : same.at(-1) });
-    emit(14, `exiting = ${exiting ? 'True' : 'False'}`);
-    if (exiting) {
-      same.pop();
-      emit(15, `path['${s[u]}'].pop() → ${u}`);
-      emit(16, 'continue');
-      continue;
-    }
-    const match = same.at(-1);
-    emit(17, match === undefined ? 'same = ∅' : `${match} · ${s[u]}`, { match });
-    if (match !== undefined) {
-      newParent[u] = match;
-      emit(18, `new_parent[${u}] = ${match}`, { match });
-    }
-    same.push(u);
-    emit(19, `path['${s[u]}'] ← ${u}`);
-    order.push(u);
-    emit(20, `order ← ${u}`);
-    stack.push([u, true]);
-    emit(21, `stack ← (${u}, True)`);
-    for (const child of children[u].slice().reverse()) {
-      v = child;
-      emit(22, `v = ${v}`);
-      stack.push([v, false]);
-      emit(23, `stack ← (${v}, False)`);
-    }
-    emit(22, bi('Đã xếp các con', 'Children queued'));
-  }
-  current = undefined;
-  emit(11, 'stack = ∅');
-
-  phase = 'count';
+  buildCurrent = null;
+  emit(10, 'build', bi('Đã dựng cây gốc', 'Original tree ready'));
   size = Array(n).fill(1);
-  emit(24, 'size = [1, …]');
-  for (u of order.slice(1).reverse()) {
-    current = u;
-    emit(25, `u = ${u}`);
-    p = newParent[u];
-    emit(26, `p = ${p}`);
-    const previous = size[p];
-    size[p] += size[u];
-    emit(27, `${previous} + ${size[u]} = ${size[p]}`, { transfer: { from: u, to: p } });
+  emit(13, 'init', 'size = [1, …]');
+  last = {};
+  emit(14, 'init', 'last = {}');
+  emit(16, 'define', bi('Định nghĩa dfs(x)', 'Define dfs(x)'));
+
+  function dfs(x) {
+    const frame = {x};
+    frames.push(frame);
+    frame.c = s[x];
+    emit(17, 'enter', `dfs(${x}) · c = '${frame.c}'`);
+    frame.new_parent = Object.hasOwn(last, frame.c) ? last[frame.c] : parent[x];
+    newParent[x] = frame.new_parent;
+    decided.push(x);
+    emit(20, 'find', frame.new_parent === -1 ? bi('Node gốc: không có cha', 'Root: no parent')
+      : Object.hasOwn(last, frame.c) ? bi(`Cùng '${frame.c}' gần nhất: #${frame.new_parent}`, `Nearest '${frame.c}': #${frame.new_parent}`)
+      : bi(`Không trùng chữ: giữ cha #${parent[x]}`, `No matching ancestor: keep parent #${parent[x]}`), {matched: Object.hasOwn(last, frame.c)});
+    frame.prev = Object.hasOwn(last, frame.c) ? last[frame.c] : null;
+    emit(23, 'save', `prev = ${frame.prev === null ? 'None' : frame.prev}`);
+    last[frame.c] = x;
+    emit(24, 'push', `last['${frame.c}'] = ${x}`);
+    for (const child of graph[x]) {
+      frame.child = child;
+      emit(26, 'child', `child = ${child}`);
+      emit(27, 'call', `dfs(${child})`);
+      dfs(child);
+    }
+    emit(26, 'children-done', bi(`Các con của #${x} đã xong`, `Children of #${x} complete`));
+    emit(30, 'restore-check', `prev is None → ${frame.prev === null ? 'True' : 'False'}`, {condition: frame.prev === null});
+    if (frame.prev === null) {
+      delete last[frame.c];
+      emit(31, 'restore', `del last['${frame.c}']`);
+    } else {
+      last[frame.c] = frame.prev;
+      emit(33, 'restore', `last['${frame.c}'] = ${frame.prev}`);
+    }
+    emit(36, 'add-check', `new_parent != -1 → ${frame.new_parent !== -1 ? 'True' : 'False'}`, {condition: frame.new_parent !== -1});
+    if (frame.new_parent !== -1) {
+      const before = size[frame.new_parent];
+      const amount = size[x];
+      size[frame.new_parent] += amount;
+      finished.push(x);
+      emit(37, 'add', `size[${frame.new_parent}]: ${before} + ${amount} = ${size[frame.new_parent]}`, {
+        transfer: {from: x, to: frame.new_parent, before, amount, after: size[frame.new_parent]},
+      });
+    } else finished.push(x);
+    frames.pop();
   }
-  current = undefined;
-  emit(25, bi('Đã cộng về gốc', 'Sizes accumulated'));
-  emit(28, `size = [${size.join(', ')}]`);
-  return { original: { parent, s }, answer: size, steps };
+  emit(39, 'start', 'dfs(0)');
+  dfs(0);
+  emit(40, 'done', `size = [${size.join(', ')}]`);
+  return {original: {parent, s}, answer: [...size], steps};
 }
 
-module.exports = {
-  3331: {
-    id: 3331,
-    title: bi('Find Subtree Sizes After Changes', 'Find Subtree Sizes After Changes'),
-    titleVi: bi('Kích thước cây con sau khi đổi cha', 'Find Subtree Sizes After Changes'),
-    slug: 'find-subtree-sizes-after-changes',
-    difficulty: 'medium',
-    category: { key: 'tree', vi: 'Cây', en: 'Tree' },
-    tags: [{ key: 'dfs', vi: 'DFS', en: 'DFS' }],
-    statement: bi(
-      'Trên cây gốc, tìm tổ tiên gần nhất cùng chữ cho mỗi node. Đổi cha đồng thời rồi đếm kích thước cây con.',
-      'On the original tree, find each node’s nearest ancestor with the same letter. Reparent simultaneously, then count subtree sizes.',
-    ),
-    defaultInput,
-    inputKind: 'string',
-    inputLabel: bi(`parent (tối đa ${maxNodes} node)`, `parent (up to ${maxNodes} nodes)`),
-    extraParams: [{ key: 's', type: 'string', label: bi('s (chữ trên node)', 's (node labels)'), default: defaultLabels }],
-    visualizationLimits: { maxNodes },
-    debugMode: 'line-by-line',
-    approach: [bi('DFS trên cây gốc → chọn cha mới → cộng kích thước từ dưới lên.', 'DFS on the original tree → choose new parents → add sizes bottom-up.')],
-    complexity: { time: 'O(n)', space: 'O(n)' },
-    code,
-    builder: build,
-    liveArgs(input, params) {
-      const { parent, s } = parse(input, params);
-      return [parent, s];
-    },
-  },
-};
+module.exports = {3331: {
+  id: 3331, title: bi('Find Subtree Sizes After Changes', 'Find Subtree Sizes After Changes'),
+  titleVi: bi('Kích thước cây con sau khi đổi cha', 'Subtree sizes after reparenting'),
+  slug: 'find-subtree-sizes-after-changes', difficulty: 'medium',
+  category: {key: 'tree', vi: 'Cây', en: 'Tree'}, tags: [{key: 'dfs', vi: 'DFS', en: 'DFS'}],
+  statement: bi('Mỗi node đổi cha sang tổ tiên gần nhất cùng chữ trên cây gốc; nếu không có thì giữ cha. Các thay đổi diễn ra đồng thời. Trả về kích thước cây con mới của từng node.', 'Each node moves to its nearest same-letter ancestor in the original tree, keeping its parent if none exists. All changes happen simultaneously. Return the new subtree sizes.'),
+  defaultInput, inputKind: 'string', inputLabel: bi(`parent · tối đa ${maxNodes} node`, `parent · up to ${maxNodes} nodes`),
+  extraParams: [{key: 's', type: 'string', label: bi('s · chữ trên node', 's · node labels'), default: defaultLabels}],
+  visualizationLimits: {maxNodes}, debugMode: 'line-by-line',
+  approach: [bi('DFS cây gốc: lưu last → duyệt con → khôi phục last → cộng size vào new_parent.', 'DFS the original tree: save last → visit children → restore last → add size to new_parent.')],
+  complexity: {time: 'O(n)', space: 'O(n)'}, code, builder: build,
+  liveArgs(input, params) { const {parent, s} = parse(input, params); return [parent, s]; },
+}};

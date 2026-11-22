@@ -3072,8 +3072,12 @@ function renderCode() {
     split.classList.toggle("problem-2058-layout", problemId === 2058);
     split.classList.toggle("problem-2101-layout", problemId === 2101);
     split.classList.toggle("problem-2124-layout", problemId === 2124);
+    split.classList.toggle("problem-1653-layout", problemId === 1653);
+    split.classList.toggle("problem-3331-layout", problemId === 3331);
   }
   if (typeof setupABeforeB2124CodeTheme === "function") setupABeforeB2124CodeTheme();
+  if (typeof setupBalancedString1653CodeTheme === "function") setupBalancedString1653CodeTheme();
+  if (typeof setupSubtree3331CodeTheme === "function") setupSubtree3331CodeTheme();
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   const code = localizedCode || (problemData && problemData.code) || [];
   const code2 = (problemData && problemData.code2) || null;
