@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.aBeforeB2124View), surface: "treeView", render: (step) => { renderABeforeB2124View(step); } },
     { predicate: (step) => Boolean(step.prefixCollisionView), surface: "treeView", render: (step) => { renderPrefixCollisionPictures(step); } },
     { predicate: (step) => Boolean(step.rectangleBound363View), surface: "treeView", render: (step) => { renderRectangleBound363(step); } },
     { predicate: (step) => Boolean(step.rewardFive3181View), surface: "treeView", render: (step) => { renderRewardFive3181(step); } },

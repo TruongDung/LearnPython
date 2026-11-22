@@ -3071,7 +3071,9 @@ function renderCode() {
     split.classList.toggle("problem-685-layout", problemId === 685);
     split.classList.toggle("problem-2058-layout", problemId === 2058);
     split.classList.toggle("problem-2101-layout", problemId === 2101);
+    split.classList.toggle("problem-2124-layout", problemId === 2124);
   }
+  if (typeof setupABeforeB2124CodeTheme === "function") setupABeforeB2124CodeTheme();
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   const code = localizedCode || (problemData && problemData.code) || [];
   const code2 = (problemData && problemData.code2) || null;
