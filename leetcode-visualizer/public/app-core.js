@@ -3074,10 +3074,12 @@ function renderCode() {
     split.classList.toggle("problem-2124-layout", problemId === 2124);
     split.classList.toggle("problem-1653-layout", problemId === 1653);
     split.classList.toggle("problem-3331-layout", problemId === 3331);
+    split.classList.toggle("problem-trie-pictures-layout", problemId === 208 || problemId === 3045);
   }
   if (typeof setupABeforeB2124CodeTheme === "function") setupABeforeB2124CodeTheme();
   if (typeof setupBalancedString1653CodeTheme === "function") setupBalancedString1653CodeTheme();
   if (typeof setupSubtree3331CodeTheme === "function") setupSubtree3331CodeTheme();
+  if (typeof setupTriePictureCodeTheme === "function") setupTriePictureCodeTheme(problemId);
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   const code = localizedCode || (problemData && problemData.code) || [];
   const code2 = (problemData && problemData.code2) || null;

@@ -1,0 +1,25 @@
+.ps3045-word { margin-top:12px;padding:10px 12px;border:1px solid var(--tp-border);border-radius:10px;background:var(--tp-soft);min-width:0; }
+.ps3045-word > header { display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px; }
+.ps3045-word > header span { font-size:12px;color:var(--tp-muted); }
+.ps3045-pairs { position:relative;display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:thin;padding:9px 3px 5px; }
+.ps3045-pair { display:flex;align-items:center;flex-direction:column;min-width:36px;flex:none;border:1px solid var(--tp-border);border-radius:8px;padding:4px 5px;background:var(--tp-bg); }
+.ps3045-pair.current { outline:2px solid var(--tp-active);outline-offset:1px; }
+.ps3045-pair.visited { border-color:var(--tp-blue); }
+.ps3045-pair small { font:11px monospace;color:var(--tp-muted); }
+.ps3045-pair b { font:700 24px monospace; }
+.ps3045-pair .front { color:var(--tp-active); }
+.ps3045-pair .back { color:var(--tp-blue); }
+.ps3045-link { color:var(--tp-muted);font-size:12px;line-height:1.1; }
+.ps3045-sum,.ps3045-terminal { display:flex;flex-direction:column;gap:4px; }
+.ps3045-sum small,.ps3045-terminal small { color:var(--tp-muted);font:12px monospace; }
+.ps3045-sum strong { font:700 22px monospace; }
+.ps3045-sum strong b { color:var(--tp-good); }
+.ps3045-terminal { text-align:center; }
+.ps3045-terminal strong { color:var(--tp-good);font:700 25px monospace; }
+.ps3045-matches { padding:10px 12px;margin-top:12px;border:1px solid var(--tp-border);border-radius:10px; }
+.ps3045-matches header { display:flex;justify-content:space-between;font-size:14px; }
+.ps3045-matches > div { display:flex;gap:7px;overflow-x:auto;padding:8px 0 3px;scrollbar-width:thin; }
+.ps3045-match { display:flex;flex-direction:column;gap:3px;flex:none;padding:6px 8px;border:1px solid var(--tp-border);border-radius:7px;background:var(--tp-soft); }
+.ps3045-match small,.ps3045-match > span,.ps3045-matches > small { color:var(--tp-muted);font-size:11px; }
+.ps3045-match > b { color:var(--tp-good);font:700 17px monospace; }
+.ps3045-match.fresh { border-color:var(--tp-good); }
