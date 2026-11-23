@@ -78,6 +78,7 @@ Object.assign(categories['monotonic-stack'], require('./preorder-list-pictures')
 Object.assign(categories['monotonic-stack'], require('./stack-sequences-pictures'));
 Object.assign(categories['monotonic-stack'], require('./stack-boundaries-paths'));
 Object.assign(categories['monotonic-stack'], require('./stack-jump-grid-pictures'));
+Object.assign(categories['monotonic-stack'], require('./all-ones-submatrices-1504'));
 Object.assign(categories['monotonic-stack'], require('./maximum-binary-tree-654'));
 Object.assign(categories['monotonic-stack'], require('./visible-people-grid-2282'));
 Object.assign(categories['monotonic-stack'], require('./shortest-unsorted-581'));
