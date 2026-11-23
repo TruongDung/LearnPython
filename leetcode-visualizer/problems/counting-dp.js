@@ -1250,6 +1250,7 @@ Object.assign(module.exports, {
     slug: "find-x-value-of-array-ii",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     tags: [
+      { key: "prefix-product", vi: "Tích prefix", en: "Prefix Product" },
       { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
       { key: "math", vi: "Toán học", en: "Math" },
       { key: "counting", vi: "Đếm", en: "Counting" },
