@@ -126,7 +126,7 @@ function builder(input) {
 module.exports = { 1352: {
   id: 1352, slug: 'product-of-the-last-k-numbers', difficulty: 'medium',
   category: { key: 'design', vi: 'Thiết kế hệ thống', en: 'Design' },
-  tags: [{ key: 'prefix-sum', vi: 'Prefix Sum', en: 'Prefix Sum' }, { key: 'array', vi: 'Mảng', en: 'Array' }],
+  tags: [{ key: 'prefix-product', vi: 'Tích prefix', en: 'Prefix Product' }, { key: 'prefix-sum', vi: 'Prefix Sum', en: 'Prefix Sum' }, { key: 'array', vi: 'Mảng', en: 'Array' }],
   title: bi('Product of the Last K Numbers', 'Product of the Last K Numbers'),
   titleVi: bi('Tích của k số cuối trong luồng', 'Product of the last k values in a stream'),
   statement: bi('add(num) thêm một số. getProduct(k) trả tích của k số cuối. Khởi tạo ProductOfNumbers() tự động; kết quả liệt kê các lệnh bên dưới.', 'add(num) appends a value. getProduct(k) returns the product of the last k values. ProductOfNumbers() is initialized automatically; results correspond to the operations below.'),
