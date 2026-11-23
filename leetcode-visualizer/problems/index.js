@@ -57,6 +57,8 @@ Object.assign(categories.trie, require('./prefix-suffix-pairs-3045'));
 Object.assign(categories.trie, require('./trie-pictures-208'));
 Object.assign(categories.trie, require('./memory-file-system-588'));
 Object.assign(categories.bitmask, require('./excellent-pairs-2354'));
+Object.assign(categories.hashmap, require('./maximum-equal-frequency-1224'));
+Object.assign(categories.design, require('./product-last-k-1352'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.
 Object.assign(categories.array,
@@ -80,6 +82,7 @@ Object.assign(categories['monotonic-stack'], require('./stack-boundaries-paths')
 Object.assign(categories['monotonic-stack'], require('./stack-jump-grid-pictures'));
 Object.assign(categories['monotonic-stack'], require('./all-ones-submatrices-1504'));
 Object.assign(categories['monotonic-stack'], require('./increment-layers-1526'));
+Object.assign(categories['monotonic-stack'], require('./maximum-ranges-2832'));
 Object.assign(categories.array, require('./equal-xy-submatrices-3212'));
 Object.assign(categories['monotonic-stack'], require('./maximum-binary-tree-654'));
 Object.assign(categories['monotonic-stack'], require('./visible-people-grid-2282'));
