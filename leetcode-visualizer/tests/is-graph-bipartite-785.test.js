@@ -3,6 +3,9 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 
 const problem = require("../problems").SUPPORTED[785];
 
@@ -124,4 +127,73 @@ test("785 DFS line mapping follows recursion, conflict, propagation, and returns
   assert.ok(fail.steps.some((step) => step.bipartiteView.decision === "conflict" && step.codeLines.includes(14) && step.codeLines.includes(15)));
   assert.ok(fail.steps.some((step) => step.bipartiteView.decision === "propagate-false" && step.codeLines.includes(11) && step.codeLines.includes(12)));
   assert.deepEqual(fail.steps.at(-1).codeLines, [21, 22]);
+});
+
+function makeRenderer(language = "en") {
+  const element = {};
+  const context = vm.createContext({
+    lang: language,
+    $: () => element,
+    escapeHtml: value => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;"),
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/renderers-01.js"), "utf8"), context);
+  return step => {
+    context.renderBipartiteView(step);
+    return element.innerHTML;
+  };
+}
+
+test("785 renders actual node colours and a persistent conflict witness for both approaches", () => {
+  const render = makeRenderer();
+  for (const approach of [1, 2]) {
+    const run = problem.builder(JSON.stringify(cases[1][0]), { approach });
+    const conflictStep = run.steps.find(step => step.bipartiteView.conflictEdge);
+    const { u, v, color } = conflictStep.bipartiteView.conflictEdge;
+    for (const step of run.steps.filter(step => step.bipartiteView.conflictEdge)) {
+      const html = render(step);
+      assert.match(html, /Same colour → False/);
+      assert.match(html, new RegExp(`bip785-edge conflict" data-edge="(?:${u}-${v}|${v}-${u})"`));
+      for (const node of [u, v]) {
+        assert.match(html, new RegExp(`bip785-node c${color}[^\"]* conflict" data-node="${node}"`));
+      }
+    }
+  }
+});
+
+test("785 distinguishes a pending DFS colour from the colour assigned on entry", () => {
+  const run = problem.builder(JSON.stringify(cases[0][0]), { approach: 2 });
+  const index = run.steps.findIndex(step => step.bipartiteView.decision === "recurse");
+  const node = run.steps[index].bipartiteView.activeNeighbor;
+  const render = makeRenderer();
+  const pending = render(run.steps[index]);
+  assert.match(pending, new RegExp(`bip785-node none[^\"]*" data-node="${node}"`));
+  assert.match(pending, /Flip the neighbour's colour/);
+  assert.match(pending, /uncoloured/);
+  assert.match(render(run.steps[index + 1]), new RegExp(`bip785-node c1[^\"]*" data-node="${node}"`));
+});
+
+test("785 renders every frame in both languages with stable geometry and faithful queue state", () => {
+  for (const language of ["en", "vi"]) {
+    const render = makeRenderer(language);
+    for (const approach of [1, 2]) {
+      for (const [graph] of [...cases, [Array.from({ length: 12 }, () => []), true]]) {
+        const run = problem.builder(JSON.stringify(graph), { approach });
+        let topology;
+        for (const step of run.steps) {
+          const html = render(step);
+          assert.doesNotMatch(html, /undefined|NaN|Infinity/);
+          const nodes = [...html.matchAll(/data-node="(\d+)" transform="([^"]+)"/g)].map(match => [match[1], match[2]]);
+          assert.equal(nodes.length, graph.length);
+          if (topology) assert.deepEqual(nodes, topology);
+          topology = nodes;
+          assert.match(html, /<details class="bip785-adj">/);
+          if (approach === 1 && step.bipartiteView.decision === "dequeue") {
+            assert.match(html, /bip785-processing/);
+            assert.ok(!step.bipartiteView.queue.includes(step.bipartiteView.activeNode));
+          }
+        }
+        assert.match(render(run.steps.at(-1)), new RegExp(`bip785-status ${run.answer ? "true" : "false"}`));
+      }
+    }
+  }
 });

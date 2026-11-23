@@ -2718,24 +2718,48 @@ function renderBipartiteView(step) {
   const frontier = Array.isArray(view.queue) ? view.queue : [];
   const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
   const activeNeighbor = Number.isInteger(view.activeNeighbor) ? view.activeNeighbor : null;
-  const startNode = Number.isInteger(view.startNode) ? view.startNode : null;
   const conflict = view.conflictEdge || null;
   const conflictNodes = new Set(conflict ? [conflict.u, conflict.v] : []);
 
-  // ── Phase bar ───────────────────────────────────────────────────────────
-  const stage = ["intro", "init"].includes(view.phase) ? 0 : view.phase === "done" ? 2 : 1;
-  const stageLabels = vi
-    ? ["Khởi tạo color[]", isDfs ? "DFS tô 2 màu" : "BFS tô 2 màu", "Kết luận"]
-    : ["Init color[]", isDfs ? "DFS 2-colouring" : "BFS 2-colouring", "Conclusion"];
-  const phases = stageLabels.map((label, i) => {
-    const state = i < stage ? "done" : i === stage ? "active" : "";
-    return `<span class="${state}">${i < stage ? "✓" : i + 1}<b>${escapeHtml(label)}</b></span>`;
-  }).join("");
+  // Keep the topology fixed while colouring. Focus rings never replace a node's
+  // actual colour: two equal colours must still look equal at a conflict.
+  const tone = (node) => color[node] === 0 ? "c0" : color[node] === 1 ? "c1" : "none";
+  const colourLabel = (node) => color[node] === -1
+    ? (vi ? "chưa tô" : "uncoloured") : `${vi ? "màu" : "colour"} ${color[node]}`;
+  const edgeIs = (u, v, a, b) => (u === a && v === b) || (u === b && v === a);
+  const size = n > 8 ? 480 : 360;
+  const radius = n === 1 ? 0 : n > 8 ? 180 : 112;
+  const positions = Array.from({ length: n }, (_, id) => {
+    const angle = -Math.PI / 2 + id * Math.PI * 2 / n;
+    return { x: size / 2 + radius * Math.cos(angle), y: size / 2 + radius * Math.sin(angle) };
+  });
+  const edges = [];
+  const seenEdges = new Set();
+  adj.forEach((neighbors, u) => neighbors.forEach((v) => {
+    const key = [Math.min(u, v), Math.max(u, v)].join("-");
+    if (seenEdges.has(key)) return;
+    seenEdges.add(key);
+    const bad = conflict && edgeIs(u, v, conflict.u, conflict.v);
+    const current = edgeIs(u, v, activeNode, activeNeighbor);
+    edges.push({ u, v, state: bad ? "conflict" : current ? "current" : "" });
+  }));
+  // Draw the focused edge last so it stays visible in a dense graph.
+  edges.sort((a, b) => Number(Boolean(a.state)) - Number(Boolean(b.state)));
+  const graphHtml = `<svg class="bip785-svg" viewBox="0 0 ${size} ${size}" role="img" aria-label="${vi ? "Đồ thị: số lớn là đỉnh, số nhỏ là màu" : "Graph: large numbers are nodes, small numbers are colours"}">
+    <title>${vi ? "Tô hai màu; mọi cạnh phải nối hai màu khác nhau" : "Two-colour the graph; every edge must join different colours"}</title>
+    ${edges.map(({ u, v, state }) => `<line class="bip785-edge ${state}" data-edge="${u}-${v}" x1="${positions[u].x}" y1="${positions[u].y}" x2="${positions[v].x}" y2="${positions[v].y}"><title>${u} — ${v}${state === "conflict" ? (vi ? ": cùng màu, vi phạm" : ": same colour, conflict") : ""}</title></line>`).join("")}
+    ${positions.map((p, id) => `<g class="bip785-node ${tone(id)}${id === activeNode ? " active" : ""}${id === activeNeighbor ? " neighbor" : ""}${conflictNodes.has(id) ? " conflict" : ""}" data-node="${id}" transform="translate(${p.x},${p.y})">
+      <title>${vi ? "Đỉnh" : "Node"} ${id}: ${colourLabel(id)}${id === activeNode ? (vi ? ", đang xét" : ", current") : id === activeNeighbor ? (vi ? ", hàng xóm" : ", neighbour") : ""}</title>
+      <circle class="bip785-ring" r="31"/><circle class="bip785-disc" r="25"/>
+      <text class="bip785-id" text-anchor="middle" y="1">${id}</text>
+      <text class="bip785-node-colour" text-anchor="middle" y="16">${color[id] === -1 ? "?" : `c${color[id]}`}</text>
+    </g>`).join("")}
+  </svg>`;
 
   // ── The two sets: the whole point of the problem ────────────────────────
   const setNodes = (c) => color.map((v, i) => (v === c ? i : -1)).filter((i) => i >= 0);
   const setChip = (i) => {
-    const cls = ["bip785-chip"];
+    const cls = ["bip785-chip", tone(i)];
     if (i === activeNode) cls.push("active");
     if (i === activeNeighbor) cls.push("neighbor");
     if (conflictNodes.has(i)) cls.push("conflict");
@@ -2745,9 +2769,8 @@ function renderBipartiteView(step) {
   const setB = setNodes(1);
   const uncoloured = color.map((v, i) => (v === -1 ? i : -1)).filter((i) => i >= 0);
   const partitionHtml = `<div class="bip785-sets">
-    <section class="bip785-set c0"><header><strong>${vi ? "TẬP 0" : "SET 0"}</strong><span>${setA.length}</span></header><div>${setA.map(setChip).join("") || `<em>∅</em>`}</div></section>
-    <div class="bip785-vs">${conflict ? "✕" : "|"}</div>
-    <section class="bip785-set c1"><header><strong>${vi ? "TẬP 1" : "SET 1"}</strong><span>${setB.length}</span></header><div>${setB.map(setChip).join("") || `<em>∅</em>`}</div></section>
+    <section class="bip785-set c0"><header><strong>${vi ? "Tập A · màu 0" : "Set A · colour 0"}</strong></header><div>${setA.map(setChip).join("") || `<em>∅</em>`}</div></section>
+    <section class="bip785-set c1"><header><strong>${vi ? "Tập B · màu 1" : "Set B · colour 1"}</strong></header><div>${setB.map(setChip).join("") || `<em>∅</em>`}</div></section>
   </div>
   ${uncoloured.length ? `<div class="bip785-uncoloured"><small>${vi ? "chưa tô" : "uncoloured"}</small><div>${uncoloured.map(setChip).join("")}</div></div>` : ""}`;
 
@@ -2757,14 +2780,14 @@ function renderBipartiteView(step) {
     if (i === activeNode) cls.push("active");
     if (i === activeNeighbor) cls.push("neighbor");
     if (conflictNodes.has(i)) cls.push("conflict");
-    return `<div class="${cls.join(" ")}"><small>${i}</small><strong>${c === -1 ? "−1" : c}</strong></div>`;
+    return `<div class="${cls.join(" ")}"><small>${vi ? "đỉnh" : "node"} ${i}</small><strong>${c === -1 ? "−1" : c}</strong></div>`;
   }).join("");
 
   // ── Frontier (queue for BFS / call stack for DFS) ───────────────────────
   const frontierLabel = isDfs ? "call stack" : "queue";
   const frontierHint = isDfs
-    ? (vi ? "khung trên cùng đang chạy" : "top frame is running")
-    : (vi ? "front được pop trước" : "front pops first");
+    ? (vi ? "Đáy → đỉnh stack; khung cuối đang chạy" : "Bottom → top; last frame is running")
+    : (vi ? "Đầu → cuối; lấy bên trái trước" : "Front → back; leftmost is next");
   const frontierHtml = frontier.length
     ? frontier.map((item, i) => {
       const front = isDfs ? i === frontier.length - 1 : i === 0;
@@ -2802,7 +2825,7 @@ function renderBipartiteView(step) {
     "start-component": vi ? "Component mới: gán màu 0 cho node bắt đầu (chọn màu nào cũng được)." : "New component: give the start node colour 0 (either choice works).",
     dequeue: vi ? "Lấy node ra khỏi queue để xét các hàng xóm." : "Dequeue a node to inspect its neighbours.",
     "colour-node": vi ? "Tô node hiện tại rồi đi xét từng hàng xóm." : "Colour the current node, then inspect each neighbour.",
-    "colour-neighbour": vi ? "Hàng xóm chưa tô → tô màu ĐẢO rồi thêm vào frontier." : "Neighbour is uncoloured → assign the FLIPPED colour and add it to the frontier.",
+    "colour-neighbour": vi ? "Hàng xóm chưa tô → tô màu ngược rồi thêm vào cuối queue." : "Neighbour is uncoloured → assign the opposite colour and enqueue it.",
     recurse: vi ? "Đi sâu vào hàng xóm với màu đảo." : "Recurse into the neighbour with the flipped colour.",
     "already-ok": vi ? "Hàng xóm đã tô và khác màu → cạnh này hợp lệ." : "Neighbour is already coloured and differs → this edge is fine.",
     conflict: vi ? "Cạnh nối hai node CÙNG màu → có chu trình lẻ → không bipartite." : "This edge joins two nodes of the SAME colour → odd cycle → not bipartite.",
@@ -2816,44 +2839,41 @@ function renderBipartiteView(step) {
   const rv = view.returnValue;
   const decCls = rv === true ? "true" : rv === false ? "false" : "";
   const isDone = view.phase === "done";
-  const rvLabel = rv === null || rv === undefined ? (vi ? "chưa return" : "no return yet") : String(rv);
-
-  const conflictBanner = conflict
-    ? `<div class="bip785-conflict"><b>${vi ? "CẠNH VI PHẠM" : "VIOLATING EDGE"}</b><code>${conflict.u} — ${conflict.v}</code><span>${vi ? `cả hai đều màu ${conflict.color}` : `both are colour ${conflict.color}`}</span></div>`
-    : "";
+  const focusU = conflict ? conflict.u : activeNode;
+  const focusV = conflict ? conflict.v : activeNeighbor;
+  const hasPair = focusU !== null && focusV !== null;
+  const painting = ["colour-neighbour", "recurse"].includes(view.decision) && !conflict;
+  const pairNode = (id, label) => `<div class="bip785-pair-node ${tone(id)}"><small>${label}</small><b>${id}</b><span>${colourLabel(id)}</span></div>`;
+  const comparison = hasPair ? `<div class="bip785-pair ${conflict ? "bad" : painting ? "painting" : "good"}">
+    ${pairNode(focusU, vi ? "Đỉnh đang xét" : "Current node")}
+    <strong>${conflict ? "=" : color[focusV] === -1 ? "→" : "≠"}</strong>
+    ${pairNode(focusV, vi ? "Hàng xóm" : "Neighbour")}
+    <div class="bip785-pair-verdict">${conflict ? (vi ? "✕ Cùng màu → False" : "✕ Same colour → False") : painting ? (vi ? "Đảo màu cho hàng xóm" : "Flip the neighbour's colour") : (vi ? "✓ Khác màu → hợp lệ" : "✓ Different colours → valid")}</div>
+    ${painting ? `<code>color[${focusV}] = 1 − ${color[focusU]} = ${1 - color[focusU]}</code>` : ""}
+  </div>` : `<div class="bip785-no-pair">${activeNode !== null ? pairNode(activeNode, vi ? "Đỉnh đang xét" : "Current node") : `<strong>${isDone ? (vi ? "✓ Mọi cạnh đều khác màu" : "✓ Every edge joins different colours") : (vi ? "Bắt đầu từ một đỉnh chưa tô" : "Start at an uncoloured node")}</strong>`}</div>`;
+  const status = rv === false ? "False" : isDone && rv === true ? "True" : (vi ? "Đang kiểm tra" : "Checking");
 
   $("treeView").innerHTML = `<section class="bip785-viz" aria-label="${escapeHtml(vi ? "Trực quan hóa kiểm tra đồ thị hai phía" : "Is-graph-bipartite visualization")}">
-    <div class="bip785-phases">${phases}</div>
-    ${conflictBanner}
+    <header class="bip785-title"><div><small>785 · ${isDfs ? "DFS" : "BFS"}</small><h3>${vi ? "Nối nhau → phải khác màu" : "Connected → must have different colours"}</h3></div><b class="bip785-status ${decCls}" role="status">${status}</b></header>
     <div class="bip785-layout">
-      <div id="bip785Graph" class="bip785-graph"></div>
-      <div class="bip785-state">
-        <div class="bip785-head"><strong>${vi ? "HAI TẬP MÀU" : "THE TWO SETS"}</strong><span>${vi ? "mọi cạnh phải bắc qua giữa" : "every edge must cross the middle"}</span></div>
-        ${partitionHtml}
-        <div class="bip785-head"><strong>${escapeHtml(frontierLabel)}</strong><span>${escapeHtml(frontierHint)}</span></div>
-        <div class="bip785-frontier">${frontierHtml}</div>
+      <div class="bip785-graph">
+        <div class="bip785-legend"><span class="c0">${vi ? "Màu 0 · Tập A" : "Colour 0 · Set A"}</span><span class="c1">${vi ? "Màu 1 · Tập B" : "Colour 1 · Set B"}</span><span class="none">${vi ? "? · Chưa tô" : "? · Uncoloured"}</span></div>
+        ${graphHtml}
+        <p>${conflict ? `${vi ? "✕ Cạnh vi phạm" : "✕ Violating edge"}: <b>${conflict.u} — ${conflict.v}</b> · ${vi ? "hai đầu cùng màu" : "same colour at both ends"}` : hasPair ? `${vi ? "Cạnh đang xét" : "Current edge"}: <b>${focusU} — ${focusV}</b>` : (vi ? "Số lớn = đỉnh · c0 / c1 = màu" : "Large number = node · c0 / c1 = colour")}</p>
       </div>
+      <div class="bip785-state">
+        ${comparison}
+        <div class="bip785-decision ${decCls}"><small>${isDone ? (vi ? "Kết luận" : "Conclusion") : (vi ? "Bước hiện tại" : "Current step")}</small><strong>${escapeHtml(decisionText)}</strong></div>
+        ${partitionHtml}
+      </div>
+    </div>
+    <div class="bip785-work"><div class="bip785-head"><strong>${escapeHtml(frontierLabel)}</strong><span>${escapeHtml(frontierHint)}</span></div>
+      <div class="bip785-work-row">${!isDfs && activeNode !== null && ["dequeue", "colour-neighbour", "already-ok", "conflict"].includes(view.decision) ? `<div class="bip785-processing"><small>${vi ? "Đã lấy ra, đang xét" : "Dequeued, processing"}</small>${setChip(activeNode)}</div>` : ""}<div class="bip785-frontier">${frontierHtml}</div></div>
     </div>
     <div class="bip785-head"><strong>color[]</strong><span>${vi ? "−1 = chưa tô" : "−1 = uncoloured"}</span></div>
     <div class="bip785-array">${colorCells}</div>
-    <div class="bip785-lower">
-      <div class="bip785-adj">
-        <div class="bip785-head"><strong>adjacency list</strong><span>${vi ? "hàng xóm mỗi node" : "neighbours per node"}</span></div>
-        <div>${adjHtml}</div>
-      </div>
-      <div class="bip785-decision ${decCls}${isDone ? " done" : ""}">
-        <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
-        <strong>${escapeHtml(decisionText)}</strong>
-        <div>
-          ${startNode === null ? "" : `<span>start = ${escapeHtml(startNode)}</span>`}
-          ${activeNode === null ? "" : `<span>node = ${escapeHtml(activeNode)}</span>`}
-          ${activeNeighbor === null ? "" : `<span>nb = ${escapeHtml(activeNeighbor)}</span>`}
-          <span>return = ${escapeHtml(rvLabel)}</span>
-        </div>
-      </div>
-    </div>
+    <details class="bip785-adj"><summary>${vi ? "Xem danh sách kề" : "Show adjacency list"}</summary><div>${adjHtml}</div></details>
   </section>`;
-  renderGraph(step, "bip785Graph");
 }
 
 function renderPathExistsBfsView(step) {
