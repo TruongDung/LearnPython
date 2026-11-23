@@ -116,7 +116,7 @@ test('917 is registered with dedicated browser assets and an updated roadmap row
   assert.ok(problem.tags.some(tag => tag.key === 'string'));
   const registry = fs.readFileSync(require.resolve('../public/script.js'), 'utf8');
   const prefix = registry.slice(0, registry.indexOf('\nfunction ', registry.indexOf('const ORDERED_RENDERER_REGISTRY')));
-  const context = { renderReverseLetters917View: step => { context.rendered = step; } };
+  const context = { renderLessonPictures: step => { context.rendered = step; } };
   vm.createContext(context);
   vm.runInContext(prefix + '\nglobalThis.registry = ORDERED_RENDERER_REGISTRY;', context);
   const step = problem.builder('ab-cd').steps[0];

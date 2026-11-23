@@ -806,7 +806,7 @@ Chọn–khám phá–hoàn tác; tách bài toán con và tránh sinh kết qu�
 | 624 | [2002. Maximum Product of the Length of Two Palindromic Subsequences](https://leetcode.com/problems/maximum-product-of-the-length-of-two-palindromic-subsequences/) | Medium |  | Chưa |
 | 625 | [2767. Partition String Into Minimum Beautiful Substrings](https://leetcode.com/problems/partition-string-into-minimum-beautiful-substrings/) | Medium |  | Chưa |
 | 626 | [3211. Generate Binary Strings Without Adjacent Zeros](https://leetcode.com/problems/generate-binary-strings-without-adjacent-zeros/) | Medium |  | Chưa |
-| 627 | [3799. Word Squares II](https://leetcode.com/problems/word-squares-ii/) | Medium |  | Chưa |
+| 627 | [3799. Word Squares II](https://leetcode.com/problems/word-squares-ii/) | Medium |  | Có |
 | 628 | [3955. Valid Binary Strings With Cost Limit](https://leetcode.com/problems/valid-binary-strings-with-cost-limit/) | Medium |  | Chưa |
 | 629 | [126. Word Ladder II](https://leetcode.com/problems/word-ladder-ii/) | Hard |  | Có |
 | 630 | [282. Expression Add Operators](https://leetcode.com/problems/expression-add-operators/) | Hard |  | Có |

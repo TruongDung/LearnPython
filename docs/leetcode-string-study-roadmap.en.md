@@ -806,7 +806,7 @@ Choose, explore and undo; split into subproblems and avoid generating invalid re
 | 624 | [2002. Maximum Product of the Length of Two Palindromic Subsequences](https://leetcode.com/problems/maximum-product-of-the-length-of-two-palindromic-subsequences/) | Medium |  | Not yet |
 | 625 | [2767. Partition String Into Minimum Beautiful Substrings](https://leetcode.com/problems/partition-string-into-minimum-beautiful-substrings/) | Medium |  | Not yet |
 | 626 | [3211. Generate Binary Strings Without Adjacent Zeros](https://leetcode.com/problems/generate-binary-strings-without-adjacent-zeros/) | Medium |  | Not yet |
-| 627 | [3799. Word Squares II](https://leetcode.com/problems/word-squares-ii/) | Medium |  | Not yet |
+| 627 | [3799. Word Squares II](https://leetcode.com/problems/word-squares-ii/) | Medium |  | Available |
 | 628 | [3955. Valid Binary Strings With Cost Limit](https://leetcode.com/problems/valid-binary-strings-with-cost-limit/) | Medium |  | Not yet |
 | 629 | [126. Word Ladder II](https://leetcode.com/problems/word-ladder-ii/) | Hard |  | Available |
 | 630 | [282. Expression Add Operators](https://leetcode.com/problems/expression-add-operators/) | Hard |  | Available |

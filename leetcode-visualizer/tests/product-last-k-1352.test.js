@@ -107,5 +107,5 @@ test('1352 picture assets load lazily with independent code themes and native li
   const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8');
   assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g,''),/renderer-product-last-k-1352|product-last-k-1352\.css/);
   assert.match(html,/trie-picture-ui\.js[^>]+data-problem-ids="[^"]*1352/);assert.match(html,/product-last-k-1352\.css/);assert.match(html,/renderer-product-last-k-1352\.js/);
-  assert.match(fs.readFileSync(require.resolve('../public/trie-picture-ui.js'),'utf8'),/1224,1352,1504/);assert.equal(p.debugMode,'line-by-line');
+  assert.match(fs.readFileSync(require.resolve('../public/trie-picture-ui.js'),'utf8'),/\[[\d, ]*\b1352\b[\d, ]*\]\.includes/);assert.equal(p.debugMode,'line-by-line');
 });

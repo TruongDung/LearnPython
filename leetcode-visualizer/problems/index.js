@@ -59,6 +59,15 @@ Object.assign(categories.trie, require('./memory-file-system-588'));
 Object.assign(categories.bitmask, require('./excellent-pairs-2354'));
 Object.assign(categories.hashmap, require('./maximum-equal-frequency-1224'));
 Object.assign(categories.design, require('./product-last-k-1352'));
+const newPictureLessons = require('./requested-picture-lessons');
+categories.backtracking[3799] = newPictureLessons[3799];
+categories.bitmask[1947] = newPictureLessons[1947];
+categories.dp[4060] = newPictureLessons[4060];
+categories['two-pointer'][917] = newPictureLessons[917];
+categories['two-pointer'][26] = newPictureLessons[26];
+categories['two-pointer'][18] = newPictureLessons[18];
+for(const id of [11,15,16,80])categories['two-pointer'][id] = newPictureLessons[id];
+Object.assign(categories.trie, require('./picture-trie-1268-1804'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.
 Object.assign(categories.array,
