@@ -1157,6 +1157,27 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.bipartiteView), surface: "treeView", render: (step) => {
       renderBipartiteView(step);
     } },
+    { predicate: (step) => Boolean(step.magnificent2493View), surface: "treeView", render: (step) => {
+      renderMagnificentGroups2493View(step);
+    } },
+    { predicate: (step) => Boolean(step.partition886View), surface: "treeView", render: (step) => {
+      renderPossibleBipartition886View(step);
+    } },
+    { predicate: (step) => Boolean(step.garden1042View), surface: "treeView", render: (step) => {
+      renderFlowerGardens1042View(step);
+    } },
+    { predicate: (step) => Boolean(step.sudoku36View), surface: "treeView", render: (step) => {
+      renderValidSudoku36View(step);
+    } },
+    { predicate: (step) => Boolean(step.paint1411View), surface: "treeView", render: (step) => {
+      renderPaintGrid1411View(step);
+    } },
+    { predicate: (step) => Boolean(step.paint1931View), surface: "treeView", render: (step) => {
+      renderPaintGrid1931View(step);
+    } },
+    { predicate: (step) => Boolean(step.consecutive128View), surface: "treeView", render: (step) => {
+      renderLongestConsecutive128View(step);
+    } },
     { predicate: (step) => Boolean(step.autocompleteView), surface: "treeView", render: (step) => {
       renderAutocomplete642View(step);
     } },

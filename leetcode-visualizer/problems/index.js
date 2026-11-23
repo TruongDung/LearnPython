@@ -99,6 +99,11 @@ Object.assign(categories['monotonic-stack'], require('./shortest-unsorted-581'))
 Object.assign(categories['monotonic-stack'], require('./chunk-partitions-768-769'));
 Object.assign(categories['monotonic-stack'], require('./advanced-stack-pictures'));
 Object.assign(categories.graph, require('./subtree-sizes-3331'));
+Object.assign(categories.graph, require('./magnificent-groups-2493'));
+Object.assign(categories.graph, require('./graph-coloring-886-1042'));
+Object.assign(categories.array, require('./valid-sudoku-36'));
+Object.assign(categories.dp, require('./grid-coloring-1411-1931'));
+Object.assign(categories.array, require('./longest-consecutive-128'));
 Object.assign(categories.string, require('./remove-k-digits-402'));
 Object.assign(categories.hashmap, require('./circular-next-greater-503'));
 Object.assign(categories.heap, require('./busiest-servers-1606'));

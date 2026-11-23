@@ -4,6 +4,11 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-valid-sudoku-36.js',
+  'renderer-grid-coloring-1411-1931.js',
+  'renderer-longest-consecutive-128.js',
+  'renderer-graph-coloring-886-1042.js',
+  'renderer-magnificent-groups-2493.js',
   'renderer-reshape-matrix-566.js',
   'renderer-shift-grid-1260.js',
   'renderer-flipping-image-832.js',
@@ -250,6 +255,9 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'color-constraints-lessons.css',
+  'graph-coloring-886-1042.css',
+  'magnificent-groups-2493.css',
   'reshape-matrix-566.css',
   'shift-grid-1260.css',
   'flipping-image-832.css',
