@@ -404,6 +404,9 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         args: [...operation.args],
       })));
     case 588: {
+      if (typeof problem.parseOperations === "function") {
+        return designConfig("FileSystem", [], problem.parseOperations(input).map(operation => ({ name: operation.name, args: [...operation.args] })));
+      }
       const aliases = { add: "addContentToFile", read: "readContentFromFile" };
       const operations = parseFunctionOperations(input).map((operation) => ({ ...operation, name: aliases[operation.name] || operation.name }));
       return designConfig("FileSystem", [], operations);

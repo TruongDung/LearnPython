@@ -55,6 +55,8 @@ Object.assign(categories.string, require('./a-before-b-2124'));
 Object.assign(categories.dp, require('./balanced-string-1653'));
 Object.assign(categories.trie, require('./prefix-suffix-pairs-3045'));
 Object.assign(categories.trie, require('./trie-pictures-208'));
+Object.assign(categories.trie, require('./memory-file-system-588'));
+Object.assign(categories.bitmask, require('./excellent-pairs-2354'));
 
 // Missing lessons from the requested sweep-line study lists, in study order.
 Object.assign(categories.array,

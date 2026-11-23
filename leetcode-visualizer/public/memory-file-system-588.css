@@ -1,0 +1,64 @@
+.fs588-header-icon { display:flex;align-items:center;gap:6px; }
+.fs588-header-icon .fs588-icon { width:27px;height:30px; }
+.fs588-icon { width:19px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round;flex:none;vertical-align:middle; }
+.fs588-icon.folder { color:#fbbf24; }
+.fs588-icon.file { color:var(--tp-blue); }
+[data-theme="light"] .fs588-icon.folder { color:#a16207; }
+.fs588-call { margin-top:12px;padding:10px 12px;border:1px solid var(--tp-border);border-radius:10px;background:var(--tp-soft); }
+.fs588-call > code { font-size:14px;color:var(--tp-active); }
+.fs588-breadcrumb { display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:7px;min-width:0; }
+.fs588-breadcrumb > span { font:14px monospace;padding:4px 6px;border:1px solid var(--tp-border);border-radius:5px;overflow-wrap:anywhere; }
+.fs588-breadcrumb > .current { color:var(--tp-active);border-color:var(--tp-active);background:var(--tp-bg); }
+.fs588-breadcrumb > .segment { box-shadow:inset 0 -2px 0 var(--tp-blue); }
+.fs588-breadcrumb i { font-style:normal;color:var(--tp-muted); }
+.fs588-layout { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:10px;margin-top:12px; }
+.fs588-directory,.fs588-inspector { min-width:0;border:1px solid var(--tp-border);border-radius:11px;background:var(--tp-bg);padding:10px; }
+.fs588-directory > header,.fs588-inspector > header { display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:14px; }
+.fs588-directory > header b,.fs588-inspector > header b { display:flex;align-items:center;gap:7px; }
+.fs588-directory > header > span { color:var(--tp-muted);font:13px monospace; }
+.fs588-tree { position:relative;max-height:265px;min-height:185px;overflow:auto;scrollbar-width:thin;margin-top:8px; }
+.fs588-tree .fs588-entry { width:100%;min-width:0;display:flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:7px;padding:7px 5px 7px calc(3px + var(--depth)*15px);text-align:left;background:transparent; }
+.fs588-entry .fs588-twig { color:var(--tp-border);font:14px monospace;flex:none;width:7px; }
+.fs588-entry .fs588-name { overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;font:14px monospace; }
+.fs588-entry small { font:11px monospace;color:var(--tp-muted); }
+.fs588-entry > b { color:var(--tp-active);font-size:12px;min-width:8px; }
+.fs588-tree .fs588-entry.current { background:color-mix(in srgb,var(--tp-active) 12%,var(--tp-bg));border-color:var(--tp-active); }
+.fs588-tree .fs588-entry.created { border-color:var(--tp-good); }
+.fs588-tree .fs588-entry.inspected { outline:2px solid var(--tp-blue);outline-offset:-2px; }
+.fs588-entry.created > b { color:var(--tp-good); }
+.fs588-empty-tree { display:flex;align-items:center;justify-content:center;gap:15px;min-height:170px;color:var(--tp-muted);font-size:24px; }
+.fs588-empty-tree svg { width:36px;height:36px; }
+.fs588-kind { padding:3px 5px;border:1px solid var(--tp-border);border-radius:5px;color:var(--tp-muted);font:11px monospace; }
+.fs588-inspect-path { display:block;margin:9px 0;color:var(--tp-active);font-size:13px;overflow-wrap:anywhere; }
+.fs588-field { display:flex;flex-direction:column;gap:6px;margin-top:10px; }
+.fs588-field > code { color:var(--tp-muted);font-size:12px; }
+.fs588-field > div { display:flex;flex-wrap:wrap;gap:5px; }
+.fs588-field > div > span:not(.tp-muted) { padding:3px 5px;border:1px solid var(--tp-border);border-radius:5px;font:13px monospace;max-width:100%;overflow-wrap:anywhere; }
+.fs588-none { font:700 20px monospace;color:var(--tp-muted); }
+.fs588-content { margin:0;padding:8px;border:1px solid var(--tp-border);border-radius:7px;background:var(--tp-soft);max-height:125px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:15px/1.5 monospace;color:var(--tp-text); }
+.fs588-pending { margin-top:10px;padding:7px;border:1px dashed var(--tp-active);border-radius:7px;font-size:12px;color:var(--tp-active); }
+.fs588-inspector.manual { border-color:var(--tp-blue); }
+.fs588-inspector .fs588-follow { margin-top:10px;padding:5px 7px;font-size:12px; }
+.fs588-outcome { margin-top:12px;min-height:77px;padding:10px 12px;border:1px solid var(--tp-border);border-radius:10px;background:var(--tp-soft); }
+.fs588-output-head { display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px; }
+.fs588-output-head > span { font-size:12px;color:var(--tp-muted); }
+.fs588-listing { display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:8px; }
+.fs588-listing > span { display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--tp-border);border-radius:6px;background:var(--tp-bg);font:14px monospace; }
+.fs588-read-value { max-height:120px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0 0;color:var(--tp-good);font:700 17px/1.4 monospace; }
+.fs588-append { display:grid;grid-template-columns:minmax(0,1fr) 13px minmax(0,1fr) 13px minmax(0,1.2fr);align-items:center;gap:5px; }
+.fs588-append > div { min-width:0;display:flex;flex-direction:column;gap:6px; }
+.fs588-append small { color:var(--tp-muted);font-size:12px; }
+.fs588-append code { padding:6px;border:1px solid var(--tp-border);border-radius:6px;background:var(--tp-bg);white-space:pre-wrap;overflow-wrap:anywhere;max-height:100px;overflow:auto;color:var(--tp-active);font-size:14px; }
+.fs588-append > div:nth-of-type(2) code { color:var(--tp-blue); }
+.fs588-append .after code { color:var(--tp-good);border-color:var(--tp-good); }
+.fs588-stack { display:flex;gap:5px;align-items:center;overflow-x:auto;padding-top:4px;scrollbar-width:thin; }
+.fs588-stack > span { font:11px monospace;white-space:nowrap;color:var(--tp-muted); }
+.fs588-stack i { font-style:normal;color:var(--tp-muted); }
+.fs588-history { margin-top:12px;font-size:13px;color:var(--tp-muted); }
+.fs588-history summary { cursor:pointer; }
+.fs588-history > div { margin-top:7px;max-height:200px;overflow:auto;display:grid;gap:5px; }
+.fs588-history button { display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;min-width:0; }
+.fs588-history button small { font:11px monospace; }
+.fs588-history button code { font-size:12px;overflow-wrap:anywhere; }
+.fs588-history button b { font:700 13px monospace;color:var(--tp-good);overflow-wrap:anywhere;max-width:100%; }
+@media(max-width:600px) { .fs588-layout { grid-template-columns:1fr; } .fs588-tree { min-height:150px;max-height:230px; } .fs588-inspector { min-height:170px; } .fs588-header-icon { display:none; } .fs588-append code { padding:5px;font-size:13px; } }
