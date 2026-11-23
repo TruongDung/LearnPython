@@ -3074,7 +3074,7 @@ function renderCode() {
     split.classList.toggle("problem-2124-layout", problemId === 2124);
     split.classList.toggle("problem-1653-layout", problemId === 1653);
     split.classList.toggle("problem-3331-layout", problemId === 3331);
-    split.classList.toggle("problem-trie-pictures-layout", [208, 588, 1504, 2354, 3045].includes(problemId));
+    split.classList.toggle("problem-trie-pictures-layout", [208, 588, 1504, 1526, 2354, 3045, 3212].includes(problemId));
   }
   if (typeof setupABeforeB2124CodeTheme === "function") setupABeforeB2124CodeTheme();
   if (typeof setupBalancedString1653CodeTheme === "function") setupBalancedString1653CodeTheme();
