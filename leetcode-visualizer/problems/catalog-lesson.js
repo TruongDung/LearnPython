@@ -66,7 +66,7 @@ function define(id, title, group, sample, expected, source, options = {}) {
         return { arr: [], highlight: [], mark: [], codeLines: [event.line], codeBlock: 1, final,
           title: bi(final ? "Hoàn tất · kết quả" : `Dòng ${event.line} · ${event.scope}`,final ? "Complete · result" : `Line ${event.line} · ${event.scope}`),
           note: bi("", ""), vars: Object.entries(locals).map(([name,value])=>({name,value,rawValue:value})),
-          catalogLessonView: { id, group, names, args, line: event.line, source: code[event.line-1],
+          catalogLessonView: { id, group, names, args, teaching: options.teaching || null, line: event.line, source: code[event.line-1],
             locals, changed, oldValues, frames: event.frames, objects: event.objects || [], branch: event.branch,
             returning: event.returning, returned: event.returned,
             result: final ? trace.answer : null, final, trace: trace.trace },
