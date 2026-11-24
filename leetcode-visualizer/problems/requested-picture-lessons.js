@@ -3,7 +3,9 @@ const { runTrace } = require('./wasm-picture-trace');
 const bi = (vi, en) => ({ vi, en });
 const copy = value => JSON.parse(JSON.stringify(value));
 const twoPointerBase=require('./two-pointer');
+const twoSumBase=require('./hashmap')[1];
 const CODES = {
+  1: `${twoSumBase.code.join('\n')}\n        return []`,
   11: `class Solution:
     def maxArea(self, height):
         left, right = 0, len(height) - 1
@@ -187,6 +189,7 @@ function matrix(input, name, limit) {
 }
 function argsFor(id, input, params = {}, live = false) {
   if (!params || typeof params !== 'object' || Array.isArray(params)) throw new TypeError(`${id}: invalid parameters`);
+  if(id===1){const target=params.target??9;if(typeof target!=='number'||!Number.isInteger(target)||Math.abs(target)>1e9)throw new RangeError('1: target phải là số nguyên trong [−10^9,10^9] / invalid target.');return[numbers(input,id,live),target];}
   if([11,15,26,80].includes(id))return[numbers(input,id,live)];
   if([16,18].includes(id)){const target=params.target??(id===16?1:0),bound=id===16?10000:1e9;if(typeof target!=='number'||!Number.isInteger(target)||Math.abs(target)>bound)throw new RangeError(`${id}: target phải là số nguyên trong [−${bound},${bound}] / invalid target.`);return[numbers(input,id,live),target];}
   if (id === 917) return require('./reverse-only-letters-917')[917].liveArgs(input);
@@ -206,24 +209,33 @@ function dpStates(value) {
 }
 function numbers(input,id,live){
  let a=input;if(typeof input==='string')try{a=input.trim().startsWith('[')?JSON.parse(input):input.split(',').map(part=>/^-?\d+$/.test(part.trim())?Number(part):NaN);}catch(_){a=null;}
- const limits={11:[24,100000,10000,2],15:[14,3000,100000,3],16:[14,500,1000,3],18:[14,200,1e9,1],26:[24,30000,100,1],80:[24,30000,10000,1]},[visual,full,bound,min]=limits[id],limit=live?full:visual;
+ const limits={1:[24,10000,1e9,2],11:[24,100000,10000,2],15:[14,3000,100000,3],16:[14,500,1000,3],18:[14,200,1e9,1],26:[24,30000,100,1],80:[24,30000,10000,1]},[visual,full,bound,min]=limits[id],limit=live?full:visual;
  if(!Array.isArray(a)||a.length<min||a.length>limit||!Array.from(a).every(x=>typeof x==='number'&&Number.isInteger(x)&&Math.abs(x)<=bound&&(id!==11||x>=0)))throw new RangeError(`${id}: cần ${min}–${limit} số nguyên trong [${id===11?0:-bound},${bound}] / invalid numbers.`);
  if([26,80].includes(id)&&a.some((x,i)=>i&&a[i-1]>x))throw new RangeError(`${id}: nums phải được sắp xếp tăng dần / nums must be sorted.`);
  return [...a];
 }
 function build(id, input, params = {}) {
   const args = argsFor(id, input, params), code = CODES[id].split('\n');
-  const method = {11:'maxArea',15:'threeSum',16:'threeSumClosest',18:'fourSum',26:'removeDuplicates',80:'removeDuplicates',917:'reverseOnlyLetters',3799:'wordSquares',1947:'maxCompatibilitySum',4060:'countEvenlyGoodIntegers'}[id];
+  const method = {1:'twoSum',11:'maxArea',15:'threeSum',16:'threeSumClosest',18:'fourSum',26:'removeDuplicates',80:'removeDuplicates',917:'reverseOnlyLetters',3799:'wordSquares',1947:'maxCompatibilitySum',4060:'countEvenlyGoodIntegers'}[id];
   const native = runTrace({code:CODES[id], method, args, ...([15,18,3799].includes(id) ? {summarizeLocals:{ans:0}} : {})});
   if (native.trace.truncated) throw new Error(`${id}: incomplete source trace`);
   const placed = {top:null,left:null,right:null,bottom:null}, gallery = [], parents = [];
   const skippedLeft=[],skippedRight=[],swaps=[];
+  const seenWrites=new Map();let previousSeen=new Map();
   let transition = {}, progress = null, lastSwap = null, swapCount = 0, priorNums=null,lastCopy=null,sumRecord=null,closestRecord=null,areaRecord=null,bestPair=null,bestArea=-1,latestCount = {bound:null,digits:'',pos:null,digit:null,tight:null,started:null,parity:null,ways:null,limit:null,dp:[],nextDp:[],transition:{},returned:null};
   const steps = native.events.map((event, index) => {
     const x = event.locals, line = event.line, source = code[line-1].trim();
     const final = event.scope === method && event.returning;
     let detail;
-    if(id===11){
+    if(id===1){
+      const seen=x.seen?.__pairs__??[],hasCurrent=line>=4&&line<=8&&!(line===4&&event.branch===false),lookup=line===6?event.branch:line===7?true:line===8?false:null;
+      const write=line===8?{value:x.nums[x.i],index:x.i,previous:previousSeen.get(x.nums[x.i])??null}:null;
+      if(write)seenWrites.set(write.value,index);
+      detail={nums:[...args[0]],target:args[1],read:hasCurrent?x.i:null,current:hasCurrent?x.nums[x.i]:null,
+        complement:line>=5&&line<=8?x.complement:null,lookup,matchedIndex:lookup?seen.find(([key])=>key===x.complement)[1]:null,
+        seen:seen.map(([value,index])=>({value,index,step:seenWrites.get(value)})),write,pair:final?[...native.answer]:[]};
+      previousSeen=new Map(seen);
+    }else if(id===11){
       if(line===8)areaRecord={left:x.left,right:x.right,width:x.width,height:x.water_height,area:x.area};
       if(line===9&&x.area>bestArea){bestArea=x.area;bestPair={...areaRecord};}
       detail={heights:[...args[0]],left:x.left??null,right:x.right??null,best:x.best??null,areaRecord:areaRecord?{...areaRecord}:null,bestPair:bestPair?{...bestPair}:null};
@@ -307,6 +319,9 @@ function build(id, input, params = {}) {
 function binCount(mask) { let n=0;while(mask){mask&=mask-1;n++;}return n; }
 const common = {inputKind:'string',extraParams:[],debugMode:'line-by-line'};
 const definitions = {
+  1: {...twoSumBase,inputKind:'string',defaultInput:'2,7,11,15',debugMode:'line-by-line',inputLabel:bi('nums · 2–24 số nguyên trong [−10⁹,10⁹]','nums · 2–24 integers in [−10⁹,10⁹]'),
+    approach:[bi('Với nums[i], tìm target − nums[i] trong seen trước khi lưu nums[i] → i. Vì thế luôn chọn hai vị trí khác nhau.','For nums[i], look up target − nums[i] in seen before storing nums[i] → i. This always uses two distinct positions.')],
+    complexity:{time:'O(n)',space:'O(n)',note:bi('Minh hoạ tối đa 24 số; live code hỗ trợ 10.000 số. Input tự chọn không có cặp sẽ trả [].','Visualization: up to 24 values; live code accepts 10,000. Custom inputs with no pair return [].')}},
   11: {...twoPointerBase[11],inputKind:'string',defaultInput:'1,8,6,2,5,4,8,3,7',debugMode:'line-by-line',inputLabel:bi('height · 2–24 cột cao 0…10⁴','height · 2–24 walls, heights 0…10⁴'),approach:[bi('Nước cao bằng cột thấp hơn, rộng bằng khoảng cách hai cột. Dời con trỏ ở cột thấp hơn vào trong.','Water height is the shorter wall; width is the distance between walls. Move the shorter wall inward.')],complexity:{time:'O(n)',space:'O(1)',note:bi('Minh hoạ 2–24 cột; live code hỗ trợ đến 100.000 cột.','Visualization: 2–24 walls; live code accepts up to 100,000.')}},
   15: {...twoPointerBase[15],inputKind:'string',defaultInput:'-1,0,1,2,-1,-4',debugMode:'line-by-line',inputLabel:bi('nums · 3–14 số nguyên trong [−10⁵,10⁵]','nums · 3–14 integers in [−10⁵,10⁵]'),approach:[bi('Cố định i, trượt L/R theo tổng. Bỏ qua số trùng để chỉ lưu mỗi bộ ba một lần.','Fix i and move L/R according to the sum. Skip duplicate values so each triplet is saved once.')],complexity:{time:'O(n²)',space:'O(n + output)',note:bi('Minh hoạ tối đa 14 số; live code hỗ trợ 3.000 số.','Visualization: up to 14 values; live code accepts 3,000.')}},
   16: {...twoPointerBase[16],inputKind:'string',defaultInput:'-1,2,1,-4',debugMode:'line-by-line',inputLabel:bi('nums · 3–14 số nguyên −1000…1000','nums · 3–14 integers in −1000…1000'),approach:[bi('Cố định i và trượt L/R. Giữ tổng có khoảng cách đến target nhỏ nhất; dừng khi tổng bằng target.','Fix i and move L/R. Keep the sum with the smallest distance to target; stop on an exact match.')],complexity:{time:'O(n²)',space:'O(n)',note:bi('Minh hoạ tối đa 14 số; live code hỗ trợ 500 số.','Visualization: up to 14 values; live code accepts 500.')}},

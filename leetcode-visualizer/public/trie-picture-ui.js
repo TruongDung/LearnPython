@@ -30,7 +30,7 @@ function centerTriePictureGraph(host,current) {
 }
 function setupTriePictureCodeTheme(problemId) {
   const old=document.getElementById('triePictureCodeTheme'),panel=$('codePanel');
-  if(![11,15,16,18,26,80,208,588,917,1224,1268,1352,1504,1526,1804,1947,2354,2832,3045,3212,3799,4060].includes(Number(problemId))){old?.remove();delete panel.dataset.triePictureTheme;return;}
+  if(![1,11,15,16,18,26,80,205,208,217,219,383,588,917,1224,1268,1352,1504,1526,1804,1947,2354,2832,3020,3045,3212,3799,4060,9018,9019].includes(Number(problemId))){old?.remove();delete panel.dataset.triePictureTheme;return;}
   const t=(vi,en)=>lang==='vi'?vi:en,key=`triePictureCodeTheme${problemId}`;
   let saved=null;try{saved=localStorage.getItem(key);}catch(_){}
   const selected=['light','dark'].includes(saved)?saved:document.documentElement.dataset.theme==='light'?'light':'dark';
