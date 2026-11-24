@@ -128,6 +128,7 @@ Object.assign(categories.bst, require('./split-bst-776'));
 Object.assign(categories.greedy, require('./burst-balloons-452'));
 Object.assign(categories.greedy, require('./task-scheduler-ii-2365'));
 Object.assign(categories['two-pointer'], require('./reverse-k-group-25'));
+Object.assign(categories['two-pointer'], require('./add-two-numbers-2'));
 Object.assign(categories.string, require('./valid-number-65'));
 Object.assign(categories.sliding, require('./minimum-window-substring-76'));
 Object.assign(categories.dp, require('./scramble-string-87'));

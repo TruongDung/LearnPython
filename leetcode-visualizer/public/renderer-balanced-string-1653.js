@@ -70,7 +70,7 @@ function setupBalancedString1653CodeTheme() {
   const toolbar = oldToolbar || document.createElement('div');
   toolbar.id = 'bs1653CodeTheme'; toolbar.className = 'bs1653-code-theme';
   toolbar.setAttribute('role', 'group'); toolbar.setAttribute('aria-label', text('Theme code', 'Code theme'));
-  toolbar.innerHTML = `<span>Code</span><button type="button" data-bs1653-theme="light">☀ ${text('Sáng', 'Light')}</button><button type="button" data-bs1653-theme="dark">☾ ${text('Tối', 'Dark')}</button>`;
+  toolbar.innerHTML = `<button type="button" data-bs1653-theme="light" title="${text('Nền code sáng', 'Light code theme')}" aria-label="${text('Nền code sáng', 'Light code theme')}"><span aria-hidden="true">☀</span></button><button type="button" data-bs1653-theme="dark" title="${text('Nền code tối', 'Dark code theme')}" aria-label="${text('Nền code tối', 'Dark code theme')}"><span aria-hidden="true">☾</span></button>`;
   panel.parentElement.querySelector('.code-mode-bar').appendChild(toolbar);
   const apply = theme => {
     panel.dataset.bs1653Theme = theme;

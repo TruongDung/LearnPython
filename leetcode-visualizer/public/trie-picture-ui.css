@@ -76,3 +76,6 @@
 .problem-trie-pictures-layout #codePanel[data-trie-picture-theme] .indent-guide { border-color:var(--code-border); }
 .problem-trie-pictures-layout #codePanel[data-trie-picture-theme] .code-line.active { background:var(--code-highlight); box-shadow:inset 3px 0 0 var(--code-active); }
 .problem-trie-pictures-layout #codePanel[data-trie-picture-theme] .code-line.active .ln,.problem-trie-pictures-layout #codePanel[data-trie-picture-theme] .code-line.active::before { color:var(--code-active); }
+
+/* Compact icon-only code theme choices. */
+.tp-code-theme button { min-width:34px; min-height:32px; padding:5px 8px; font-size:18px; line-height:1; display:inline-grid; place-items:center; }

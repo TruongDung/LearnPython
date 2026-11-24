@@ -99,3 +99,6 @@
 .problem-1653-layout #codePanel[data-bs1653-theme] .code-line.active { background:var(--code-highlight); box-shadow:inset 3px 0 0 var(--code-active); }
 .problem-1653-layout #codePanel[data-bs1653-theme] .code-line.active .ln,.problem-1653-layout #codePanel[data-bs1653-theme] .code-line.active::before { color:var(--code-active); }
 @media (max-width:600px) { .bs1653-viz { padding:12px; } .bs1653-head h2 { font-size:22px; } .bs1653-choices { gap:16px; } .bs1653-branch { padding:8px; } .bs1653-branch.selected { padding:7px; } .bs1653-branch header { gap:4px; } .bs1653-branch header b { font-size:13px; } .bs1653-kept header { flex-wrap:wrap; } }
+
+/* Compact icon-only code theme choices. */
+.bs1653-code-theme button { min-width:34px; min-height:32px; padding:5px 8px; font-size:18px; line-height:1; display:inline-grid; place-items:center; }

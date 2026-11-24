@@ -36,7 +36,7 @@ function setupTriePictureCodeTheme(problemId) {
   const selected=['light','dark'].includes(saved)?saved:document.documentElement.dataset.theme==='light'?'light':'dark';
   const bar=old||document.createElement('div');bar.id='triePictureCodeTheme';bar.className='tp-code-theme';
   bar.setAttribute('role','group');bar.setAttribute('aria-label',t('Theme code','Code theme'));
-  bar.innerHTML=`<span>Code</span><button type="button" data-tp-theme="light">☀ ${t('Sáng','Light')}</button><button type="button" data-tp-theme="dark">☾ ${t('Tối','Dark')}</button>`;
+  bar.innerHTML=`<button type="button" data-tp-theme="light" title="${t('Nền code sáng','Light code theme')}" aria-label="${t('Nền code sáng','Light code theme')}"><span aria-hidden="true">☀</span></button><button type="button" data-tp-theme="dark" title="${t('Nền code tối','Dark code theme')}" aria-label="${t('Nền code tối','Dark code theme')}"><span aria-hidden="true">☾</span></button>`;
   panel.parentElement.querySelector('.code-mode-bar').appendChild(bar);
   const apply=theme=>{panel.dataset.triePictureTheme=theme;bar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tpTheme===theme)));};
   bar.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{apply(b.dataset.tpTheme);try{localStorage.setItem(key,b.dataset.tpTheme);}catch(_){}}));apply(selected);

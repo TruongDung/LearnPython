@@ -76,7 +76,7 @@ function setupABeforeB2124CodeTheme() {
   toolbar.className = "ab2124-code-theme";
   toolbar.setAttribute("role", "group");
   toolbar.setAttribute("aria-label", text("Theme code", "Code theme"));
-  toolbar.innerHTML = `<span>Code</span><button type="button" data-ab2124-theme="light">☀ ${text("Sáng", "Light")}</button><button type="button" data-ab2124-theme="dark">☾ ${text("Tối", "Dark")}</button>`;
+  toolbar.innerHTML = `<button type="button" data-ab2124-theme="light" title="${text("Nền code sáng", "Light code theme")}" aria-label="${text("Nền code sáng", "Light code theme")}"><span aria-hidden="true">☀</span></button><button type="button" data-ab2124-theme="dark" title="${text("Nền code tối", "Dark code theme")}" aria-label="${text("Nền code tối", "Dark code theme")}"><span aria-hidden="true">☾</span></button>`;
   panel.parentElement.querySelector(".code-mode-bar").appendChild(toolbar);
   const apply = theme => {
     panel.dataset.ab2124Theme = theme;

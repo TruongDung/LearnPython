@@ -91,3 +91,6 @@
 .problem-2124-layout #codePanel[data-ab2124-theme] .code-line.active { background:var(--code-highlight); box-shadow:inset 3px 0 0 var(--code-active); }
 .problem-2124-layout #codePanel[data-ab2124-theme] .code-line.active .ln,.problem-2124-layout #codePanel[data-ab2124-theme] .code-line.active::before { color:var(--code-active); }
 @media (max-width:600px) { .ab2124-viz { padding:12px; } .ab2124-machine { padding:14px 10px; gap:7px; grid-template-columns:1fr 35px 1fr; } .ab2124-state small { font-size:11px; } .ab2124-answer { font-size:18px; } .ab2124-outcome { padding:10px; gap:8px; flex-wrap:wrap; } .ab2124-head h2 { font-size:23px; } }
+
+/* Compact icon-only code theme choices. */
+.ab2124-code-theme button { min-width:34px; min-height:32px; padding:5px 8px; font-size:18px; line-height:1; display:inline-grid; place-items:center; }

@@ -118,7 +118,7 @@ function setupSubtree3331CodeTheme() {
   const toolbar = oldToolbar || document.createElement('div');
   toolbar.id = 's3331CodeTheme'; toolbar.className = 's3331-code-theme';
   toolbar.setAttribute('role', 'group'); toolbar.setAttribute('aria-label', text('Theme code', 'Code theme'));
-  toolbar.innerHTML = `<span>Code</span><button type="button" data-s3331-theme="light">☀ ${text('Sáng', 'Light')}</button><button type="button" data-s3331-theme="dark">☾ ${text('Tối', 'Dark')}</button>`;
+  toolbar.innerHTML = `<button type="button" data-s3331-theme="light" title="${text('Nền code sáng', 'Light code theme')}" aria-label="${text('Nền code sáng', 'Light code theme')}"><span aria-hidden="true">☀</span></button><button type="button" data-s3331-theme="dark" title="${text('Nền code tối', 'Dark code theme')}" aria-label="${text('Nền code tối', 'Dark code theme')}"><span aria-hidden="true">☾</span></button>`;
   panel.parentElement.querySelector('.code-mode-bar').appendChild(toolbar);
   const apply = theme => {
     panel.dataset.s3331Theme = theme;

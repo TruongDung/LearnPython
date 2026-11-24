@@ -34,14 +34,16 @@ function renderCatalogLesson(step) {
   }
   function matrixPicture(matrix,name) {
     const rows=matrix.length,cols=matrix[0]?.length||0;
-    const activeR=x.r ?? x.nr ?? x.row,activeC=x.c ?? x.nc ?? x.col;
+    const activeR=v.id===351&&Number.isInteger(x.last)?Math.floor((x.last-1)/3):x.r ?? x.nr ?? x.row;
+    const activeC=v.id===351&&Number.isInteger(x.last)?(x.last-1)%3:x.c ?? x.nc ?? x.col;
     const old=v.oldValues?.[name];
     const cells=matrix.flatMap((row,r)=>Array.from(row).map((value,c)=>{
       const current=r===activeR&&c===activeC;
-      const visited=selectedPairs.has(`${r},${c}`);
+      const visited=selectedPairs.has(`${r},${c}`)||(v.id===351&&Array.isArray(x.used)&&x.used.includes(r*3+c+1));
       const edited=Array.isArray(old)&&old[r]&&old[r][c]!==value;
       const bounds=Number.isInteger(x.top)&&Number.isInteger(x.bottom)&&Number.isInteger(x.left)&&Number.isInteger(x.right)&&r>=x.top&&r<=x.bottom&&c>=x.left&&c<=x.right;
-      const piece=value===1||value==="1"?"●":value===0||value==="0"?"·":value;
+      const binary=["board","grid","image","maze"].includes(name);
+      const piece=binary&&(value===1||value==="1")?"●":binary&&(value===0||value==="0")?"·":value;
       return `<span class="cl-square${current?" is-current":""}${visited?" is-visited":""}${edited?" is-changed":""}${bounds?" in-bounds":""}" data-r="${r}" data-c="${c}"><b>${esc(piece)}</b><small>${r},${c}</small></span>`;
     })).join("");
     return `<div class="cl-board-scroll" tabindex="0" aria-label="${esc(name)}"><div class="cl-board" style="--cl-cols:${cols}" data-rows="${rows}" data-cols="${cols}">${cells}</div></div>`;
@@ -104,7 +106,8 @@ function renderCatalogLesson(step) {
     if(v.id===478){const[r,cx,cy]=v.args;circle={r,cx,cy};points=[[cx-r,cy-r],[cx+r,cy+r]];if(Array.isArray(v.result))points.push(v.result);else if(Number.isFinite(x.x)&&Number.isFinite(x.y))points.push([x.x,x.y]);}
     if(!points?.length)return "";
     const minX=Math.min(...points.map(p=>p[0]))-1,maxX=Math.max(...points.map(p=>p[0]))+1,minY=Math.min(...points.map(p=>p[1]))-1,maxY=Math.max(...points.map(p=>p[1]))+1;
-    const px=a=>35+(a-minX)/(maxX-minX)*480,py=a=>270-(a-minY)/(maxY-minY)*230;
+    const scale=Math.min(480/(maxX-minX),230/(maxY-minY));
+    const px=a=>275+(a-(minX+maxX)/2)*scale,py=a=>155-(a-(minY+maxY)/2)*scale;
     let art=`<path class="cl-axis" d="M35,${py(0)} H515 M${px(0)},40 V270"/>`;
     if(path||closed){const shown=path&&Number.isInteger(x.i)?Math.min(points.length,x.i+2):points.length;art+=`<polyline class="cl-geoline" points="${points.slice(0,shown).map(p=>`${px(p[0])},${py(p[1])}`).join(" ")}${closed?` ${px(points[0][0])},${py(points[0][1])}`:""}"/>`;}
     if(mirror!==null)art+=`<path class="cl-mirror" d="M${px(mirror)},30 V280"/>`;
