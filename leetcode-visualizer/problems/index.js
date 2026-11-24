@@ -62,6 +62,7 @@ Object.assign(categories.design, require('./product-last-k-1352'));
 const newPictureLessons = require('./requested-picture-lessons');
 categories.hashmap[1] = newPictureLessons[1];
 Object.assign(categories.hashmap, require('./hash-picture-lessons'));
+Object.assign(categories.math, require('./equal-products-3411'));
 categories.backtracking[3799] = newPictureLessons[3799];
 categories.bitmask[1947] = newPictureLessons[1947];
 categories.dp[4060] = newPictureLessons[4060];

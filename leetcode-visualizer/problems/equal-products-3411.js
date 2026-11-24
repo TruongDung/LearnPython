@@ -51,6 +51,7 @@ function build(input){
   const view={line,source:code[line-1].trim(),condition:event.branch,final,nums:[...nums],left,right,
     product:initialized.product?x.product:null,g:initialized.g?x.g:null,l:initialized.l?x.l:null,
     productTo,gcdTo,lcmTo,comparison:comparison?{...comparison}:null,best:best?{...best}:null,answer:x.answer??null,
+    update:[13,14,15].includes(line)?{kind:{13:'product',14:'g',15:'l'}[line],before:native.events[index-1].locals[{13:'product',14:'g',15:'l'}[line]],value:x.value,after:x[{13:'product',14:'g',15:'l'}[line]]}:null,
     cells:[...cells.values()].map(cell=>({...cell}))};
   return{title:bi(`Dòng ${line} · ${view.source}`,`Line ${line} · ${view.source}`),note:bi('',''),arr:[],highlight:[],mark:[],codeLines:[line],final,
     vars:Object.entries(x).map(([name,value])=>({name,value})),equalProducts3411View:view};
