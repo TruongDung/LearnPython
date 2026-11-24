@@ -214,6 +214,20 @@ for (const id of windowDecisionPictures.ids) {
 categories['two-pointer'][283] = windowDecisionPictures.attach(283, categories['two-pointer'][283]);
 categories['binary-search'][528] = require('./random-pick-three-528')(categories['binary-search'][528]);
 
+// Complete the first hundred lessons using their existing algorithm categories.
+for (const [id, problem] of Object.entries(require('./first-hundred-missing'))) {
+  categories[problem.category.key][id] = problem;
+}
+// The remaining lessons in 100–500 are executed through the shared source
+// tracer, with domain-specific pictures selected by the catalog renderer.
+const catalogLessons = Object.assign({},
+  require('./catalog-100-199'), require('./catalog-200-299'),
+  require('./catalog-300-399'), require('./catalog-400-500'));
+for (const [id, problem] of Object.entries(catalogLessons)) {
+  const key = problem.category.key;
+  if (!categories[key]) categories[key] = {};
+  if (!Object.values(categories).some(category => Object.hasOwn(category, id))) categories[key][id] = problem;
+}
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 const { PREFIX_MAX_TAG, PREFIX_MAX_ROSTER, PREFIX_MAX_ORDER, PREFIX_MAX_ORDER_LABEL, PREFIX_MAX_GUIDE, prefixMaxSubTabs } = require('./prefix-max-catalog');

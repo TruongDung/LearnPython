@@ -1,0 +1,48 @@
+.fh-viz{--fh-text:#e2e8f0;--fh-muted:#a9b8cc;--fh-panel:#172337;--fh-line:#43516b;--fh-current:#fbbf24;--fh-good:#34d399;--fh-warm:#93c5fd;--fh-bad:#fb7185;display:grid;gap:14px;color:var(--fh-text);width:100%;min-width:0;text-align:left;font-family:inherit}
+[data-theme="light"] .fh-viz{--fh-text:#172033;--fh-muted:#526079;--fh-panel:#f1f5f9;--fh-line:#cbd5e1;--fh-current:#a26108;--fh-good:#047857;--fh-warm:#2563eb;--fh-bad:#be123c}
+.fh-viz *{box-sizing:border-box}
+#treeView:has(>.fh-viz){border:0;background:transparent;padding:0;min-height:0;min-width:0;overflow:visible}
+.viz-left:has(.fh-viz){min-width:0}
+.fh-viz>header{display:flex;gap:10px;align-items:center}
+.fh-viz h3{margin:0;font-size:17px;line-height:1.45;overflow-wrap:anywhere}
+.fh-badge{background:var(--fh-panel);border:1px solid var(--fh-line);padding:8px;border-radius:10px;font-weight:700}
+.fh-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--fh-muted)}
+.fh-legend span::before{content:'●';margin-right:4px}
+.fh-viz .active{color:var(--fh-current)}
+.fh-viz .done{color:var(--fh-good)}
+.fh-viz .warm{color:var(--fh-warm)}
+.fh-viz .bad{color:var(--fh-bad)}
+.fh-equation{background:var(--fh-panel);border-left:4px solid var(--fh-current);padding:12px;border-radius:8px;font:600 15px/1.5 ui-monospace,monospace;overflow-wrap:anywhere}
+.fh-row h4,.fh-sequence h4{margin:0 0 8px;font-size:12px;color:var(--fh-muted);font-weight:500}
+.fh-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-height:250px;overflow:auto;padding:3px}
+.fh-cell{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:38px;min-height:46px;padding:8px;border:1px solid var(--fh-line);border-radius:9px;background:var(--fh-panel);gap:5px}
+.fh-cell b{font:600 17px ui-monospace,monospace;white-space:nowrap}
+.fh-cell small{font:11px ui-monospace,monospace;color:var(--fh-muted)}
+.fh-cell.active{border:2px solid var(--fh-current);background:color-mix(in srgb,var(--fh-current) 12%,var(--fh-panel))}
+.fh-cell.done,.fh-cell.warm,.fh-cell.bad{border-color:currentColor}
+.fh-empty{padding:12px;color:var(--fh-muted)}
+.fh-strip i{font-style:normal;color:var(--fh-muted);font-size:18px}
+.fh-grid-scroll{max-width:100%;max-height:500px;overflow:auto;padding:4px;border:1px solid var(--fh-line);border-radius:12px;background:var(--fh-panel)}
+.fh-grid-scroll:focus-visible{outline:2px solid var(--fh-current)}
+.fh-grid{display:block;min-width:190px;max-width:none}
+.fh-grid-cell rect{fill:var(--fh-panel);stroke:var(--fh-line);stroke-width:1.5}
+.fh-grid-cell text,.fh-tree text{fill:var(--fh-text);text-anchor:middle;font:600 17px ui-monospace,monospace}
+.fh-grid-cell.active rect{stroke:var(--fh-current);stroke-width:3;fill:color-mix(in srgb,var(--fh-current) 17%,var(--fh-panel))}
+.fh-grid-cell.done rect{stroke:var(--fh-good)}
+.fh-path{fill:none;stroke:var(--fh-warm);stroke-width:3;stroke-dasharray:5 4;opacity:.8}
+.fh-forest{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-height:650px;overflow:auto}
+.fh-forest article{border:1px solid var(--fh-line);border-radius:10px;padding:8px;min-width:0;background:var(--fh-panel)}
+.fh-forest small{font-size:11px;color:var(--fh-muted)}
+.fh-tree{display:block;width:100%;height:200px}
+.fh-tree-edges{stroke:var(--fh-line);stroke-width:2}
+.fh-tree circle{fill:var(--fh-panel);stroke:var(--fh-good);stroke-width:2}
+.fh-tree .root circle{stroke:var(--fh-current);stroke-width:3}
+.fh-ranges{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.fh-ranges span{padding:9px;background:var(--fh-panel);border:1px solid var(--fh-warm);border-radius:7px}
+.fh-sequence>div{display:flex;flex-wrap:wrap;gap:7px;max-height:230px;overflow:auto}
+.fh-sequence span{border:1px solid var(--fh-line);padding:7px;border-radius:6px;font:13px ui-monospace,monospace;overflow-wrap:anywhere}
+.fh-sequence span.active{border-color:var(--fh-current)}
+.fh-viz footer{display:grid;gap:8px;padding:13px;border:1px solid var(--fh-good);border-radius:10px;background:var(--fh-panel)}
+.fh-viz footer small{font-size:10px;letter-spacing:.1em;color:var(--fh-good)}
+.fh-viz footer strong{font:600 19px/1.5 ui-monospace,monospace;overflow-wrap:anywhere;max-height:180px;overflow:auto}
+@media(max-width:600px){.fh-viz h3{font-size:15px}.fh-cell{min-width:34px;padding:6px}.fh-cell b{font-size:15px}.fh-forest{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}}

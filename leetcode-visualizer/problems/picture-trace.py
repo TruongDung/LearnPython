@@ -62,6 +62,10 @@ def picture_trace(payload):
     code = payload['code']
     filename = '<picture-lesson>'
     scope = {'TreeNode': PictureTreeNode} if payload.get('treeArgs') else {}
+    # Optional, bundled context for lessons that construct new nodes or model
+    # judge APIs. Compile separately so context helpers are not learner steps.
+    if payload.get('prelude'):
+        exec(compile(payload['prelude'], '<lesson-context>', 'exec'), scope)
     if payload.get('linkedArgs'):
         scope['ListNode'] = PictureListNode
     if payload.get('captureNext'):
@@ -200,6 +204,8 @@ def picture_trace(payload):
                 return trace
             if frame in pending:
                 if event_limit and len(events) >= event_limit and not (event == 'return' and frame is entry):
+                    if payload.get('failOnTruncate'):
+                        raise ValueError('Example exceeds the step budget; use a smaller input.')
                     truncated = True
                     sys.settrace(None)
                     return None
@@ -228,6 +234,8 @@ def picture_trace(payload):
         return trace
 
     args = list(payload['args'])
+    if '_viz_args' in scope:
+        args = scope['_viz_args'](args)
     for index in payload.get('linkedArgs', []):
         args[index] = picture_list(args[index], index)
         if payload.get('captureLinked'):
@@ -267,6 +275,8 @@ def picture_trace(payload):
         events.append({'line': entry.f_lineno, 'scope': entry.f_code.co_name, 'locals': state,
                        'outer': state, 'frames': [{'name': entry.f_code.co_name, 'locals': state}],
                        'returned': encode(answer), 'returning': True, 'branch': None, **tree_state()})
+    if '_viz_answer' in scope:
+        answer = scope['_viz_answer'](answer)
     return json.dumps({'answer': encode(answer), 'events': events,
                        'trace': {'captured': len(events), 'truncated': truncated, 'limit': event_limit}},
                       separators=(',', ':'))
