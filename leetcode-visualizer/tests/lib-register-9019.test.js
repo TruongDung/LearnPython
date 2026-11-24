@@ -1,3 +1,4 @@
+// Legacy renderer fixtures; native UI traces are covered by hash-and-system-picture-lessons.test.js.
 "use strict";
 
 const assert = require("node:assert/strict");
@@ -7,7 +8,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const { readFrontendIndex, readFrontendJavaScript, readFrontendStyles } = require("./helpers/frontend-source");
-const problem = require("../problems").SUPPORTED[9019];
+const problem = require("../problems/lib-register-9019")[9019];
 
 test("9019 is registered with immutable single-line trace views", () => {
   assert.equal(problem.id, 9019);

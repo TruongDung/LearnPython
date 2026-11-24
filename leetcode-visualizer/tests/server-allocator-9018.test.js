@@ -1,10 +1,11 @@
+// Legacy renderer fixtures; native UI traces are covered by hash-and-system-picture-lessons.test.js.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const problem = require('../problems').SUPPORTED[9018];
+const problem = require('../problems/server-allocator-9018')[9018];
 
 function oracle(inventory, operations) {
   const occupied = new Map();

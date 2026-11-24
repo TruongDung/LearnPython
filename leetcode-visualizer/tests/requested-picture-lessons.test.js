@@ -14,6 +14,21 @@ const fixtures={
  1804:[['apple,apple,app,apply',{countWord:'apple',countPrefix:'app',erase:'apple'}],['app,apple',{countWord:'app',countPrefix:'app',erase:'app'}],['cat,car',{countWord:'cap',countPrefix:'ca',erase:'cat'}],['a,a,ab',{countWord:'a',countPrefix:'a',erase:'a'}]],
  917:[['ab-cd',{}],['Test1ng-Leet=code-Q!',{}],['123-!',{}],['A',{}],['<a>B&c',{}],['a-1B'.repeat(25),{}]],
 };
+test('1 finds a valid pair of distinct indices for every short array and handles no solution',()=>{
+ for(let n=2;n<=4;n++)for(let mask=0;mask<3**n;mask++){let m=mask;const nums=Array.from({length:n},()=>{const x=[-2,0,2][m%3];m=Math.floor(m/3);return x;});for(const target of [-4,-2,0,2,4]){let exists=false;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)exists ||= nums[i]+nums[j]===target;const input=[...nums],r=run(1,input,{target});assert.deepEqual(input,nums);if(exists){assert.equal(r.answer.length,2);const [a,b]=r.answer;assert.notEqual(a,b);assert.ok(a>=0&&a<n&&b>=0&&b<n);assert.equal(nums[a]+nums[b],target);}else assert.deepEqual(r.answer,[]);}}
+});
+test('1 seen entries appear only on insertion, reuse stored indices and retain exact line state',()=>{
+ for(const [input,target]of [['2,7,11,15',9],['3,3',6],['0,4,3,0',0],['-3,4,3,90',0],['2,2,2,7',9],['1000000000,-1000000000',0],['1,2,3',10]]){const r=run(1,input,{target});for(const s of r.steps){const v=s.lessonPictureView;if(v.line===4)assert.equal(v.complement,null);if(v.lookup===true){assert.ok(v.matchedIndex<v.read);assert.equal(v.nums[v.matchedIndex]+v.current,target);}if(v.line===8){const entry=v.seen.find(x=>x.value===v.current);assert.equal(entry.index,v.read);assert.equal(entry.step,r.steps.indexOf(s));assert.equal(v.lookup,false);}if(v.read!==null&&v.line!==8)assert.ok(v.seen.every(x=>x.index<v.read));}assert.deepEqual(r.steps.at(-1).lessonPictureView.pair,r.answer);}
+ const same=run(1,'3,3',{target:6});assert.equal(same.steps.find(s=>s.lessonPictureView.line===6).lessonPictureView.lookup,false);assert.deepEqual(same.answer,[1,0]);
+ const overwritten=run(1,'2,2,2,7',{target:9});assert.ok(overwritten.steps.some(s=>s.lessonPictureView.write?.previous===1));assert.deepEqual(overwritten.answer,[3,2]);
+});
+test('1 validates visual bounds and preserves the full live input range',()=>{
+ for(const input of ['', '1', '1,,2', '1.5,2', '[true,2]', '1000000001,2', Array(25).fill(0)])assert.throws(()=>run(1,input,{target:0}),/1:/);
+ for(const target of [1e9+1,-1e9-1,1.5,Infinity,'9'])assert.throws(()=>run(1,'2,7',{target}),/1:/);
+ assert.equal(P[1].liveArgs(Array(10000).fill(0),{target:0})[0].length,10000);assert.throws(()=>P[1].liveArgs(Array(10001).fill(0),{target:0}),/1:/);
+ assert.equal(run(1,Array.from({length:24},(_,i)=>i).join(','),{target:45}).answer.length,2);
+});
+
 test('11 maximum water agrees with every pair, including zeros and equal walls',()=>{
  for(const nums of [[1,8,6,2,5,4,8,3,7],[1,1],[0,0,0,0],[1,2,3,4,5],[10000,0,10000]]){let best=0;for(let i=0;i<nums.length;i++)for(let j=i+1;j<nums.length;j++)best=Math.max(best,(j-i)*Math.min(nums[i],nums[j]));const r=run(11,nums.join(',')),v=r.steps.at(-1).lessonPictureView;assert.equal(r.answer,best);assert.equal(v.bestPair.area,best);assert.equal(v.bestPair.width,v.bestPair.right-v.bestPair.left);assert.equal(v.bestPair.height,Math.min(nums[v.bestPair.left],nums[v.bestPair.right]));}
 });
@@ -63,10 +78,10 @@ test('917 retains every locked index and records all condition evaluations as ac
  const r=run(917,'-a!');assert.ok(r.steps.some(s=>s.lessonPictureView.line===6&&s.lessonPictureView.condition===false));
 });
 
-test('all twelve lessons match full CPython post-statement lines and locals',()=>{
+test('all requested lessons match full CPython post-statement lines and locals',()=>{
  const payloads=[];
- for(const id of [11,15,16,18,26,80,917,1268,1804,1947,3799,4060]){
-  let code=P[id].code.join('\n'),args,method={11:'maxArea',15:'threeSum',16:'threeSumClosest',80:'removeDuplicates',18:'fourSum',26:'removeDuplicates',917:'reverseOnlyLetters',1268:'suggestedProducts',1947:'maxCompatibilitySum',3799:'wordSquares',4060:'countEvenlyGoodIntegers'}[id],extra={};
+ for(const id of [1,11,15,16,18,26,80,205,217,219,383,917,1268,1804,1947,3020,3799,4060]){
+  let code=P[id].code.join('\n'),args,method={205:'isIsomorphic',217:'containsDuplicate',219:'containsNearbyDuplicate',383:'canConstruct',3020:'maximumLength',1:'twoSum',11:'maxArea',15:'threeSum',16:'threeSumClosest',80:'removeDuplicates',18:'fourSum',26:'removeDuplicates',917:'reverseOnlyLetters',1268:'suggestedProducts',1947:'maxCompatibilitySum',3799:'wordSquares',4060:'countEvenlyGoodIntegers'}[id],extra={};
   if(id===1804){const ops=P[id].prepareLiveDesign(P[id].defaultInput,defaults(id)).operations;args=[ops.map(op=>[op.name,op.args[0]])];method='run';code+=`\nclass Solution:\n    def run(self, operations):\n        trie = Trie()\n        results = []\n        for index, (method, word) in enumerate(operations):\n            results.append(getattr(trie, method)(word))\n        return results`;extra={captureAllocations:['TrieNode'],stateClasses:['Trie']};}
   else args=P[id].liveArgs(P[id].defaultInput,defaults(id));
   payloads.push({id,payload:{code,method,args,...extra,...([15,18,3799].includes(id)?{summarizeLocals:{ans:0}}:{})}});
@@ -80,7 +95,7 @@ test('all twelve lessons match full CPython post-statement lines and locals',()=
 test('VI/EN renderers cover every captured statement without corrupting data or leaking invalid values',()=>{
  const host={innerHTML:'',querySelectorAll:()=>[]},context={lang:'vi',$:()=>host,steps:[],stepIndex:0,escapeHtml:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')};vm.createContext(context);
  for(const name of ['renderer-requested-picture-lessons.js','renderer-picture-trie-lessons.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+name),'utf8'),context);
- for(const id of [11,15,16,18,26,80,917,1268,1804,1947,3799,4060]){const r=run(id);context.steps=r.steps;const before=JSON.stringify(r.steps);for(const lang of ['vi','en']){context.lang=lang;r.steps.forEach((s,i)=>{context.stepIndex=i;context[id===1268||id===1804?'renderPictureTrieLesson':'renderLessonPictures'](s);assert.doesNotMatch(host.innerHTML,/undefined|NaN|Infinity|object Object/);assert.match(host.innerHTML,new RegExp(`data-source-line="${s.codeLines[0]}"`));if(id===917)assert.doesNotMatch(host.innerHTML,/<a>|<b>B/);});}assert.equal(JSON.stringify(r.steps),before);}
+ for(const id of [1,11,15,16,18,26,80,205,217,219,383,917,1268,1804,1947,3020,3799,4060]){const r=run(id);context.steps=r.steps;const before=JSON.stringify(r.steps);for(const lang of ['vi','en']){context.lang=lang;r.steps.forEach((s,i)=>{context.stepIndex=i;context[id===1268||id===1804?'renderPictureTrieLesson':'renderLessonPictures'](s);assert.doesNotMatch(host.innerHTML,/undefined|NaN|Infinity|object Object/);assert.match(host.innerHTML,new RegExp(`data-source-line="${s.codeLines[0]}"`));if(id===917)assert.doesNotMatch(host.innerHTML,/<a>|<b>B/);});}assert.equal(JSON.stringify(r.steps),before);}
 });
 test('input validation and full live constraints remain distinct from readable picture limits',()=>{
  for(const input of ['','a,b,c,d','able,able,echo,also','able,area,echo,also,more,word,next','ABLE,area,echo,also'])assert.throws(()=>run(3799,input,{}),/3799/);
@@ -97,8 +112,8 @@ test('input validation and full live constraints remain distinct from readable p
 });
 test('new assets are lazy, use shared independent code themes, and preserve existing shared picture assets',()=>{
  const html=fs.readFileSync(require.resolve('../public/index.html'),'utf8'),active=html.replace(/<template[\s\S]*?<\/template>/g,'');
- for(const name of ['requested-picture-lessons.css','renderer-requested-picture-lessons.js','picture-trie-lessons.css','renderer-picture-trie-lessons.js']){assert.equal(html.split(name).length-1,1,`one manifest entry for ${name}`);assert.ok(!active.includes(name));}
+ for(const name of ['requested-picture-lessons.css','renderer-requested-picture-lessons.js','picture-trie-lessons.css','renderer-picture-trie-lessons.js','system-picture-lessons.css','renderer-system-picture-lessons.js']){assert.equal(html.split(name).length-1,1,`one manifest entry for ${name}`);assert.ok(!active.includes(name));}
  assert.match(fs.readFileSync(require.resolve('../public/renderer-picture-lessons.js'),'utf8'),/function renderPictureLesson\(/);
  assert.match(fs.readFileSync(require.resolve('../public/picture-lessons.css'),'utf8'),/\.pl-viz/);
- for(const id of [11,15,16,18,26,80,917,1268,1804,1947,3799,4060]){assert.equal(P[id].debugMode,'line-by-line');assert.match(html,new RegExp(`trie-picture-ui\\.js[^>]+data-problem-ids="[^"]*\\b${id}\\b`));}
+ for(const id of [1,11,15,16,18,26,80,205,217,219,383,917,1268,1804,1947,3020,3799,4060]){assert.equal(P[id].debugMode,'line-by-line');assert.match(html,new RegExp(`trie-picture-ui\\.js[^>]+data-problem-ids="[^"]*\\b${id}\\b`));}
 });
