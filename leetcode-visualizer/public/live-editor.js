@@ -1342,7 +1342,7 @@ function resetLoadedLiveEditorState() {
   $("liveExitBtn").classList.add("hidden");
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
-  $("liveEditBtn").classList.remove("hidden");
+  $("liveEditBtn").classList.toggle("hidden",Boolean(problemData?.liveEditorDisabled));
   $("codeBlurBtn").classList.remove("hidden");
   $("liveVarsView").classList.add("hidden");
   hide("liveError");
@@ -1352,7 +1352,7 @@ function resetLoadedLiveEditorState() {
 function setLiveMode(on) {
   liveMode = on;
   setLiveEditorLayoutMode(on);
-  $("liveEditBtn").classList.toggle("hidden", on);
+  $("liveEditBtn").classList.toggle("hidden", on||Boolean(problemData?.liveEditorDisabled));
   $("codeBlurBtn").classList.toggle("hidden", on);
   $("liveExitBtn").classList.toggle("hidden", !on);
   $("liveEditorWrap").classList.toggle("hidden", !on);

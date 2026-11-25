@@ -18732,7 +18732,7 @@ module.exports = {
     inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
     extraParams: [
       { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 7 },
-      { key: "restricted", label: { vi: "restricted (cách bởi ,)", en: "restricted (comma separated)" }, default: "4,5" },
+      { key: "restricted", type: "string", label: { vi: "restricted (cách bởi ,)", en: "restricted (comma separated)" }, default: "4,5" },
     ],
     approach: [
       { vi: "blocked = set(restricted) để kiểm tra O(1).", en: "blocked = set(restricted) for O(1) lookup." },

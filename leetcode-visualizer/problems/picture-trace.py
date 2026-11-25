@@ -125,6 +125,8 @@ def picture_trace(payload):
         if value is None or isinstance(value, (str, bool, int)):
             return value
         if isinstance(value, float):
+            if math.isnan(value):
+                return None
             return value if math.isfinite(value) else ('∞' if value > 0 else '−∞')
         if isinstance(value, dict):
             if all(isinstance(k, str) for k in value):

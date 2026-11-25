@@ -83,7 +83,7 @@ function renderCatalogLesson(step) {
     return value&&typeof value==="object"?nestedPicture(value):`<strong class="cl-number">${esc(format(value))}</strong>`;
   }
   function objectGraph() {
-    const objects=v.objects||[];
+    const objects=(v.objects||[]).filter(object=>Object.hasOwn(object.fields,"val"));
     if(!objects.length)return "";
     const byId=new Map(objects.map(o=>[o.id,o])),links=[];
     for(const node of objects){for(const name of ["left","right","next","random"])if(isRef(node.fields[name])&&byId.has(node.fields[name].id))links.push({from:node.id,to:node.fields[name].id,name});if(Array.isArray(node.fields.children))node.fields.children.forEach((child,i)=>{if(isRef(child)&&byId.has(child.id))links.push({from:node.id,to:child.id,name:`children[${i}]`});});}
@@ -107,7 +107,7 @@ function renderCatalogLesson(step) {
     const width=list?Math.min(6,objects.length)*105+10:Math.max(330,objects.length*76+14),height=list?Math.ceil(objects.length/6)*100+10:Math.max(180,maxDepth*90+100);
     const refs=new Map();for(const [name,value]of Object.entries(x))if(isRef(value)){if(!refs.has(value.id))refs.set(value.id,[]);refs.get(value.id).push(name);}
     const lines=links.map(l=>{const a=coordinates.get(l.from),b=coordinates.get(l.to);if(!a||!b)return"";const loop=b.x<=a.x&&b.y===a.y;return `<path class="cl-edge${l.name==="right"?" is-right":""}${l.name==='random'?' is-random':''}" d="${loop?`M${a.x},${a.y-23} Q${(a.x+b.x)/2},${a.y-65} ${b.x},${b.y-23}`:`M${a.x},${a.y+8} L${b.x},${b.y-8}`}" marker-end="url(#cl-arrow-${v.id})"><title>${esc(l.name)}</title></path>`;}).join("");
-    const nodes=objects.map(o=>{const p=coordinates.get(o.id),labels=refs.get(o.id)||[];return `<g class="cl-object${labels.length?" is-current":""}" data-object-id="${esc(o.id)}"><circle cx="${p.x}" cy="${p.y}" r="24"/><text x="${p.x}" y="${p.y+5}">${esc(o.fields.val)}</text><text class="cl-object-id" x="${p.x}" y="${p.y+40}">${esc(o.id.replace("object:","#"))}</text>${labels.length?`<text class="cl-pointer-label" x="${p.x}" y="${p.y-31}">${esc(labels.join(" / "))}</text>`:""}</g>`;}).join("");
+    const nodes=objects.map(o=>{const p=coordinates.get(o.id),labels=refs.get(o.id)||[];return `<g class="cl-object${labels.length?" is-current":""}" data-object-id="${esc(o.id)}"><circle cx="${p.x}" cy="${p.y}" r="24"/><text x="${p.x}" y="${p.y+5}">${esc(o.fields.val===""&&o.fields.len?o.fields.len:o.fields.val)}</text><text class="cl-object-id" x="${p.x}" y="${p.y+40}">${esc(o.id.replace("object:","#"))}</text>${labels.length?`<text class="cl-pointer-label" x="${p.x}" y="${p.y-31}">${esc(labels.join(" / "))}</text>`:""}</g>`;}).join("");
     return `<section class="cl-card cl-objects"><header>${t("CÁC NODE VÀ CON TRỎ", "NODES AND POINTERS")} <small>${t("đường nét đứt: nhánh phải", "dashed: right child")}</small></header><div class="cl-svg-scroll" tabindex="0"><svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${t("Trạng thái node thực tế", "Actual node state")}"><defs><marker id="cl-arrow-${v.id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z"/></marker></defs>${lines}${nodes}</svg></div></section>`;
   }
   function geometry() {
@@ -218,12 +218,14 @@ function renderCatalogLesson(step) {
   const changes=v.teaching?(v.changed||[]).filter(name=>name!=='self').slice(0,4).map(name=>`<div><b>${esc(name)}</b><span>${Object.hasOwn(v.oldValues||{},name)?esc(short(v.oldValues[name])):t('chưa có','unset')} → <strong>${esc(short(x[name]))}</strong></span></div>`).join(''):'';
   const teaching=v.teaching?`<section class="cl-teaching"><b>${t('Ý TƯỞNG CẦN NHỚ','KEY IDEA')}</b><p>${esc(vi?v.teaching.vi:v.teaching.en)}</p><div class="cl-step-explanation">${v.final?t('Đã chạy tới lệnh trả về. Kết quả bên dưới là giá trị thuật toán thực sự trả về.','Execution reached the return. The result below is the actual returned value.'):v.branch!==null?(v.branch?t('Điều kiện đúng → tiếp tục vào nhánh / vòng lặp.','Condition is true → enter the branch / loop.'):t('Điều kiện sai → bỏ nhánh này hoặc kết thúc vòng lặp.','Condition is false → skip this branch or finish the loop.')):t('Ảnh bên dưới là trạng thái sau dòng code đang sáng; ô viền vàng vừa đổi giá trị.','The pictures show the state after the highlighted statement; gold outlines mark changed values.')}</div>${changes?`<details class="cl-changes"><summary>${t('Vừa thay đổi gì?','What changed?')}</summary>${changes}</details>`:''}</section>`:'';
   const actions=v.teaching?`<nav class="cl-actions">${[['change',t('Lần cập nhật tiếp →','Next update →')],['decision',t('Điều kiện tiếp →','Next decision →')],['answer',t('Kết quả ✓','Result ✓')]].map(([kind,label])=>`<button type="button" data-catalog-jump="${kind}"${v.final?' disabled':''}>${label}</button>`).join('')}</nav>`:'';
+  const guided=v.teaching?.mode==='guided'&&typeof renderGuidedScene==='function';
+  const scene=guided?renderGuidedScene(v,vi?'vi':'en'):'';
   const html=`<section class="cl-viz" data-lesson-id="${v.id}">
     <header class="cl-top"><b>#${v.id}</b><h3>${t("Theo dõi thuật toán qua từng bước", "Follow the algorithm one statement at a time")}</h3><span>${v.line}/${typeof problemData!=="undefined"?problemData.code.length:""}</span></header>
-    ${teaching}<div class="cl-source"><b>L${v.line}</b><code>${esc(v.source.trim())}</code>${branch}</div>
+    ${scene}${guided?`<details class="cl-guided-details"><summary>${t('Xem ý tưởng và dòng code vừa chạy','Show the idea and executed statement')}</summary>`:''}${teaching}<div class="cl-source"><b>L${v.line}</b><code>${esc(v.source.trim())}</code>${branch}</div>${guided?'</details>':''}
     <div class="cl-legend"><span class="is-current">● ${t("đang xét / con trỏ", "current / pointer")}</span><span class="is-changed">● ${t("vừa cập nhật", "just changed")}</span><span class="is-visited">● ${t("đã thăm", "visited")}</span></div>
     ${teachingDiagram()}${geometry()}${gameBoard()}${objectGraph()}${bitPicture()}
-    ${vars?`<div class="cl-values">${vars}</div>`:""}${stack}${cards}
+    ${guided?`<details class="cl-guided-details"><summary>${t('Chi tiết biến và ngăn xếp','Variable and call-stack details')}</summary>`:''}${vars?`<div class="cl-values">${vars}</div>`:""}${stack}${cards}${guided?'</details>':''}
     ${v.final?`<section class="cl-result"><header>✓ ${t("KẾT QUẢ", "RESULT")}</header>${picture(v.result,"result")}</section>`:""}
     ${actions}<section class="cl-inputs">${inputs}</section>
   </section>`;

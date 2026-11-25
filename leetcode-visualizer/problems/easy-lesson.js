@@ -6,7 +6,7 @@ function defineEasy(id,title,group,sample,expected,source,guideVi,time,space,opt
   const guideEn=options.guide||options.description||title;
   return define(id,title,group,sample,expected,source,{...options,time,space,
     vi:options.vi||title,guideVi,guide:guideEn,
-    teaching:{vi:guideVi,en:guideEn,focus:options.focus||[],diagram:options.diagram||group},
+    teaching:{vi:guideVi,en:guideEn,focus:options.focus||[],diagram:options.diagram||group,mode:options.teachingMode,scene:options.scene||null},
   });
 }
 module.exports={defineEasy};

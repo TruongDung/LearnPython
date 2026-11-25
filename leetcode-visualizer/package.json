@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "audit:live": "node tests/build-live-audit-cases.js | python tests/audit_live_runner.py"
+    "audit:live": "node tests/build-live-audit-cases.js | python tests/audit_live_runner.py",
+    "setup:visualizations": "node scripts/setup-visualizations.js"
   },
   "dependencies": {
     "@babel/generator": "^7.29.15",

@@ -2297,7 +2297,7 @@ function resetLiveEditorShell() {
   $("liveExitBtn").classList.add("hidden");
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
-  $("liveEditBtn").classList.remove("hidden");
+  $("liveEditBtn").classList.toggle("hidden",Boolean(problemData?.liveEditorDisabled));
   $("codeBlurBtn").classList.remove("hidden");
   $("liveVarsView").classList.add("hidden");
   hide("liveError");

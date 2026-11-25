@@ -376,6 +376,8 @@ app.get("/api/problem/:id", (req, res) => {
     approach: problem.approach || null,
     debugMode: problem.debugMode || null,
     hasLiveArgs: typeof problem.liveArgs === "function",
+    liveEditorDisabled: Boolean(problem.liveEditorDisabled),
+    sourceLanguage: problem.sourceLanguage || 'python',
   });
 });
 

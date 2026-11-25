@@ -233,7 +233,8 @@ const catalogLessons = Object.assign({},
   require('./easy-800-899'), require('./easy-900-1000'), require('./easy-1000-1099'),
   require('./easy-1100-1199'), require('./easy-1200-1299'), require('./easy-1300-1399'),
   require('./easy-1400-1500'), require('./easy-1501-1599'), require('./easy-1600-1699'),
-  require('./easy-1700-1799'), require('./easy-1800-1899'), require('./easy-1900-2000'));
+  require('./easy-1700-1799'), require('./easy-1800-1899'), require('./easy-1900-2000'),
+  require('./guided-2000-3000'));
 for (const [id, problem] of Object.entries(catalogLessons)) {
   const key = problem.category.key;
   if (!categories[key]) categories[key] = {};

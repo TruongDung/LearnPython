@@ -57,7 +57,7 @@ function define(id, title, group, sample, expected, source, options = {}) {
         randomSeed: options.seed ?? 105, maxEvents, failOnTruncate: true,
         summarizeLocals: options.traceOptions?.summarizeLocals || {},
         captureAllocations: ["TreeNode", "ListNode", "Node",...(options.captureClasses||[])], stateClasses: ["Solution",...(options.stateClasses||[])],
-        objectClasses: ["TreeNode", "ListNode", "Node"] });
+        sequenceClasses:["SortedList","SortedSet"],objectClasses: ["TreeNode", "ListNode", "Node",...(options.objectClasses||[])] });
       let previous = {};
       const motion = [];
       const steps = trace.events.map((event, index) => {

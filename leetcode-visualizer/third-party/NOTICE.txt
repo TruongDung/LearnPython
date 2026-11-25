@@ -1,0 +1,23 @@
+The guided lessons in problems/guided-2000-3000.json include adapted algorithm
+implementations. Each entry records its origin and license in `provenance`.
+
+MIT entries: LeetCode solutions by Peng-Yu Chen (walkccc) and contributors.
+Source: https://github.com/walkccc/LeetCode
+Copyright (c) 2022 Peng-Yu Chen. Full license: walkccc-MIT-LICENSE.txt.
+
+CC-BY-SA-4.0 entries: doocs/leetcode contributors.
+Source: https://github.com/doocs/leetcode
+Full license: doocs-CC-BY-SA-4.0-LICENSE.txt.
+The adapted code/reference query in those entries remains available under
+CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/
+
+Local modifications include normalized formatting/type annotations, judge API
+adapters, runnable examples, SQLite dialect adaptations, corrected upstream
+defects, current problem-interface updates and teaching-oriented algorithms.
+JavaScript/TypeScript solutions are transpiled and instrumented for an isolated
+V8 execution context with a deterministic virtual clock. Native Python/Pandas
+code uses a separate local environment. Source descriptions are not copied
+into the application; examples are structured data used to verify execution.
+
+The interactive scenes, Vietnamese explanations, source instrumentation,
+runtime integration and regression/property checks are local additions.

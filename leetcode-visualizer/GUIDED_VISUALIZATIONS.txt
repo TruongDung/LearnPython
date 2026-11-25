@@ -1,0 +1,43 @@
+Guided visualizations, problems 2000–3000
+
+837 lessons were added while preserving the existing 164 implementations.
+All new lessons use actual executed source states. The first panel explains the
+current step with cells, tables, pointers, graph edges, frequency bars or a timer
+timeline. Source code and full variable snapshots are available in expandable
+details. Results appear only after execution reaches completion.
+
+Runtime setup for a new checkout:
+  npm install
+  npm run setup:visualizations
+  npm start
+
+The setup command creates an isolated .viz-python environment and installs the
+versions in requirements-visualizations.txt. No system packages are modified.
+LEETCODE_PYTHON can select the base Python used for setup.
+LEETCODE_PYTHON_NATIVE can select an existing runtime with those dependencies.
+
+Native Python executes algorithm, Pandas and SQLite lessons. SQL reference
+queries are adapted to SQLite, with real CTE output snapshots; dynamic SQL and
+stored-procedure exercises use labeled Python relational models.
+JavaScript executes in isolated V8 contexts. A virtual clock runs actual timer
+and Promise callbacks deterministically without wall-clock sleeps. Example
+callbacks and API adapters are bundled; inputs remain JSON data, not eval code.
+
+New guided lessons have source viewing and input editing. The browser's Python
+live-code editor is disabled for these lessons because it does not provide the
+native packages or JavaScript runtime used by their source.
+
+Tests:
+  node --test --test-concurrency=1 tests/guided-2000-3000.test.js
+  node --test tests/guided-2000-3000-properties.test.js
+
+Every new default example is checked against its known result. Every frame is
+rendered in VI/EN and replayed without snapshot mutation. Instrumented JS is
+compared with uninstrumented V8 on the same example and virtual timer schedule.
+Independent enumeration and reference checks cover product ranks, rolling
+hashes, graph connectivity, secrets, ideal arrays, subsets, budgets, digit DP,
+cache expiration, timers, empty tables and special judge structures.
+
+Attribution and licenses: third-party/NOTICE.txt and each dataset entry's
+provenance. The local scene code, Vietnamese explanations and instrumentation
+are separate from the adapted algorithm/reference-query entries.
