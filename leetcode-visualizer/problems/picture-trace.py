@@ -107,6 +107,14 @@ def picture_trace(payload):
     def encode(value):
         if type(value).__name__ in allocation_classes:
             return allocation_ref(value)
+        module = type(value).__module__
+        if module.startswith('pandas.'):
+            if type(value).__name__ == 'DataFrame':
+                return encode(value.to_dict(orient='records'))
+            if type(value).__name__ == 'Series':
+                return encode(value.to_list())
+        if module.startswith('numpy') and hasattr(value, 'tolist'):
+            return encode(value.tolist())
         if isinstance(value, PictureListNode):
             return {'id': value.node_id, 'val': value.val,
                     'next': value.next.node_id if value.next else None}

@@ -3016,17 +3016,6 @@ function buildSteps1044(input) {
       bestLength = mid;
       lo = mid + 1;
     } else {
-      addStep({
-        event: "else-branch",
-        phase: "compare",
-        title: { vi: "else · tìm trái", en: "else · search left" },
-        codeLines: [11],
-        mid,
-        square,
-        comparison,
-        vars: [{ name: "mid * mid < num", value: false }],
-        note: { vi: "mid² lớn hơn num.", en: "mid² is greater than num." },
-      });
       hi = mid - 1;
     }
     history.push({ round, lo: roundLo, hi: roundHi, mid, found, nextLo: lo, nextHi: hi });

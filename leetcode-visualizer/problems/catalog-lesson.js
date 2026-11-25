@@ -11,6 +11,7 @@ const categories = {
   sliding: ["sliding", "Cửa sổ trượt", "Sliding Window"], greedy: ["greedy", "Tham lam", "Greedy"],
   sql: ["sql", "SQL · bảng dữ liệu", "SQL · Tables"], shell: ["shell", "Shell · xử lý văn bản", "Shell · Text Processing"],
   concurrency: ["concurrency", "Đồng bộ luồng", "Concurrency"],
+  javascript: ["javascript", "JavaScript", "JavaScript"],
 };
 function parseArguments(input, entry) {
   if (typeof input !== "string" || input.length > 12000) throw new Error("Nhập danh sách tham số JSON ≤ 12000 ký tự / Enter a JSON argument list ≤ 12000 characters.");
@@ -51,18 +52,18 @@ function define(id, title, group, sample, expected, source, options = {}) {
     builder(input) {
       const args = parseArguments(input, entry);
       // JSON config is parsed in Python rather than interpolated as Python literals.
-      const prefix = context + "\n_viz_config = json.loads(" + JSON.stringify(JSON.stringify({ kinds: options.kinds || [], answerKind: options.answerKind })) + ")\n";
-      const trace = runTrace({ code: code.join("\n"), method, args, prelude: prefix,
+      const prefix = context + '\n'+(options.prelude||'')+"\n_viz_config = json.loads(" + JSON.stringify(JSON.stringify({ kinds: options.kinds || [], answerKind: options.answerKind })) + ")\n";
+      const trace = runTrace({ engine:options.engine,harness:options.harness,code: code.join("\n"), method, args, prelude: prefix,
         randomSeed: options.seed ?? 105, maxEvents, failOnTruncate: true,
         summarizeLocals: options.traceOptions?.summarizeLocals || {},
-        captureAllocations: ["TreeNode", "ListNode", "Node"], stateClasses: ["Solution"],
+        captureAllocations: ["TreeNode", "ListNode", "Node",...(options.captureClasses||[])], stateClasses: ["Solution",...(options.stateClasses||[])],
         objectClasses: ["TreeNode", "ListNode", "Node"] });
       let previous = {};
       const motion = [];
       const steps = trace.events.map((event, index) => {
         const final = index === trace.events.length - 1;
-        const locals = { ...event.outer, ...event.locals };
-        if ([657,874,1041].includes(id) && Number.isFinite(locals.x) && Number.isFinite(locals.y)
+        const locals = { ...event.outer, ...event.locals,...(options.exposeState&&event.locals.self?event.locals.self:{}) };
+        if ([657,874,1041,1496].includes(id) && Number.isFinite(locals.x) && Number.isFinite(locals.y)
           && (!motion.length || motion.at(-1)[0] !== locals.x || motion.at(-1)[1] !== locals.y)) motion.push([locals.x,locals.y]);
         const changed = Object.keys(locals).filter(name => JSON.stringify(locals[name]) !== JSON.stringify(previous[name]));
         const oldValues = Object.fromEntries(changed.filter(name=>Object.hasOwn(previous,name)).map(name=>[name,previous[name]]));

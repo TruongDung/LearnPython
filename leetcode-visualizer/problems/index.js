@@ -224,13 +224,16 @@ categories['binary-search'][528] = require('./random-pick-three-528')(categories
 for (const [id, problem] of Object.entries(require('./first-hundred-missing'))) {
   categories[problem.category.key][id] = problem;
 }
-// The remaining lessons in 100–1000 are executed through the shared source
+// The remaining lessons in 100–2000 are executed through the shared source
 // tracer, with domain-specific pictures selected by the catalog renderer.
 const catalogLessons = Object.assign({},
   require('./catalog-100-199'), require('./catalog-200-299'),
   require('./catalog-300-399'), require('./catalog-400-500'),
   require('./easy-500-599'), require('./easy-600-699'), require('./easy-700-799'),
-  require('./easy-800-899'), require('./easy-900-1000'), require('./easy-1000-1099'));
+  require('./easy-800-899'), require('./easy-900-1000'), require('./easy-1000-1099'),
+  require('./easy-1100-1199'), require('./easy-1200-1299'), require('./easy-1300-1399'),
+  require('./easy-1400-1500'), require('./easy-1501-1599'), require('./easy-1600-1699'),
+  require('./easy-1700-1799'), require('./easy-1800-1899'), require('./easy-1900-2000'));
 for (const [id, problem] of Object.entries(catalogLessons)) {
   const key = problem.category.key;
   if (!categories[key]) categories[key] = {};
