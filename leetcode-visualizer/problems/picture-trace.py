@@ -65,7 +65,7 @@ def picture_trace(payload):
     # Optional, bundled context for lessons that construct new nodes or model
     # judge APIs. Compile separately so context helpers are not learner steps.
     if payload.get('prelude'):
-        exec(compile(payload['prelude'], '<lesson-context>', 'exec'), scope)
+        exec(compile(payload['prelude'], '<lesson-context>', 'exec'), scope)  # pylint: disable=exec-used
     if payload.get('linkedArgs'):
         scope['ListNode'] = PictureListNode
     if payload.get('captureNext'):
