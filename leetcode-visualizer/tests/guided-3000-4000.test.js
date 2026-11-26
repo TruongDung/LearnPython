@@ -2,11 +2,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const lessons=require('../problems/guided-3000-4000'),data=require('../problems/guided-3000-4000.json');
 const {verifyAnswer}=require('./helpers/guided-answers');
+const specializedLessons=require('../problems/stone-removal-game-3360');
 
 test('904 illustrated lessons fill the registry through 4000 and execute their examples on real source lines',()=>{
  const{SUPPORTED}=require('../problems');assert.equal(data.length,904);
  for(let id=3000;id<=4000;id++)assert.equal(typeof SUPPORTED[id]?.builder,'function',`Missing #${id}`);
- let count=0;for(const entry of data){const p=lessons[entry.id];assert.equal(p,SUPPORTED[entry.id]);const r=p.builder(p.defaultInput);verifyAnswer(entry,r.answer);
+ let count=0;for(const entry of data){const p=lessons[entry.id];assert.equal(specializedLessons[entry.id]||p,SUPPORTED[entry.id]);const r=p.builder(p.defaultInput);verifyAnswer(entry,r.answer);
   assert.equal(p.debugMode,'line-by-line');assert.equal(r.steps.filter(s=>s.final).length,1);assert.equal(r.steps.at(-1).catalogLessonView.trace.truncated,false);
   for(const step of r.steps){assert.ok(step.codeLines[0]>0&&step.codeLines[0]<=p.code.length);assert.equal(step.catalogLessonView.source,p.code[step.codeLines[0]-1]);}
   assert.ok(entry.guideVi&&entry.guideEn&&entry.provenance);if(++count%100===0)process.stdout.write(`Verified ${count}/904 examples\n`);
