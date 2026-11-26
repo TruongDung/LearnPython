@@ -18,7 +18,7 @@ test("3360 is registered for one-line-at-a-time tracing and validates n", () => 
 });
 
 test("3360 follows the alternating removal game and snapshots each executed line", () => {
-  for (const [n, expected] of [[1, false], [10, false], [12, true], [19, false], [54, true]]) {
+  for (const [n, expected] of [[1, false], [9, false], [10, true], [12, true], [19, false], [54, true]]) {
     const run = problem.builder(n);
     assert.equal(run.answer, expected, `n=${n}`);
     assert.equal(run.steps.at(-1).stoneRemoval3360View.winner, expected ? "Alice" : "Bob");
@@ -48,9 +48,15 @@ test("3360 renderer translates its status and exposes both themes", () => {
     context.lang = language;
     context.renderStoneRemovalGame3360View(problem.builder(12).steps.at(-1));
     assert.match(host.innerHTML, /Alice/);
-    assert.match(host.innerHTML, /sr3360-turn failed/);
+    assert.match(host.innerHTML, /sr3360-turn current bob failed/);
+    assert.ok(host.innerHTML.includes(language === "vi" ? "đã lấy" : "taken"));
     assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
   }
+  const steps = problem.builder(12).steps;
+  context.renderStoneRemovalGame3360View(steps.find((step) => step.codeLines[0] === 4));
+  assert.match(host.innerHTML, /L4 · 10 \? 12/);
+  context.renderStoneRemovalGame3360View(steps.find((step) => step.codeLines[0] === 5));
+  assert.match(host.innerHTML, /L5 · 10 ≤ 12/);
   assert.match(readFrontendIndex(), /renderer-stone-removal-game-3360\.js/);
   assert.match(readFrontendIndex(), /stone-removal-game-3360\.css/);
   assert.match(readFrontendStyles(), /\[data-theme="light"\] \.sr3360-viz/);

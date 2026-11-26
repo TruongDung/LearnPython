@@ -22,7 +22,7 @@ function renderStoneRemovalGame3360View(step) {
     : "";
   const pile = Array.from({ length: view.remaining }, () => stone("pile")).join("");
   const currentLine = view.current
-    ? `${view.current.stones} ${view.current.possible === false ? ">" : "≤"} ${view.remaining}`
+    ? `${view.current.stones} ${view.current.possible === null ? "?" : view.current.possible ? "≤" : ">"} ${view.remaining}`
     : `n = ${view.remaining}`;
   const end = view.winner
     ? `<section class="sr3360-result ${view.winner.toLowerCase()}" aria-label="${t("Người thắng", "Winner")}">
