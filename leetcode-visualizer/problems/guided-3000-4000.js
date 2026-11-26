@@ -12,6 +12,11 @@ for(const entry of require('./guided-3000-4000.json')){
  if(/import pandas|pd\.DataFrame/.test(entry.code))lesson.codeLabel={vi:'Python · Pandas · từng bước trên bảng',en:'Python · Pandas · table operations'};
  lesson.liveEditorDisabled=true;
  lesson.sourceLanguage=entry.engine==='javascript'?'javascript':'python';
+ if(entry.id===3999){
+  lesson.statement={vi:'Quay vòng độc lập các ký tự ở vị trí chẵn và lẻ. Hai từ cùng nhóm khi cả hai dãy đều quay được về cùng cặp đại diện. Chỉ số bắt đầu từ 0.',en:'Rotate even-position and odd-position characters independently. Two words share a group when both sequences rotate to the same representative pair. Indices start at 0.'};
+  lesson.approach=[{vi:'Tím: vị trí chẵn. Xanh: vị trí lẻ.',en:'Purple: even positions. Teal: odd positions.'},{vi:'Thử các vòng quay, giữ chuỗi nhỏ nhất của mỗi màu.',en:'Try rotations and keep the smallest string of each color.'},{vi:'Cả hai đại diện trùng nhau → cùng nhóm.',en:'Both representatives match → the same group.'}];
+  lesson.complexity={time:'O(Σ |w|²)',space:'O(Σ |w|)',note:{vi:'Bản minh hoạ duyệt từng vòng quay; không tính lịch sử debug.',en:'This teaching version visits each rotation; excludes debug history.'}};
+ }
  lessons[entry.id]=lesson;
 }
 module.exports=lessons;

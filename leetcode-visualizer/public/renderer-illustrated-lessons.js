@@ -162,7 +162,9 @@ function renderIllustratedLesson(v, language) {
   const primaryNames=['grid','matrix','board','nums','s','arr','colors','word','text','values','heights','nums1','cost','digitSum','time','points','stream','pattern'];
   let primary=v.teaching.scene.primary||primaryNames.find(name=>v.names.includes(name))||v.names.find(name=>Array.isArray(arg(name))||typeof arg(name)==='string')||v.names[0];
   let art='',heroName=primary;
-  if(kind==='chess'){art=chess();heroName=t('Bàn cờ','Chessboard');}
+  if(kind==='binary-subsequence'&&typeof renderBinarySubsequence3998==='function'){art=renderBinarySubsequence3998(v,language);heroName=t('Biến đổi chuỗi','String transformation');}
+  else if(kind==='parity-rotation'&&typeof renderRotationGroups3999==='function'){art=renderRotationGroups3999(v,language);heroName=t('Quay vòng chẵn / lẻ','Even / odd rotations');}
+  else if(kind==='chess'){art=chess();heroName=t('Bàn cờ','Chessboard');}
   else if(kind==='circles'){art=circles();heroName=t('Vùng bị chắn','Blocked regions');}
   else if(kind==='circular')art=ring(primary);
   else if(['tree','graph','list'].includes(kind))art=graph();
@@ -183,15 +185,15 @@ function renderIllustratedLesson(v, language) {
   if(!art)art='<span class="iv-empty">'+t('Chờ dữ liệu của bước đầu','Waiting for the first step')+'</span>';
   const ignored=new Set(['self','connection','query','statement','definitions','placeholders','columns','pendingTimers',heroName]);
   const candidates=[...new Set([...(v.changed||[]),...(v.teaching.focus||[]),'dp','counts','count','heap','queue','stack','parent'])].filter(name=>!ignored.has(name)&&x[name]!==undefined&&x[name]!==null&&typeof x[name]==='object'&&!ref(x[name]));
-  const states=candidates.filter(name=>!(kind==='list'&&Array.isArray(x[name])&&x[name].every(ref))).slice(0,2);
+  const states=['parity-rotation','binary-subsequence'].includes(kind)?[]:candidates.filter(name=>!(kind==='list'&&Array.isArray(x[name])&&x[name].every(ref))).slice(0,2);
   // Keep the current command visible even when its object has no stored fields yet.
   const command=x.operation ? `<span class="iv-command">${esc(x.operation)}(${esc(brief(x.args||[]))})</span>` : '';
-  const metrics=[...new Set([...(v.changed||[]),'ans','answer','count','best','left','right','mid'])].filter(name=>!ignored.has(name)&&scalar(x[name])&&x[name]!==undefined&&String(x[name]).length<40&&!['operations','arguments'].includes(name)).slice(0,4);
+  const metrics=['parity-rotation','binary-subsequence'].includes(kind)?[]:[...new Set([...(v.changed||[]),'ans','answer','count','best','left','right','mid'])].filter(name=>!ignored.has(name)&&scalar(x[name])&&x[name]!==undefined&&String(x[name]).length<40&&!['operations','arguments'].includes(name)).slice(0,4);
   const lines=typeof problemData!=='undefined'&&Array.isArray(problemData.code)?problemData.code:[];
   const first=Math.max(0,v.line-4),last=Math.min(lines.length,v.line+3);
   const code=(lines.length?lines.slice(first,last).map((line,index)=>({number:first+index+1,line})):[{number:v.line,line:v.source}]).map(({number,line})=>`<div class="${number===v.line?'current':''}" data-code-line="${number}" ${number===v.line?'aria-current="step"':''}><span>${number}</span><code>${esc(line)}</code></div>`).join('');
   const hint=String(vi?v.teaching.vi:v.teaching.en).split(/(?<=[.!?])\s+/)[0];
-  const changed=(v.changed||[]).filter(name=>!ignored.has(name)&&Object.hasOwn(v.oldValues||{},name)&&scalar(x[name])&&scalar(v.oldValues[name])).slice(0,2);
+  const changed=['parity-rotation','binary-subsequence'].includes(kind)?[]:(v.changed||[]).filter(name=>!ignored.has(name)&&Object.hasOwn(v.oldValues||{},name)&&scalar(x[name])&&scalar(v.oldValues[name])).slice(0,2);
   const transition=changed.map(name=>`<span><code>${esc(name)}</code> <del>${esc(brief(v.oldValues[name]))}</del> → <b>${esc(brief(x[name]))}</b></span>`).join('');
   const branch=v.branch===null?'':`<span class="iv-branch ${v.branch?'yes':'no'}">${v.branch?'✓':'✕'} ${t(v.branch?'Đúng':'Sai',v.branch?'True':'False')}</span>`;
   return `<section class="iv-scene" data-guided-id="${v.id}" data-illustrated-kind="${esc(kind)}"><header class="iv-heading"><strong>${v.final?'✓ '+t('KẾT QUẢ','RESULT'):t('BƯỚC ĐANG XÉT','CURRENT STEP')}</strong><span><i class="iv-dot gold"></i>${t('đang xét','current')} <i class="iv-dot green"></i>${t('vừa đổi','changed')}</span></header><p class="iv-hint">${esc(hint)}</p><div class="iv-hero"><header><b>${esc(label(heroName||kind))}</b>${command}${branch}</header>${art}</div>${transition?`<div class="iv-transition">${transition}</div>`:''}${states.length?`<div class="iv-states">${states.map(name=>`<section><header>${esc(label(name))}<code>${esc(name)}</code></header>${picture(x[name],name)}</section>`).join('')}</div>`:''}${metrics.length?`<div class="iv-metrics">${metrics.map(name=>`<div><small>${esc(label(name))}</small><b>${esc(brief(x[name]))}</b></div>`).join('')}</div>`:''}<section class="iv-debug"><header><strong>${t('Dòng','Line')} ${v.line}</strong><span class="iv-scope">${esc(v.frames?.at(-1)?.name||'')}</span><nav><button type="button" data-iv-step="-1" aria-label="${esc(t('Lùi một dòng','Previous line'))}" title="${esc(t('Lùi một dòng','Previous line'))}">←</button><button type="button" data-iv-step="1" aria-label="${esc(t('Tiến một dòng','Next line'))}" title="${esc(t('Tiến một dòng','Next line'))}">→</button></nav></header><div class="iv-source">${code}</div></section></section>`;

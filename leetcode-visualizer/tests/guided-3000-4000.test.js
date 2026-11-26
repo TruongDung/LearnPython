@@ -16,7 +16,7 @@ test('904 illustrated lessons fill the registry through 4000 and execute their e
 
 test('all frames render bilingual pictures and the active source line; replay is reversible and never reveals a future result',()=>{
  const host={innerHTML:'',querySelectorAll:()=>[]},ctx=vm.createContext({lang:'vi',$:()=>host,problemData:{code:[]}});
- for(const file of['renderer-illustrated-lessons.js','renderer-guided-scenes.js','renderer-catalog-lessons.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+file),'utf8'),ctx);
+ for(const file of['renderer-binary-subsequence-3998.js','renderer-rotation-groups-3999.js','renderer-illustrated-lessons.js','renderer-guided-scenes.js','renderer-catalog-lessons.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+file),'utf8'),ctx);
  let count=0,frames=0;for(const entry of data){const p=lessons[entry.id],r=p.builder(p.defaultInput),before=JSON.stringify(r);ctx.problemData=p;
   for(const lang of['vi','en']){ctx.lang=lang;for(const step of r.steps){ctx.renderCatalogLesson(step);assert.match(host.innerHTML,new RegExp(`data-guided-id="${p.id}"`));assert.match(host.innerHTML,new RegExp(`data-code-line="${step.codeLines[0]}" aria-current="step"`));assert.equal(host.innerHTML.includes('class="cl-result"'),step.final);assert.doesNotMatch(host.innerHTML,/\[object Object\]|<script|<img|(?:cx|cy|rx|ry|width|height|x|y)="(?:NaN|undefined)"/);frames++;}}
   ctx.renderCatalogLesson(r.steps[0]);const first=host.innerHTML;ctx.renderCatalogLesson(r.steps.at(-1));ctx.renderCatalogLesson(r.steps[0]);assert.equal(host.innerHTML,first);assert.equal(JSON.stringify(r),before);
@@ -39,7 +39,7 @@ test('new scripts and theme styles are lazy, correctly ordered, and registered f
 
 test('specialized pictures show readable letters, visible node arrows, circles, and numeric scales with collapsed inputs',()=>{
  const host={innerHTML:'',querySelectorAll:()=>[]},ctx=vm.createContext({lang:'vi',$:()=>host,problemData:{code:[]}});
- for(const file of['renderer-illustrated-lessons.js','renderer-guided-scenes.js','renderer-catalog-lessons.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+file),'utf8'),ctx);
+ for(const file of['renderer-binary-subsequence-3998.js','renderer-rotation-groups-3999.js','renderer-illustrated-lessons.js','renderer-guided-scenes.js','renderer-catalog-lessons.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+file),'utf8'),ctx);
  for(const id of[3001,3235,3294,3337,3648,3879]){const p=lessons[id],r=p.builder(p.defaultInput);ctx.problemData=p;
   for(const language of['vi','en']){ctx.lang=language;for(const step of r.steps){ctx.renderCatalogLesson(step);assert.doesNotMatch(host.innerHTML,/\[object Object\]|(?:cx|cy|width|height)="(?:NaN|undefined)"|class="cl-input" open/);assert.match(host.innerHTML,new RegExp(`data-code-line="${step.codeLines[0]}" aria-current="step"`));}}
   if(id===3001)assert.match(host.innerHTML,/iv-chess/);

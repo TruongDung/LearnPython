@@ -63885,24 +63885,27 @@
     "id": 3998,
     "title": "Transform Binary String Using Subsequence Sort",
     "url": "https://leetcode.com/problems/transform-binary-string-using-subsequence-sort",
-    "tags": [],
+    "tags": [
+      "String",
+      "Greedy"
+    ],
     "difficulty": "medium",
-    "code": "class Solution:\n    def run(self, s, strs):\n        zeroes=s.count('0')\n        answer=[]\n        for pattern in strs:\n            reachable={0}\n            required=0\n            for before,after in zip(s,pattern):\n                required+=before=='0'\n                choices=(0,1) if after=='?' else (int(after=='0'),)\n                reachable={count+extra for count in reachable for extra in choices if required<=count+extra<=zeroes}\n            answer.append(zeroes in reachable)\n        return answer\n",
+    "code": "class Solution:\n    def canTransform(self, s, strs):\n        zeroes = s.count('0')\n        answer = []\n        for query_index, pattern in enumerate(strs):\n            need = zeroes - pattern.count('0')\n            if need < 0 or need > pattern.count('?'):\n                answer.append(False)\n                continue\n            target = []\n            for index, char in enumerate(pattern):\n                if char == '?':\n                    char = '0' if need > 0 else '1'\n                    need -= int(char == '0')\n                target.append(char)\n            source_zeroes = 0\n            target_zeroes = 0\n            possible = True\n            for index, (before, after) in enumerate(zip(s, target)):\n                source_zeroes += int(before == '0')\n                target_zeroes += int(after == '0')\n                if target_zeroes < source_zeroes:\n                    possible = False\n                    break\n            current = list(s)\n            moves = []\n            if possible:\n                for index, char in enumerate(target):\n                    if char == '0' and current[index] == '1':\n                        zero_index = current.index('0', index + 1)\n                        current[index], current[zero_index] = current[zero_index], current[index]\n                        moves.append([index, zero_index])\n            answer.append(possible)\n        return answer\n",
     "license": "local",
-    "method": "run",
+    "method": "canTransform",
     "names": [
       "s",
       "strs"
     ],
-    "guideVi": "Sắp dãy con chỉ đưa số 0 sang trái; ở mọi prefix đích phải có ít nhất số 0 của prefix gốc.",
-    "guideEn": "Sorting subsequences only moves zeroes left; every target prefix needs at least the original zero count.",
-    "group": "math",
+    "guideVi": "Số 0 chỉ đi sang trái; tổng số 0 giữ nguyên.",
+    "guideEn": "Zeroes only move left; their total stays fixed.",
+    "group": "string",
     "sample": [
-      "101",
+      "1010",
       [
-        "1?1",
-        "0?1",
-        "0?0"
+        "0?1?",
+        "1?0?",
+        "11??"
       ]
     ],
     "expected": [
@@ -63911,9 +63914,11 @@
       false
     ],
     "focus": [
-      "answer",
-      "zeroes",
-      "reachable"
+      "target",
+      "source_zeroes",
+      "target_zeroes",
+      "current",
+      "moves"
     ],
     "kinds": [
       null,
@@ -63927,14 +63932,17 @@
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "number",
-      "tags": []
+      "kind": "binary-subsequence",
+      "tags": [
+        "String",
+        "Greedy"
+      ]
     },
     "provenance": {
       "origin": "Local teaching implementation",
       "license": "Project code",
       "reference": "https://leetcode.com/problems/transform-binary-string-using-subsequence-sort",
-      "modifications": "Small-example algorithm and judge adapter; explicit visual limits where applicable."
+      "modifications": "Greedy wildcard resolution, explicit prefix checks, and actual two-index subsequence-sort witnesses expose every learner step."
     }
   },
   {
@@ -63947,26 +63955,28 @@
       "String"
     ],
     "difficulty": "hard",
-    "code": "class Solution:\n    def run(self, words):\n        def rotation(text):\n            if not text:\n                return ''\n            return min(text[i:]+text[:i] for i in range(len(text)))\n        groups=set()\n        for word in words:\n            even=rotation(word[::2])\n            odd=rotation(word[1::2])\n            groups.add((even,odd))\n        return len(groups)\n",
+    "code": "class Solution:\n    def minGroups(self, words):\n        groups = {}\n        for index, word in enumerate(words):\n            even = word[::2]\n            odd = word[1::2]\n            key = []\n            for parity, text in enumerate((even, odd)):\n                best = text\n                for offset in range(len(text)):\n                    candidate = text[offset:] + text[:offset]\n                    if candidate < best:\n                        best = candidate\n                key.append(best)\n            signature = tuple(key)\n            if signature not in groups:\n                groups[signature] = []\n            groups[signature].append(word)\n        return len(groups)\n",
     "license": "local",
-    "method": "run",
+    "method": "minGroups",
     "names": [
       "words"
     ],
-    "guideVi": "Tách hàng chẵn và lẻ; mỗi hàng được quay vòng độc lập, không được hoán vị tùy ý.",
-    "guideEn": "Separate even and odd positions; each row may rotate independently, but cannot permute arbitrarily.",
+    "guideVi": "Tách chẵn / lẻ → quay vòng → ghép hai đại diện để gom nhóm.",
+    "guideEn": "Split even / odd → rotate → group by both representatives.",
     "group": "string",
     "sample": [
       [
-        "ntgwz",
-        "zwntg"
+        "abcdef",
+        "cdefab",
+        "abedcf"
       ]
     ],
-    "expected": 1,
+    "expected": 2,
     "focus": [
-      "groups",
-      "even",
-      "odd"
+      "key",
+      "best",
+      "candidate",
+      "groups"
     ],
     "kinds": [
       null
@@ -63979,7 +63989,7 @@
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "window",
+      "kind": "parity-rotation",
       "tags": [
         "Hash Table",
         "Two Pointers",
@@ -63990,7 +64000,7 @@
       "origin": "Local teaching implementation",
       "license": "Project code",
       "reference": "https://leetcode.com/problems/minimum-number-of-string-groups-through-transformations",
-      "modifications": "Small-example algorithm and judge adapter; explicit visual limits where applicable."
+      "modifications": "Explicit rotation loops expose each candidate, minimum, and group insertion to the source tracer."
     }
   }
 ]
