@@ -689,6 +689,9 @@ const ORDERED_RENDERER_REGISTRY = [
     { predicate: (step) => Boolean(step.specialCharacters3121View), surface: "treeView", render: (step) => {
       renderSpecialCharacters3121View(step);
     } },
+    { predicate: (step) => Boolean(step.stoneRemoval3360View), surface: "treeView", render: (step) => {
+      renderStoneRemovalGame3360View(step);
+    } },
     { predicate: (step) => Boolean(step.serverAllocator9018BitmaskView), surface: "treeView", render: (step) => {
       renderServerAllocator9018BitmaskView(step);
     } },

@@ -1,0 +1,70 @@
+.sr3360-viz {
+  --sr-bg: #101827;
+  --sr-panel: #19263b;
+  --sr-text: #e2e8f0;
+  --sr-muted: #9aabc1;
+  --sr-line: #43536b;
+  --sr-pile: #38bdf8;
+  --sr-alice: #c084fc;
+  --sr-bob: #fbbf24;
+  --sr-win: #4ade80;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--sr-line);
+  border-radius: 12px;
+  background: var(--sr-bg);
+  color: var(--sr-text);
+}
+[data-theme="light"] .sr3360-viz {
+  --sr-bg: #f5f8fc;
+  --sr-panel: #fff;
+  --sr-text: #172033;
+  --sr-muted: #526379;
+  --sr-line: #b7c5d7;
+  --sr-pile: #0369a1;
+  --sr-alice: #7e22ce;
+  --sr-bob: #a16207;
+  --sr-win: #047857;
+}
+.sr3360-viz * { box-sizing: border-box; }
+#treeView:has(>.sr3360-viz) { min-height: 0; padding: 0; border: 0; background: transparent; overflow: visible; }
+.sr3360-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.sr3360-problem, .sr3360-line { color: var(--sr-muted); font: 11px ui-monospace, monospace; }
+.sr3360-counter { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px; border: 1px solid var(--sr-line); border-radius: 8px; background: var(--sr-panel); }
+.sr3360-counter small { color: var(--sr-muted); }
+.sr3360-counter strong { color: var(--sr-pile); font: 800 24px ui-monospace, monospace; }
+.sr3360-pile { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 5px; min-height: 54px; padding: 10px; border: 1px solid var(--sr-line); border-radius: 10px; background: var(--sr-panel); }
+.sr3360-stone { display: inline-block; flex: 0 0 11px; width: 11px; height: 11px; border-radius: 50%; background: var(--sr-pile); }
+.sr3360-pile .sr3360-stone { width: 12px; height: 12px; flex-basis: 12px; }
+.sr3360-empty { color: var(--sr-muted); font: 700 20px ui-monospace, monospace; }
+.sr3360-turns { display: grid; gap: 6px; }
+.sr3360-turn { display: grid; grid-template-columns: 28px minmax(0, 1fr) 24px; align-items: center; gap: 8px; min-height: 36px; padding: 5px 8px; border: 1px solid var(--sr-line); border-radius: 8px; background: var(--sr-panel); }
+.sr3360-player { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid currentColor; border-radius: 50%; color: var(--sr-alice); font: 700 11px ui-monospace, monospace; }
+.sr3360-turn.bob .sr3360-player, .sr3360-player.bob { color: var(--sr-bob); }
+.sr3360-turns .sr3360-tokens { display: flex; flex-wrap: wrap; gap: 4px; }
+.sr3360-turn .sr3360-stone.taken { background: currentColor; color: var(--sr-alice); }
+.sr3360-turn.bob .sr3360-stone.taken { color: var(--sr-bob); }
+.sr3360-turn.current { border-color: var(--sr-pile); box-shadow: inset 3px 0 var(--sr-pile); }
+.sr3360-turn.failed { border-color: #fb7185; box-shadow: inset 3px 0 #fb7185; }
+.sr3360-turn .sr3360-stone.available { background: var(--sr-pile); }
+.sr3360-turn .sr3360-stone.missing { border: 1px dashed var(--sr-muted); background: transparent; }
+.sr3360-turn strong { color: var(--sr-muted); text-align: right; font: 700 12px ui-monospace, monospace; }
+.sr3360-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; color: var(--sr-muted); font-size: 10px; }
+.sr3360-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sr3360-legend .sr3360-stone { flex-basis: 9px; width: 9px; height: 9px; }
+.sr3360-legend .sr3360-stone.taken { background: var(--sr-alice); }
+.sr3360-legend .sr3360-stone.missing { border: 1px dashed var(--sr-muted); background: transparent; }
+.sr3360-result { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px; border: 1px solid var(--sr-win); border-radius: 9px; background: color-mix(in srgb, var(--sr-win) 9%, var(--sr-panel)); color: var(--sr-win); }
+.sr3360-result strong { font-size: 20px; }
+.sr3360-result .sr3360-crown { font-size: 20px; }
+#vizPanel:has(.sr3360-viz) .note, #vizPanel:has(.sr3360-viz) #answer { display: none; }
+#vizPanel:has(.sr3360-viz) :is(#codePanel, #codePanel2) { max-height: none; overflow-x: auto; overflow-y: visible; width: 100%; max-width: 100%; box-sizing: border-box; white-space: pre; }
+#vizPanel:has(.sr3360-viz) .code-line { min-width: 100%; width: max-content; white-space: pre; }
+#vizPanel:has(.sr3360-viz) .code-line .txt { flex: 0 0 auto; white-space: pre; }
+@media (max-width: 480px) {
+  .sr3360-viz { gap: 9px; padding: 9px; }
+  .sr3360-pile { gap: 4px; padding: 8px; }
+  .sr3360-turn { gap: 5px; padding-inline: 5px; }
+}
