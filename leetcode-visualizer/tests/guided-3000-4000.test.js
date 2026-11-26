@@ -35,3 +35,16 @@ test('new scripts and theme styles are lazy, correctly ordered, and registered f
  assert.ok(html.indexOf('renderer-illustrated-lessons.js')<html.indexOf('renderer-guided-scenes.js'));assert.ok(html.indexOf('renderer-guided-scenes.js')<html.indexOf('renderer-catalog-lessons.js'));
  const css=fs.readFileSync(require.resolve('../public/illustrated-lessons.css'),'utf8');for(const variable of['--cl-panel','--cl-fg','--cl-current','--cl-change'])assert.ok(css.includes(variable));assert.match(css,/@media\(max-width:600px\)/);assert.match(html,/English \(US\)/);
 });
+
+test('specialized pictures show readable letters, visible node arrows, circles, and numeric scales with collapsed inputs',()=>{
+ const host={innerHTML:'',querySelectorAll:()=>[]},ctx=vm.createContext({lang:'vi',$:()=>host,problemData:{code:[]}});
+ for(const file of['renderer-illustrated-lessons.js','renderer-guided-scenes.js','renderer-catalog-lessons.js'])vm.runInContext(fs.readFileSync(require.resolve('../public/'+file),'utf8'),ctx);
+ for(const id of[3001,3235,3294,3337,3648,3879]){const p=lessons[id],r=p.builder(p.defaultInput);ctx.problemData=p;
+  for(const language of['vi','en']){ctx.lang=language;for(const step of r.steps){ctx.renderCatalogLesson(step);assert.doesNotMatch(host.innerHTML,/\[object Object\]|(?:cx|cy|width|height)="(?:NaN|undefined)"|class="cl-input" open/);assert.match(host.innerHTML,new RegExp(`data-code-line="${step.codeLines[0]}" aria-current="step"`));}}
+  if(id===3001)assert.match(host.innerHTML,/iv-chess/);
+  if(id===3235)assert.match(host.innerHTML,/iv-obstacle/);
+  if(id===3294){assert.match(host.innerHTML,/refX="32"/);assert.match(host.innerHTML,/ Q[\d.,]+ /);}
+  if(id===3337)assert.match(host.innerHTML,/<code>[a-z]<\/code>/);
+  if(id===3648)assert.match(host.innerHTML,/iv-numbers/);
+ }
+});

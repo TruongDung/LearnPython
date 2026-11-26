@@ -211,7 +211,7 @@ function renderCatalogLesson(step) {
   }).join("");
   const primitives=entries.filter(([,value])=>scalar(value)&&typeof value!=="string"||isRef(value));
   const vars=primitives.map(([name,value])=>`<div class="${changed.has(name)?"is-updated":""}"><small>${esc(name)}</small><b>${esc(isRef(value)?value.id:format(value))}</b></div>`).join("");
-  const inputs=v.args.map((value,i)=>`<details class="cl-input"${!visuals.length&&!v.objects.length?" open":""}><summary>${esc(v.names[i]||`arg${i}`)} · ${t("đầu vào", "input")}</summary>${picture(value,v.names[i])}</details>`).join("");
+  const inputs=v.args.map((value,i)=>`<details class="cl-input"${!v.teaching?.scene?.compact&&!visuals.length&&!v.objects.length?" open":""}><summary>${esc(v.names[i]||`arg${i}`)} · ${t("đầu vào", "input")}</summary>${picture(value,v.names[i])}</details>`).join("");
   const stack=v.frames.length>1?`<section class="cl-stack"><small>${t("NGĂN XẾP GỌI HÀM", "CALL STACK")}</small><div>${v.frames.map((frame,i)=>`<span class="${i===v.frames.length-1?"is-current":""}"><b>${esc(frame.name)}</b><small>${Object.entries(frame.locals).filter(([,val])=>scalar(val)).slice(0,3).map(([k,val])=>`${esc(k)}=${esc(format(val))}`).join(" · ")}</small></span>`).join('<i>→</i>')}</div></section>`:"";
   const branch=v.branch===null?"":`<span class="cl-branch ${v.branch?"is-true":"is-false"}">${v.branch?"True ✓":"False ✕"}</span>`;
   const short=value=>{const text=format(value);return text.length>95?text.slice(0,92)+'…':text;};

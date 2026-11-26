@@ -5,6 +5,9 @@ const canonical=value=>JSON.stringify(value&&typeof value==='object'&&!Array.isA
 function pathCount(grid){const dp=Array(grid[0].length).fill(0);dp[0]=1;for(const row of grid)for(let c=0;c<row.length;c++)dp[c]=row[c]==='#'?0:dp[c]+(c?dp[c-1]:0);return dp.at(-1);}
 function verifyAnswer(entry,answer,args=entry.sample){
  const validation=entry.validation;
+ if(validation==='unordered-values'){assert.deepEqual([...answer].sort((a,b)=>a-b),[...entry.expected].sort((a,b)=>a-b));return;}
+ if(validation==='unordered-chars'){assert.equal([...answer].sort().join(''),[...entry.expected].sort().join(''));return;}
+ if(validation==='factor-partition'){assert.equal(answer.length,args[1]);assert.ok(answer.every(v=>Number.isInteger(v)&&v>0));assert.equal(answer.reduce((a,b)=>a*b,1),args[0]);assert.equal(Math.max(...answer)-Math.min(...answer),Math.max(...entry.expected)-Math.min(...entry.expected));return;}
  if(validation==='unordered-rows'){assert.deepEqual(answer.map(canonical).sort(),entry.expected.map(canonical).sort());return;}
  if(validation==='order-results'){assert.deepEqual(answer.map(v=>Array.isArray(v)?[...v].sort((a,b)=>a-b):v),entry.expected.map(v=>Array.isArray(v)?[...v].sort((a,b)=>a-b):v));return;}
  if(validation==='path-grid'){

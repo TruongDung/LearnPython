@@ -41,3 +41,31 @@ cache expiration, timers, empty tables and special judge structures.
 Attribution and licenses: third-party/NOTICE.txt and each dataset entry's
 provenance. The local scene code, Vietnamese explanations and instrumentation
 are separate from the adapted algorithm/reference-query entries.
+
+
+Illustrated visualizations, problems 3000–4000
+
+904 missing lessons were added; the 97 existing lessons were preserved.
+New lessons put diagrams first: cells/windows, circular tiles, chessboards,
+node pointers, graph edges, bit rows, DP grids and data tables. Each scene
+shows an executed source window with previous/next statement controls.
+Detailed variables, explanations and inputs start collapsed. Every new scene
+has Vietnamese and English (US) text and uses the existing light/dark palette.
+
+The local native runtime above is shared by these lessons. No new dependencies
+are required. The source viewer and JSON input editing are available; the
+browser Python live editor remains disabled for native-runtime lessons.
+Small-example reference algorithms and judge adapters explicitly reject
+inputs beyond their visual state-space limits. The infinite-stream lessons
+use a periodic stream supplied as a JSON array. SQL lessons execute Pandas,
+SQLite, or explicitly labeled relational models.
+
+Validation:
+  node --test --test-concurrency=1 tests/guided-3000-4000.test.js
+  node --test tests/guided-3000-4000-properties.test.js
+
+Tests cover 904 default examples, 1277 additional reference examples, every
+VI/US render frame, executed line mapping and reversible replay. Constructive
+answers are checked for validity rather than equality to one example. Small
+independent oracles check bit operations, edits, swaps, subsets, cyclic peaks,
+and path-count grids, including every k from 1 to 1000 for problem 3990.

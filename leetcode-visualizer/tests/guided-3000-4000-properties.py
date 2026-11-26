@@ -185,4 +185,14 @@ class Properties(unittest.TestCase):
                 if not any(word in group for group in groups):groups.append(equivalent)
             self.assertEqual(run(3999,words),len(groups))
 
+    def test_coprime_score_can_keep_original_values_above_the_edit_limit(self):
+        self.assertEqual(run(3953,[2,2],1),1)
+        for _ in range(70):
+            nums=[RNG.randrange(1,6) for _ in range(3)];limit=RNG.randrange(1,4);best=-math.inf
+            for final in itertools.product(*[sorted(set([value]+list(range(1,limit+1)))) for value in nums]):
+                cost=sum(a!=b for a,b in zip(final,nums))
+                for i,value in enumerate(final):
+                    if all(i==j or math.gcd(value,other)==1 for j,other in enumerate(final)):best=max(best,value-cost)
+            self.assertEqual(run(3953,nums,limit),best)
+
 if __name__=='__main__':unittest.main(verbosity=2)

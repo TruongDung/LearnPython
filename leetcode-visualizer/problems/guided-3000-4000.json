@@ -38,14 +38,14 @@
       3
     ],
     "expected": 2,
-    "guideVi": "So các đại lượng trước và sau phép tính của dòng hiện tại.",
+    "guideVi": "Xe đi thẳng, tượng đi chéo; quân đứng giữa chặn đường.",
     "focus": [],
     "prelude": "import collections, functools, itertools, heapq, bisect, math, operator, re, string, statistics, random\nfrom collections import *\nfrom functools import *\nfrom itertools import *\nfrom heapq import *\nfrom bisect import *\nfrom math import *\nfrom typing import *\nfrom sortedcontainers import SortedList, SortedSet, SortedDict\nfrom copy import deepcopy\nfrom string import ascii_lowercase,ascii_uppercase\nfrom builtins import pow\n\n\nimport numpy as np\nfrom operator import xor,or_,and_\n",
     "engine": "native",
     "classes": [
       "Solution"
     ],
-    "guideEn": "Compare the quantities before and after the current calculation.",
+    "guideEn": "Rooks move straight and bishops diagonally; an intervening piece blocks the path.",
     "scene": {
       "compact": true,
       "debug": true,
@@ -12918,7 +12918,7 @@
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "window",
+      "kind": "circular",
       "tags": [
         "Array",
         "Sliding Window"
@@ -13036,7 +13036,7 @@
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "window",
+      "kind": "circular",
       "tags": [
         "Array",
         "Sliding Window"
@@ -14675,7 +14675,7 @@
       "Math"
     ],
     "difficulty": "hard",
-    "code": "class UnionFind:\n\n    def __init__(self, n):\n        self.id = list(range(n))\n        self.rank = [0] * n\n\n    def unionByRank(self, u, v):\n        i = self.find(u)\n        j = self.find(v)\n        if i == j:\n            return\n        if self.rank[i] < self.rank[j]:\n            self.id[i] = j\n        elif self.rank[i] > self.rank[j]:\n            self.id[j] = i\n        else:\n            self.id[i] = j\n            self.rank[j] += 1\n\n    def find(self, u):\n        if self.id[u] != u:\n            self.id[u] = self.find(self.id[u])\n        return self.id[u]\n\nclass Solution:\n\n    def canReachCorner(self, X, Y, circles):\n        n = len(circles)\n        uf = UnionFind(n + 2)\n        for i, (x, y, r) in enumerate(circles):\n            if x - r <= 0 or y + r >= Y:\n                uf.unionByRank(i, n)\n            if x + r >= X or y - r <= 0:\n                uf.unionByRank(i, n + 1)\n            for j in range(i):\n                x2, y2, r2 = circles[j]\n                if (x - x2) ** 2 + (y - y2) ** 2 <= (r + r2) ** 2:\n                    uf.unionByRank(i, j)\n        return bool(uf.find(n) != uf.find(n + 1))",
+    "code": "class Solution:\n\n    def canReachCorner(self, xCorner, yCorner, circles):\n\n        def in_circle(x, y, cx, cy, r):\n            return (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2\n\n        def cross_left_top(cx, cy, r):\n            a = abs(cx) <= r and 0 <= cy <= yCorner\n            b = abs(cy - yCorner) <= r and 0 <= cx <= xCorner\n            return a or b\n\n        def cross_right_bottom(cx, cy, r):\n            a = abs(cx - xCorner) <= r and 0 <= cy <= yCorner\n            b = abs(cy) <= r and 0 <= cx <= xCorner\n            return a or b\n\n        def dfs(i):\n            x1, y1, r1 = circles[i]\n            if cross_right_bottom(x1, y1, r1):\n                return True\n            vis[i] = True\n            for j, (x2, y2, r2) in enumerate(circles):\n                if vis[j] or not (x1 - x2) ** 2 + (y1 - y2) ** 2 <= (r1 + r2) ** 2:\n                    continue\n                if x1 * r2 + x2 * r1 < (r1 + r2) * xCorner and y1 * r2 + y2 * r1 < (r1 + r2) * yCorner and dfs(j):\n                    return True\n            return False\n        vis = [False] * len(circles)\n        for i, (x, y, r) in enumerate(circles):\n            if in_circle(0, 0, x, y, r) or in_circle(xCorner, yCorner, x, y, r):\n                return False\n            if not vis[i] and cross_left_top(x, y, r) and dfs(i):\n                return False\n        return True",
     "license": "MIT",
     "kinds": [
       null,
@@ -14684,8 +14684,8 @@
     ],
     "method": "canReachCorner",
     "names": [
-      "X",
-      "Y",
+      "xCorner",
+      "yCorner",
       "circles"
     ],
     "returnKind": null,
@@ -14702,7 +14702,7 @@
       ]
     ],
     "expected": true,
-    "guideVi": "Đặt dữ liệu lên mặt phẳng; theo dõi cặp điểm và vùng đang xét.",
+    "guideVi": "Đĩa tròn chắn đường; theo dõi chuỗi đĩa nối các cạnh làm ngăn hai góc.",
     "focus": [
       "self",
       "i",
@@ -14711,14 +14711,13 @@
     "prelude": "import collections, functools, itertools, heapq, bisect, math, operator, re, string, statistics, random\nfrom collections import *\nfrom functools import *\nfrom itertools import *\nfrom heapq import *\nfrom bisect import *\nfrom math import *\nfrom typing import *\nfrom sortedcontainers import SortedList, SortedSet, SortedDict\nfrom copy import deepcopy\nfrom string import ascii_lowercase,ascii_uppercase\nfrom builtins import pow\n\n\nimport numpy as np\nfrom operator import xor,or_,and_\n",
     "engine": "native",
     "classes": [
-      "UnionFind",
       "Solution"
     ],
-    "guideEn": "Plot the data; follow the selected points and region.",
+    "guideEn": "Circular obstacles block the route; follow connected disks that separate the two corners.",
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "points",
+      "kind": "circles",
       "tags": [
         "Depth-First Search",
         "Breadth-First Search",
@@ -14729,10 +14728,10 @@
       ]
     },
     "provenance": {
-      "origin": "walkccc/LeetCode",
-      "license": "MIT",
-      "url": "https://github.com/walkccc/LeetCode/blob/9b85aa1/solutions/3235. Check if the Rectangle Corner Is Reachable/3235.py",
-      "modifications": "Type/format normalization and runnable teaching adapter."
+      "origin": "doocs/leetcode",
+      "license": "CC-BY-SA-4.0",
+      "url": "https://github.com/doocs/leetcode/blob/main/solution/3200-3299/3235.Check%20if%20the%20Rectangle%20Corner%20Is%20Reachable/README_EN.md",
+      "modifications": "Normalized annotations; correctly clips circle intersections to the rectangle."
     }
   },
   {
@@ -15566,7 +15565,7 @@
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "array",
+      "kind": "circular",
       "tags": [
         "Binary Indexed Tree",
         "Array",
@@ -18425,7 +18424,8 @@
       "license": "MIT",
       "url": "https://github.com/walkccc/LeetCode/blob/9b85aa1/solutions/3283. Maximum Number of Moves to Kill All Pawns/3283.py",
       "modifications": "Type/format normalization and runnable teaching adapter."
-    }
+    },
+    "maxEvents": 60000
   },
   {
     "id": 3284,
@@ -18740,7 +18740,8 @@
       "license": "MIT",
       "url": "https://github.com/walkccc/LeetCode/blob/9b85aa1/solutions/3289. The Two Sneaky Numbers of Digitville/3289.py",
       "modifications": "Type/format normalization and runnable teaching adapter."
-    }
+    },
+    "validation": "unordered-values"
   },
   {
     "id": 3290,
@@ -21743,7 +21744,8 @@
         "String",
         "Dynamic Programming",
         "Counting"
-      ]
+      ],
+      "primary": "s"
     },
     "provenance": {
       "origin": "Local teaching implementation",
@@ -27042,7 +27044,7 @@
     "scene": {
       "compact": true,
       "debug": true,
-      "kind": "array",
+      "kind": "circular",
       "tags": [
         "Array"
       ]
@@ -28503,7 +28505,7 @@
       "Hash Table"
     ],
     "difficulty": "medium",
-    "code": "class Solution:\n\n    def assignElements(self, groups, elements):\n        ans = []\n        elementToMinIndex = {}\n        for i, element in enumerate(elements):\n            if element not in elementToMinIndex:\n                elementToMinIndex[element] = i\n        for num in groups:\n            ans.append(self._getMinIndex(num, elementToMinIndex))\n        return ans\n\n    def _getMinIndex(self, num, elementToMinIndex):\n        res = math.inf\n        i = 1\n        while i * i <= num:\n            if num % i != 0:\n                continue\n            if i in elementToMinIndex:\n                res = min(res, elementToMinIndex[i])\n            if num // i != i and num // i in elementToMinIndex:\n                res = min(res, elementToMinIndex[num // i])\n            i += 1\n        return -1 if res == math.inf else res",
+    "code": "class Solution:\n\n    def assignElements(self, groups, elements):\n        ans = []\n        elementToMinIndex = {}\n        for i, element in enumerate(elements):\n            if element not in elementToMinIndex:\n                elementToMinIndex[element] = i\n        for num in groups:\n            ans.append(self._getMinIndex(num, elementToMinIndex))\n        return ans\n\n    def _getMinIndex(self, num, elementToMinIndex):\n        res = math.inf\n        for i in range(1,isqrt(num)+1):\n            if num % i != 0:\n                continue\n            if i in elementToMinIndex:\n                res = min(res, elementToMinIndex[i])\n            if num // i != i and num // i in elementToMinIndex:\n                res = min(res, elementToMinIndex[num // i])\n        return -1 if res == math.inf else res",
     "license": "MIT",
     "kinds": [
       null,
@@ -43696,7 +43698,8 @@
       "license": "CC-BY-SA-4.0",
       "url": "https://github.com/doocs/leetcode/blob/main/solution/3600-3699/3669.Balanced K-Factor Decomposition/README_EN.md",
       "modifications": "Type/format normalization, runnable teaching adapter, dialect adaptation or corrected source."
-    }
+    },
+    "validation": "factor-partition"
   },
   {
     "id": 3670,
@@ -45092,7 +45095,7 @@
     "url": "https://leetcode.com/problems/split-and-merge-array-transformation",
     "tags": [],
     "difficulty": "medium",
-    "code": "class Solution:\n\n    def minSplitMerge(self, nums1, nums2):\n        n = len(nums1)\n        target = tuple(nums2)\n        start = tuple(nums1)\n        q = [start]\n        vis = set()\n        vis.add(start)\n        for ans in count(0):\n            t = q\n            q = []\n            for cur in t:\n                if cur == target:\n                    return ans\n                for l in range(n):\n                    for r in range(l, n):\n                        remain = list(cur[:l]) + list(cur[r + 1:])\n                        sub = cur[l:r + 1]\n                        for i in range(len(remain) + 1):\n                            nxt = tuple(remain[:i] + list(sub) + remain[i:])\n                            if nxt not in vis:\n                                vis.add(nxt)\n                                q.append(nxt)",
+    "code": "class Solution:\n    def minSplitMerge(self, nums1, nums2):\n        start,target=tuple(nums1),tuple(nums2)\n        if start==target:\n            return 0\n        front,back={start},{target}\n        forward,backward={start:0},{target:0}\n        n=len(nums1)\n        while front and back:\n            if len(front)>len(back):\n                front,back=back,front\n                forward,backward=backward,forward\n            next_front=set()\n            for state in front:\n                for left in range(n):\n                    for right in range(left+1,n+1):\n                        block=state[left:right]\n                        rest=state[:left]+state[right:]\n                        for index in range(len(rest)+1):\n                            candidate=rest[:index]+block+rest[index:]\n                            if candidate in forward:\n                                continue\n                            moves=forward[state]+1\n                            if candidate in backward:\n                                return moves+backward[candidate]\n                            forward[candidate]=moves\n                            next_front.add(candidate)\n            front=next_front\n        return -1\n",
     "license": "CC-BY-SA-4.0",
     "kinds": [
       null,
@@ -45138,10 +45141,9 @@
       "tags": []
     },
     "provenance": {
-      "origin": "doocs/leetcode",
-      "license": "CC-BY-SA-4.0",
-      "url": "https://github.com/doocs/leetcode/blob/main/solution/3600-3699/3690.Split and Merge Array Transformation/README_EN.md",
-      "modifications": "Type/format normalization, runnable teaching adapter, dialect adaptation or corrected source."
+      "origin": "Local teaching implementation",
+      "license": "Project code",
+      "reference": "https://leetcode.com/problems/split-and-merge-array-transformation"
     }
   },
   {
@@ -45254,7 +45256,8 @@
       "license": "CC-BY-SA-4.0",
       "url": "https://github.com/doocs/leetcode/blob/main/solution/3600-3699/3692.Majority Frequency Characters/README_EN.md",
       "modifications": "Type/format normalization, runnable teaching adapter, dialect adaptation or corrected source."
-    }
+    },
+    "validation": "unordered-chars"
   },
   {
     "id": 3693,
@@ -48874,7 +48877,7 @@
       "Dynamic Programming"
     ],
     "difficulty": "hard",
-    "code": "class Solution:\n\n    def totalWaviness(self, num1, num2):\n\n        def calc(x):\n            if x < 0:\n                return 0\n            s = str(x)\n\n            @cache\n            def dfs(pos, prev2, prev1, started, limit):\n                if pos == len(s):\n                    return (started, 0)\n                up = int(s[pos]) if limit else 9\n                cnt = wav = 0\n                for d in range(up + 1):\n                    nlimit = limit and d == up\n                    add = 0\n                    if started == 0:\n                        if d == 0:\n                            ns, np2, np1 = (0, 10, 10)\n                        else:\n                            ns, np2, np1 = (1, 10, d)\n                    else:\n                        ns, np2, np1 = (1, prev1, d)\n                        if prev2 != 10 and (prev1 > prev2 and prev1 > d or (prev1 < prev2 and prev1 < d)):\n                            add = 1\n                    c, w = dfs(pos + 1, np2, np1, ns, nlimit)\n                    cnt += c\n                    wav += w + c * add\n                return (cnt, wav)\n            return dfs(0, 10, 10, 0, True)[1]\n        return calc(num2) - calc(num1 - 1)",
+    "code": "class Solution:\n    def totalWaviness(self, num1, num2):\n        low=str(num1).zfill(len(str(num2)))\n        high=str(num2)\n        @cache\n        def dp(position,prev2,prev1,tight_low,tight_high):\n            if position==len(high):\n                return 1,0\n            lower=int(low[position]) if tight_low else 0\n            upper=int(high[position]) if tight_high else 9\n            count=total=0\n            for digit in range(lower,upper+1):\n                if prev1==-1 and digit==0:\n                    a=b=-1\n                else:\n                    a,b=prev1,digit\n                ways,waviness=dp(position+1,a,b,tight_low and digit==lower,tight_high and digit==upper)\n                peak=int(prev2!=-1 and (prev1>prev2 and prev1>digit or prev1<prev2 and prev1<digit))\n                count+=ways\n                total+=waviness+ways*peak\n            return count,total\n        return dp(0,-1,-1,True,True)[1]\n",
     "license": "CC-BY-SA-4.0",
     "kinds": [
       null,
@@ -48914,10 +48917,9 @@
       ]
     },
     "provenance": {
-      "origin": "doocs/leetcode",
-      "license": "CC-BY-SA-4.0",
-      "url": "https://github.com/doocs/leetcode/blob/main/solution/3700-3799/3753.Total Waviness of Numbers in Range II/README_EN.md",
-      "modifications": "Type/format normalization, runnable teaching adapter, dialect adaptation or corrected source."
+      "origin": "Local teaching implementation",
+      "license": "Project code",
+      "reference": "https://leetcode.com/problems/total-waviness-of-numbers-in-range-ii"
     }
   },
   {
@@ -56051,7 +56053,7 @@
       "Dynamic Programming"
     ],
     "difficulty": "hard",
-    "code": "class Solution:\n\n    def countFancy(self, l, r):\n\n        def check(s):\n            if s < 100:\n                return bool(s % 11 != 0)\n            return bool(1 < s // 10 % 10 < s % 10)\n\n        @cache\n        def dfs(pos, s, prev, st, lim):\n            if pos >= len(num):\n                if st != 3:\n                    return 1\n                return int(check(s))\n            up = int(num[pos]) if lim else 9\n            res = 0\n            for i in range(up + 1):\n                nxt_st = st\n                if st == 0:\n                    if prev == 0:\n                        nxt_st = 0\n                    elif i > prev:\n                        nxt_st = 1\n                    elif i < prev:\n                        nxt_st = 2\n                    else:\n                        nxt_st = 3\n                elif st == 1:\n                    if i > prev:\n                        nxt_st = 1\n                    else:\n                        nxt_st = 3\n                elif st == 2:\n                    if i < prev:\n                        nxt_st = 2\n                    else:\n                        nxt_st = 3\n                else:\n                    nxt_st = 3\n                res += dfs(pos + 1, s + i, i, nxt_st, lim and i == up)\n            return res\n        num = str(l - 1)\n        a = dfs(0, 0, 0, 0, True)\n        dfs.cache_clear()\n        num = str(r)\n        b = dfs(0, 0, 0, 0, True)\n        return b - a",
+    "code": "class Solution:\n    def countFancy(self, l, r):\n        low=str(l).zfill(len(str(r)))\n        high=str(r)\n        def good(value):\n            digits=list(map(int,str(value)))\n            return all(a<b for a,b in pairwise(digits)) or all(a>b for a,b in pairwise(digits))\n        @cache\n        def dp(position,previous,trend,total,tight_low,tight_high):\n            if position==len(high):\n                return int(trend!=3 or good(total))\n            lower=int(low[position]) if tight_low else 0\n            upper=int(high[position]) if tight_high else 9\n            answer=0\n            for digit in range(lower,upper+1):\n                if previous==-1 and digit==0:\n                    new_previous,new_trend=-1,0\n                elif previous==-1:\n                    new_previous,new_trend=digit,0\n                else:\n                    new_previous=digit\n                    direction=1 if digit>previous else 2 if digit<previous else 3\n                    new_trend=direction if trend==0 or direction==trend else 3\n                answer+=dp(position+1,new_previous,new_trend,total+digit,tight_low and digit==lower,tight_high and digit==upper)\n            return answer\n        return dp(0,-1,0,0,True,True)\n",
     "license": "CC-BY-SA-4.0",
     "kinds": [
       null,
@@ -56092,10 +56094,9 @@
       ]
     },
     "provenance": {
-      "origin": "doocs/leetcode",
-      "license": "CC-BY-SA-4.0",
-      "url": "https://github.com/doocs/leetcode/blob/main/solution/3800-3899/3869.Count Fancy Numbers in a Range/README_EN.md",
-      "modifications": "Type/format normalization, runnable teaching adapter, dialect adaptation or corrected source."
+      "origin": "Local teaching implementation",
+      "license": "Project code",
+      "reference": "https://leetcode.com/problems/count-fancy-numbers-in-a-range"
     }
   },
   {
@@ -61150,7 +61151,7 @@
       "Number Theory"
     ],
     "difficulty": "hard",
-    "code": "class Solution:\n    def run(self, nums, maxVal):\n        answer=-inf\n        candidate=maxVal\n        while candidate>=1 and candidate>answer:\n            bad=sum(gcd(value,candidate)>1 for value in nums)\n            cost=min(bad-int(gcd(value,candidate)>1)+int(value!=candidate) for value in nums)\n            answer=max(answer,candidate-cost)\n            candidate-=1\n        return answer\n",
+    "code": "class Solution:\n    def run(self, nums, maxVal):\n        answer=-inf\n        candidates=sorted(set(nums)|set(range(max(1,maxVal-len(nums)-1),maxVal+1)),reverse=True)\n        for candidate in candidates:\n            if candidate<=answer:\n                break\n            bad=sum(gcd(value,candidate)>1 for value in nums)\n            cost=min(bad-int(gcd(value,candidate)>1)+int(value!=candidate) for value in nums)\n            answer=max(answer,candidate-cost)\n        return answer\n",
     "license": "local",
     "method": "run",
     "names": [
