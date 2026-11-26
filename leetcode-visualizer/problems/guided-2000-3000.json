@@ -4794,7 +4794,6 @@
     "difficulty": "hard",
     "code": "class Solution:\n    def run(self, operations, arguments):\n        locations,index,answer = [],0,[None]\n        for operation,values in zip(operations[1:],arguments[1:]):\n            if operation == 'add':\n                name,score = values\n                locations.append((-score,name))\n                locations.sort()\n                answer.append(None)\n            else:\n                answer.append(locations[index][1])\n                index += 1\n        return answer\n",
     "license": "MIT",
-    "codeError": "invalid syntax (<unknown>, line 16)",
     "method": "run",
     "names": [
       "operations",
@@ -10929,7 +10928,6 @@
       null,
       null
     ],
-    "codeError": "",
     "method": "run",
     "names": [
       "num1",
@@ -28980,7 +28978,7 @@
       "data"
     ],
     "harness": "const fn=memoize((a,b)=>a+b);return args[0].map(values=>fn(...values));",
-    "guideVi": "Lần gọi đầu tính rồi lưu theo bộ tham số. Lần lặp lại cùng tham số lấy ngay từ cache; theo dõi cache và số phép tính thực sự.",
+    "guideVi": "Ví dụ dùng hàm cộng hai số; các lần gọi cùng tham số lấy kết quả từ cache. Lần gọi đầu tính rồi lưu theo bộ tham số. Lần lặp lại cùng tham số lấy ngay từ cache; theo dõi cache và số phép tính thực sự.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29166,7 +29164,7 @@
       "operations"
     ],
     "harness": "return reduce(args[0],(sum,value)=>sum+value,args[1]);",
-    "guideVi": "Bộ tích lũy bắt đầu từ init. Mỗi ô dùng kết quả lần trước và giá trị hiện tại để tạo bộ tích lũy mới.",
+    "guideVi": "Ví dụ cộng từng giá trị vào bộ tích lũy, bắt đầu từ init. Bộ tích lũy bắt đầu từ init. Mỗi ô dùng kết quả lần trước và giá trị hiện tại để tạo bộ tích lũy mới.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29333,7 +29331,7 @@
       "data"
     ],
     "harness": "return compose([x=>x+1,x=>x*2])(args[0]);",
-    "guideVi": "Hợp hàm thực hiện từ phải sang trái. Ví dụ nhân đôi trước rồi cộng 1; không phải thứ tự xuất hiện từ trái sang phải.",
+    "guideVi": "Hợp hàm chạy từ phải sang trái: ví dụ nhân 2 trước, rồi cộng 1. Hợp hàm thực hiện từ phải sang trái. Ví dụ nhân đôi trước rồi cộng 1; không phải thứ tự xuất hiện từ trái sang phải.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29434,7 +29432,7 @@
       "data"
     ],
     "harness": "return args[0].groupBy(item=>item.id);",
-    "guideVi": "Callback tạo khóa nhóm cho từng phần tử. Thêm vào cuối nhóm để giữ nguyên thứ tự xuất hiện ban đầu.",
+    "guideVi": "Ví dụ nhóm object theo khóa id; mỗi nhóm giữ thứ tự đầu vào. Callback tạo khóa nhóm cho từng phần tử. Thêm vào cuối nhóm để giữ nguyên thứ tự xuất hiện ban đầu.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29500,7 +29498,7 @@
       "data"
     ],
     "harness": "let fn=curry((a,b,c)=>a+b+c);for(const values of args[0])fn=fn(...values);return fn;",
-    "guideVi": "Mỗi lần gọi giữ lại các đối số đã có. Chỉ khi đủ số đối số của hàm gốc mới thực thi; chưa đủ thì trả closure nhận tiếp.",
+    "guideVi": "Ví dụ hàm gốc cộng ba số; mỗi lần gọi chỉ đưa vào một phần đối số. Mỗi lần gọi giữ lại các đối số đã có. Chỉ khi đủ số đối số của hàm gốc mới thực thi; chưa đủ thì trả closure nhận tiếp.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29598,7 +29596,7 @@
       "data"
     ],
     "harness": "return filter(args[0],value=>value>10);",
-    "guideVi": "Gọi điều kiện cho từng phần tử; chỉ thêm giá trị có kết quả truthy. Giữ thứ tự và không đổi mảng gốc.",
+    "guideVi": "Ví dụ giữ lại những số lớn hơn 10; callback trả đúng thì thêm số vào kết quả. Gọi điều kiện cho từng phần tử; chỉ thêm giá trị có kết quả truthy. Giữ thứ tự và không đổi mảng gốc.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29648,7 +29646,7 @@
       "data"
     ],
     "harness": "return map(args[0],value=>value+1);",
-    "guideVi": "Mỗi ô đầu ra lấy giá trị callback của đúng ô đầu vào. Số phần tử không thay đổi, khác với filter.",
+    "guideVi": "Ví dụ callback cộng 1 vào từng ô; độ dài và thứ tự mảng được giữ nguyên. Mỗi ô đầu ra lấy giá trị callback của đúng ô đầu vào. Số phần tử không thay đổi, khác với filter.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -29747,7 +29745,7 @@
       "timeLimit"
     ],
     "harness": "try{return await timeLimit(()=>new Promise(r=>setTimeout(()=>r(42),args[0])),args[1])();}catch(e){return String(e.message||e);}",
-    "guideVi": "Hàm và timer bắt đầu cùng lúc; Promise nào hoàn tất trước quyết định kết quả. Vượt thời hạn thì từ chối bằng Time Limit Exceeded.",
+    "guideVi": "Tác vụ mẫu mất duration ms và trả 42; chỉ nhận kết quả nếu chưa vượt timeLimit. Hàm và timer bắt đầu cùng lúc; Promise nào hoàn tất trước quyết định kết quả. Vượt thời hạn thì từ chối bằng Time Limit Exceeded.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -31079,7 +31077,7 @@
       "data"
     ],
     "harness": "const fn=once((a,b)=>a+b);return args[0].map(values=>fn(...values));",
-    "guideVi": "Một cờ ghi hàm đã chạy hay chưa. Chỉ lời gọi đầu thực thi hàm gốc; các lần sau trả undefined, được hiển thị là null trong dữ liệu JSON.",
+    "guideVi": "Ví dụ hàm cộng hai số, nhưng chỉ lời gọi đầu tiên được thực thi. Một cờ ghi hàm đã chạy hay chưa. Chỉ lời gọi đầu thực thi hàm gốc; các lần sau trả undefined, được hiển thị là null trong dữ liệu JSON.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -32792,7 +32790,7 @@
       "operations"
     ],
     "harness": "return (function(n){return this.value+n;}).callPolyfill(args[0],args[1]);",
-    "guideVi": "callPolyfill gắn hàm vào context tạm thời để this trỏ đúng object, gọi với các đối số rồi dọn thuộc tính tạm.",
+    "guideVi": "Ví dụ callback trả this.value + n; context quyết định giá trị của this. callPolyfill gắn hàm vào context tạm thời để this trỏ đúng object, gọi với các đối số rồi dọn thuộc tính tạm.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -32837,7 +32835,7 @@
       "data"
     ],
     "harness": "const emitter=new EventEmitter();emitter.subscribe(\"sum\",(a,b)=>a+b);emitter.subscribe(\"sum\",(a,b)=>a*b);return emitter.emit(\"sum\",args[0]);",
-    "guideVi": "Mỗi sự kiện giữ danh sách callback theo thứ tự đăng ký. emit gọi mọi callback còn đăng ký bằng cùng đối số và thu các giá trị trả về.",
+    "guideVi": "Hai callback mẫu lần lượt tính tổng và tích; emit giữ đúng thứ tự đăng ký. Mỗi sự kiện giữ danh sách callback theo thứ tự đăng ký. emit gọi mọi callback còn đăng ký bằng cùng đối số và thu các giá trị trả về.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -34424,7 +34422,7 @@
       "data"
     ],
     "harness": "return sortBy(args[0],value=>value.x);",
-    "guideVi": "Callback tạo khóa số cho mỗi phần tử. Sắp theo khóa tăng dần nhưng trả nguyên object, không chỉ trả giá trị khóa.",
+    "guideVi": "Ví dụ callback lấy khóa x của mỗi object rồi sắp x tăng dần. Callback tạo khóa số cho mỗi phần tử. Sắp theo khóa tăng dần nhưng trả nguyên object, không chỉ trả giá trị khóa.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -35924,7 +35922,7 @@
       "operations"
     ],
     "harness": "const fn=(function(n){return this.value+n;}).bindPolyfill(args[0]);return fn(args[1]);",
-    "guideVi": "bind trả một hàm mới giữ context cho các lần gọi sau. Hàm gốc không chạy ngay tại thời điểm bind.",
+    "guideVi": "Ví dụ hàm trả this.value + n; bind giữ lại context cho lời gọi sau. bind trả một hàm mới giữ context cho các lần gọi sau. Hàm gốc không chạy ngay tại thời điểm bind.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],
@@ -36038,7 +36036,7 @@
       "batchWindow"
     ],
     "harness": "const batcher=new QueryBatcher(async keys=>keys.map(k=>k.toUpperCase()),args[1]);const promises=[];for(const[at,key]of args[0]){await new Promise(r=>setTimeout(r,at-Date.now()));promises.push(batcher.getValue(key));}return await Promise.all(promises);",
-    "guideVi": "Lời gọi đầu được truy vấn ngay. Trong cửa sổ throttle, các yêu cầu sau gom thành một batch; kết quả batch phải trả về đúng Promise của từng key.",
+    "guideVi": "Truy vấn mẫu đổi key thành chữ hoa; các key đến trong cửa sổ throttle được gom vào một batch. Lời gọi đầu được truy vấn ngay. Trong cửa sổ throttle, các yêu cầu sau gom thành một batch; kết quả batch phải trả về đúng Promise của từng key.",
     "description": "JavaScript thực thi thật; clock là thời gian ảo (ms), giúp xem timer/Promise mà không phải chờ. Các callback trong ví dụ được dựng sẵn từ dữ liệu JSON.",
     "classes": [],
     "captureClasses": [],

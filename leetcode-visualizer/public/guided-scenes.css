@@ -2,3 +2,4 @@
 @media(max-width:600px){.gs-scene{padding:12px;gap:12px}.gs-caption{font-size:12px;padding:10px}.gs-cell{min-width:35px;padding:5px}.gs-cell>b{font-size:14px}.gs-panel{padding:9px}.gs-panel>header{flex-wrap:wrap}.gs-metrics>div{min-width:70px}.gs-metrics strong{font-size:17px}}
 .gs-rule{margin:0;font-size:13px;line-height:1.65;color:var(--cl-fg)}
 .gs-rectangles{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px}.gs-rectangles>div{display:grid;justify-items:center;gap:6px;border:1px solid var(--cl-line);border-radius:9px;padding:8px}.gs-rectangles svg{width:100%;height:115px}.gs-rectangles rect{fill:color-mix(in srgb,var(--cl-visited) 25%,var(--cl-panel));stroke:var(--cl-visited);stroke-width:2}.gs-rectangles b{font-size:11px}.gs-rectangles small{font-size:9px;color:var(--cl-muted)}
+.gs-timeline text{font-size:16px}.gs-graph text{font-size:14px}
