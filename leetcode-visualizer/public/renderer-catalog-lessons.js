@@ -219,12 +219,12 @@ function renderCatalogLesson(step) {
   const teaching=v.teaching?`<section class="cl-teaching"><b>${t('Ý TƯỞNG CẦN NHỚ','KEY IDEA')}</b><p>${esc(vi?v.teaching.vi:v.teaching.en)}</p><div class="cl-step-explanation">${v.final?t('Đã chạy tới lệnh trả về. Kết quả bên dưới là giá trị thuật toán thực sự trả về.','Execution reached the return. The result below is the actual returned value.'):v.branch!==null?(v.branch?t('Điều kiện đúng → tiếp tục vào nhánh / vòng lặp.','Condition is true → enter the branch / loop.'):t('Điều kiện sai → bỏ nhánh này hoặc kết thúc vòng lặp.','Condition is false → skip this branch or finish the loop.')):t('Ảnh bên dưới là trạng thái sau dòng code đang sáng; ô viền vàng vừa đổi giá trị.','The pictures show the state after the highlighted statement; gold outlines mark changed values.')}</div>${changes?`<details class="cl-changes"><summary>${t('Vừa thay đổi gì?','What changed?')}</summary>${changes}</details>`:''}</section>`:'';
   const actions=v.teaching?`<nav class="cl-actions">${[['change',t('Lần cập nhật tiếp →','Next update →')],['decision',t('Điều kiện tiếp →','Next decision →')],['answer',t('Kết quả ✓','Result ✓')]].map(([kind,label])=>`<button type="button" data-catalog-jump="${kind}"${v.final?' disabled':''}>${label}</button>`).join('')}</nav>`:'';
   const guided=v.teaching?.mode==='guided'&&typeof renderGuidedScene==='function';
+  const illustrated=guided&&v.teaching?.scene?.compact;
   const scene=guided?renderGuidedScene(v,vi?'vi':'en'):'';
   const html=`<section class="cl-viz" data-lesson-id="${v.id}">
-    <header class="cl-top"><b>#${v.id}</b><h3>${t("Theo dõi thuật toán qua từng bước", "Follow the algorithm one statement at a time")}</h3><span>${v.line}/${typeof problemData!=="undefined"?problemData.code.length:""}</span></header>
+    ${illustrated?'':`<header class="cl-top"><b>#${v.id}</b><h3>${t("Theo dõi thuật toán qua từng bước", "Follow the algorithm one statement at a time")}</h3><span>${v.line}/${typeof problemData!=="undefined"?problemData.code.length:""}</span></header>`}
     ${scene}${guided?`<details class="cl-guided-details"><summary>${t('Xem ý tưởng và dòng code vừa chạy','Show the idea and executed statement')}</summary>`:''}${teaching}<div class="cl-source"><b>L${v.line}</b><code>${esc(v.source.trim())}</code>${branch}</div>${guided?'</details>':''}
-    <div class="cl-legend"><span class="is-current">● ${t("đang xét / con trỏ", "current / pointer")}</span><span class="is-changed">● ${t("vừa cập nhật", "just changed")}</span><span class="is-visited">● ${t("đã thăm", "visited")}</span></div>
-    ${teachingDiagram()}${geometry()}${gameBoard()}${objectGraph()}${bitPicture()}
+    ${illustrated?'':`<div class="cl-legend"><span class="is-current">● ${t("đang xét / con trỏ", "current / pointer")}</span><span class="is-changed">● ${t("vừa cập nhật", "just changed")}</span><span class="is-visited">● ${t("đã thăm", "visited")}</span></div>${teachingDiagram()}${geometry()}${gameBoard()}${objectGraph()}${bitPicture()}`}
     ${guided?`<details class="cl-guided-details"><summary>${t('Chi tiết biến và ngăn xếp','Variable and call-stack details')}</summary>`:''}${vars?`<div class="cl-values">${vars}</div>`:""}${stack}${cards}${guided?'</details>':''}
     ${v.final?`<section class="cl-result"><header>✓ ${t("KẾT QUẢ", "RESULT")}</header>${picture(v.result,"result")}</section>`:""}
     ${actions}<section class="cl-inputs">${inputs}</section>
@@ -232,4 +232,5 @@ function renderCatalogLesson(step) {
   const host=typeof $==="function"?$("treeView"):document.getElementById("treeView");
   host.innerHTML=html;
   host.querySelectorAll?.('[data-catalog-jump]').forEach(button=>button.addEventListener('click',()=>catalogLessonJump(button.dataset.catalogJump)));
+  host.querySelectorAll?.('[data-iv-step]').forEach(button=>button.addEventListener('click',()=>illustratedLessonStep(Number(button.dataset.ivStep))));
 }

@@ -104,6 +104,18 @@ def picture_trace(payload):
             allocated.append(value)
         return {'id': allocation_ids[identity], 'type': type(value).__name__}
 
+    def fields(value):
+        """Read storage fields of bundled classes, including slotted helpers."""
+        result = dict(getattr(value, '__dict__', {}))
+        for cls in type(value).__mro__:
+            slots = cls.__dict__.get('__slots__', ())
+            if isinstance(slots, str):
+                slots = (slots,)
+            for name in slots:
+                if name not in ('__dict__', '__weakref__') and hasattr(value, name):
+                    result[name] = getattr(value, name)
+        return result
+
     def encode(value):
         if type(value).__name__ in allocation_classes:
             return allocation_ref(value)
@@ -140,7 +152,7 @@ def picture_trace(payload):
             except TypeError:
                 return [encode(v) for v in sorted(value, key=repr)]
         if type(value).__name__ in payload.get('objectClasses', []):
-            return {'type': type(value).__name__, **{name: encode(v) for name, v in vars(value).items()}}
+            return {'type': type(value).__name__, **{name: encode(v) for name, v in fields(value).items()}}
         return repr(value)
 
     def local(frame, suspended=False):
@@ -163,7 +175,7 @@ def picture_trace(payload):
                 values[f'{expression}[:{limit}]'] = encode(list(itertools.islice(items, limit)))
         instance = frame.f_locals.get('self')
         if type(instance).__name__ in payload.get('stateClasses', []):
-            values['self'] = {name: encode(value) for name, value in vars(instance).items()}
+            values['self'] = {name: encode(value) for name, value in fields(instance).items()}
         return values
 
     tree_nodes = []
@@ -173,7 +185,7 @@ def picture_trace(payload):
         state = {}
         if allocation_classes:
             state['objects'] = [dict(allocation_ref(value), fields={name: encode(item)
-                                for name, item in vars(value).items()}) for value in allocated]
+                                for name, item in fields(value).items()}) for value in allocated]
         if payload.get('captureTrees'):
             state['trees'] = [{'id': node.node_id, 'val': node.val,
                                'left': node.left.node_id if node.left else None,
