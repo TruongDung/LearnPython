@@ -3,7 +3,7 @@ const {defineEasy}=require('./easy-lesson');const lessons={};
 const {parseArguments}=require('./catalog-lesson');
 const ideas={};
 for(const entry of require('./guided-3000-4000.json')){
- const options={engine:entry.engine,harness:entry.harness,prelude:entry.prelude,method:entry.method,names:entry.names,kinds:entry.kinds,answerKind:entry.returnKind||undefined,difficulty:entry.difficulty,focus:entry.focus,description:entry.description,reference:entry.reference,stateClasses:entry.classes||[],objectClasses:(entry.classes||[]).filter(name=>name!=='Solution'),captureClasses:entry.captureClasses||[],exposeState:true,traceOptions:{maxEvents:entry.maxEvents||12000},teachingMode:'guided',scene:entry.scene||{compact:true,debug:true},guide:entry.guideEn,provenance:entry.provenance};
+ const options={engine:entry.engine,harness:entry.harness,prelude:entry.prelude,method:entry.method,names:entry.names,kinds:entry.kinds,answerKind:entry.returnKind||undefined,difficulty:entry.difficulty,focus:entry.focus,description:entry.description,reference:entry.reference,stateClasses:entry.classes||[],objectClasses:(entry.classes||[]).filter(name=>name!=='Solution'),captureClasses:entry.captureClasses||[],exposeState:true,traceOptions:{maxEvents:entry.maxEvents||12000,summarizeLocals:entry.summarizeLocals||{}},teachingMode:'guided',scene:entry.scene||{compact:true,debug:true},guide:entry.guideEn,provenance:entry.provenance};
  const lesson=defineEasy(entry.id,entry.title,entry.group,entry.sample,entry.expected,entry.code,ideas[entry.id]||entry.guideVi,'Xem các vòng lặp và kích thước trạng thái trong code','Không tính lịch sử mô phỏng',options);
  if(entry.engine==='javascript'){
   lesson.codeLabel={vi:'JavaScript · chạy thật · đồng hồ ảo',en:'JavaScript · actual execution · virtual clock'};
@@ -37,8 +37,8 @@ for(const entry of require('./guided-3000-4000.json')){
    return build(input);
   };
   lesson.statement={vi:'Mua bản đầu của loại i: nhận một quà từ mỗi loại j ≠ i có factor[j] chia hết cho factor[i]. Mua lặp không nhận thêm quà. Tối đa hoá tổng số bản trong ngân sách.',en:'The first purchase of type i grants one free copy of every other type whose factor is divisible by factor[i]. Repeat purchases grant no extra gifts. Maximize all paid and free copies within the budget.'};
-  lesson.approach=[{vi:'Một bản trả tiền → mở các quà chia hết.',en:'One paid copy unlocks the divisible-factor gifts.'},{vi:'Ngân sách đi từ phải sang trái: mỗi loại mở quà đúng một lần.',en:'Scan budgets right to left: unlock each type only once.'},{vi:'Tiền còn lại mua bản rẻ nhất; kiểm tra giỏ hàng.',en:'Use the remaining money for cheapest copies; inspect the cart.'}];
-  lesson.complexity={time:'O(n² + n² × B)',space:'O(n² + n × B)',note:{vi:'Bản minh hoạ lưu cả đường chọn để vẽ giỏ hàng; không tính lịch sử debug. Giới hạn hình: 10 loại, ngân sách 60.',en:'The teaching version also stores purchase witnesses for the cart; excludes debug history. Visual limit: 10 types, budget 60.'}};
+  lesson.approach=[{vi:'cnt[f] đếm số loại có hệ số f.',en:'cnt[f] counts item types with factor f.'},{vi:'gain[f] cộng cnt ở các bội của f, gồm bản mua đầu và quà.',en:'gain[f] sums counts at multiples of f, including the first paid copy and gifts.'},{vi:'Khởi tạo mua rẻ nhất, rồi cập nhật ngân sách từ phải sang trái.',en:'Start with cheapest copies, then update budgets from right to left.'}];
+  lesson.complexity={time:'O(m log m + n × B)',space:'O(m + B)',note:{vi:'m = 1500. Không tính lịch sử debug; ô 0 được gom trong hình. Giới hạn hình: 10 loại, ngân sách 60.',en:'m = 1500. Excludes debug history; zero cells are compressed in the picture. Visual limit: 10 types, budget 60.'}};
  }
  lessons[entry.id]=lesson;
 }

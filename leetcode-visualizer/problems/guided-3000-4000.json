@@ -60747,7 +60747,7 @@
       "Dynamic Programming"
     ],
     "difficulty": "medium",
-    "code": "class Solution:\n    def maximumSaleItems(self, items, budget):\n        n = len(items)\n        phase = \"gifts\"\n        gifts = []\n        gain = []\n        cheapest = 0\n        for item in range(n):\n            factor, price = items[item]\n            if price < items[cheapest][1]:\n                cheapest = item\n            free = []\n            for other in range(n):\n                remainder = items[other][0] % factor\n                if other != item and remainder == 0:\n                    free.append(other)\n            gifts.append(free)\n            gain.append(1 + len(free))\n        phase = \"dp\"\n        dp = [0] * (budget + 1)\n        paths = [[] for _ in range(budget + 1)]\n        for item in range(n):\n            factor, price = items[item]\n            for capacity in range(budget, price - 1, -1):\n                kept = dp[capacity]\n                base = dp[capacity - price]\n                candidate = base + gain[item]\n                take = candidate > kept\n                if take:\n                    dp[capacity] = candidate\n                    paths[capacity] = paths[capacity - price] + [item]\n        phase = \"fill\"\n        best = 0\n        best_path = []\n        best_extra = 0\n        for capacity in range(budget + 1):\n            extra = (budget - capacity) // items[cheapest][1]\n            candidate = dp[capacity] + extra\n            if candidate >= best:\n                best = candidate\n                best_path = paths[capacity][:]\n                best_extra = extra\n        phase = \"cart\"\n        paid_counts = [0] * n\n        for item in best_path:\n            paid_counts[item] += 1\n        paid_counts[cheapest] += best_extra\n        free_counts = [0] * n\n        for item in range(n):\n            if paid_counts[item] > 0:\n                for other in gifts[item]:\n                    free_counts[other] += 1\n        spent = 0\n        for item in range(n):\n            spent += paid_counts[item] * items[item][1]\n        remaining = budget - spent\n        return best\n",
+    "code": "class Solution:\n    def maximumSaleItems(self, items, budget):\n        m = 1500\n        cnt = [0] * (m + 1)\n        gain = [0] * (m + 1)\n        mn = min(p for f, p in items)\n\n        for f, p in items:\n            cnt[f] += 1\n\n        for f in range(1, m + 1):\n            gain[f] = sum(cnt[j] for j in range(f, m + 1, f))\n\n        dp = [b // mn for b in range(budget + 1)]\n\n        for f, p in items:\n            g = gain[f]\n            for b in range(budget, p - 1, -1):\n                dp[b] = max(dp[b], dp[b - p] + g)\n\n        return dp[budget]\n",
     "license": "CC-BY-SA-4.0",
     "kinds": [
       null,
@@ -60778,20 +60778,23 @@
       9
     ],
     "expected": 4,
-    "guideVi": "Lần mua đầu mở quà; bản mua thêm không mở quà lần nữa.",
+    "guideVi": "Đếm hệ số → cộng các bội → khởi tạo mua rẻ nhất → cập nhật DP ngược.",
     "focus": [
-      "dp",
-      "gifts",
+      "cnt",
       "gain",
-      "paid_counts",
-      "free_counts"
+      "mn",
+      "dp",
+      "f",
+      "p",
+      "b",
+      "g"
     ],
     "prelude": "",
     "engine": "wasm",
     "classes": [
       "Solution"
     ],
-    "guideEn": "The first purchase unlocks gifts; repeat copies do not unlock gifts again.",
+    "guideEn": "Count factors → sum their multiples → start with cheapest copies → update DP backwards.",
     "scene": {
       "compact": true,
       "debug": true,
@@ -60801,9 +60804,13 @@
       "origin": "doocs/leetcode",
       "license": "CC-BY-SA-4.0",
       "url": "https://github.com/doocs/leetcode/blob/main/solution/3900-3999/3946.Maximum Number of Items From Sale I/README_EN.md",
-      "modifications": "Expanded the adapted 0/1-knapsack implementation into executed loops, recorded immutable purchase witnesses, then reconstructed paid/free copies and actual spending for the teaching scene. Equal maxima may retain a later witness. Runs using the bundled WebAssembly Python runtime; no native Python environment or external Python packages are required."
+      "modifications": "Replaced with the user-provided factor-frequency and multiples-sieve implementation, including m=1500, cheapest-copy DP initialization, descending updates and return dp[budget]. Sparse snapshots preserve nonzero table entries and implicit zeroes. Uses bundled WebAssembly Python."
     },
-    "maxEvents": 20000
+    "maxEvents": 20000,
+    "summarizeLocals": {
+      "cnt": "nonzero",
+      "gain": "nonzero"
+    }
   },
   {
     "id": 3948,

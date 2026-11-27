@@ -169,6 +169,13 @@ def picture_trace(payload):
                 continue
             values[f'len({name})'] = len(value)
             limit = summaries[name]
+            if limit == 'nonzero':
+                values[name] = {
+                    '__sparse__': True,
+                    'length': len(value),
+                    'entries': [[index, encode(item)] for index, item in enumerate(value) if item != 0],
+                }
+                continue
             if limit:
                 items = value.items() if isinstance(value, dict) else value
                 expression = f'list({name}.items())' if isinstance(value, dict) else f'list({name})'
