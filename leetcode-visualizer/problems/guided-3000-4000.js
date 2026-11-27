@@ -29,6 +29,17 @@ for(const entry of require('./guided-3000-4000.json')){
   lesson.approach=[{vi:'Tím: vị trí chẵn. Xanh: vị trí lẻ.',en:'Purple: even positions. Teal: odd positions.'},{vi:'Thử các vòng quay, giữ chuỗi nhỏ nhất của mỗi màu.',en:'Try rotations and keep the smallest string of each color.'},{vi:'Cả hai đại diện trùng nhau → cùng nhóm.',en:'Both representatives match → the same group.'}];
   lesson.complexity={time:'O(Σ |w|²)',space:'O(Σ |w|)',note:{vi:'Bản minh hoạ duyệt từng vòng quay; không tính lịch sử debug.',en:'This teaching version visits each rotation; excludes debug history.'}};
  }
+ if(entry.id===3946){
+  const build=lesson.builder;
+  lesson.builder=input=>{
+   const[items,budget]=parseArguments(input,lesson.__catalog);
+   if(!Array.isArray(items)||!items.length||items.length>10||!items.every(row=>Array.isArray(row)&&row.length===2&&row.every(v=>Number.isInteger(v)&&v>=1&&v<=1500))||!Number.isInteger(budget)||budget<0||budget>60)throw new Error('#3946: 1–10 loại [factor, price] nguyên dương ≤1500; ngân sách 0–60. / Use 1–10 item types with positive integer factors/prices ≤1500 and budget 0–60.');
+   return build(input);
+  };
+  lesson.statement={vi:'Mua bản đầu của loại i: nhận một quà từ mỗi loại j ≠ i có factor[j] chia hết cho factor[i]. Mua lặp không nhận thêm quà. Tối đa hoá tổng số bản trong ngân sách.',en:'The first purchase of type i grants one free copy of every other type whose factor is divisible by factor[i]. Repeat purchases grant no extra gifts. Maximize all paid and free copies within the budget.'};
+  lesson.approach=[{vi:'Một bản trả tiền → mở các quà chia hết.',en:'One paid copy unlocks the divisible-factor gifts.'},{vi:'Ngân sách đi từ phải sang trái: mỗi loại mở quà đúng một lần.',en:'Scan budgets right to left: unlock each type only once.'},{vi:'Tiền còn lại mua bản rẻ nhất; kiểm tra giỏ hàng.',en:'Use the remaining money for cheapest copies; inspect the cart.'}];
+  lesson.complexity={time:'O(n² + n² × B)',space:'O(n² + n × B)',note:{vi:'Bản minh hoạ lưu cả đường chọn để vẽ giỏ hàng; không tính lịch sử debug. Giới hạn hình: 10 loại, ngân sách 60.',en:'The teaching version also stores purchase witnesses for the cart; excludes debug history. Visual limit: 10 types, budget 60.'}};
+ }
  lessons[entry.id]=lesson;
 }
 module.exports=lessons;

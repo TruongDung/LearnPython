@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-sale-items-3946.js',
   'renderer-guided-4000-5000.js',
   'renderer-valid-sudoku-36.js',
   'renderer-grid-coloring-1411-1931.js',
@@ -260,6 +261,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'sale-items-3946.css',
   'guided-4000-5000.css',
   'color-constraints-lessons.css',
   'graph-coloring-886-1042.css',
