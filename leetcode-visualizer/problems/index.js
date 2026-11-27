@@ -240,6 +240,10 @@ for (const [id, problem] of Object.entries(catalogLessons)) {
   if (!categories[key]) categories[key] = {};
   if (!Object.values(categories).some(category => Object.hasOwn(category, id))) categories[key][id] = problem;
 }
+const mathReplayUpgrade = require('./math-replay-lessons');
+for (const id of [13,29,50,60,166,168,171,172,204]) {
+  for (const category of Object.values(categories)) if (Object.hasOwn(category,id)) category[id]=mathReplayUpgrade(category[id]);
+}
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 const { PREFIX_MAX_TAG, PREFIX_MAX_ROSTER, PREFIX_MAX_ORDER, PREFIX_MAX_ORDER_LABEL, PREFIX_MAX_GUIDE, prefixMaxSubTabs } = require('./prefix-max-catalog');

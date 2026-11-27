@@ -76,6 +76,7 @@ function setPrimaryVisualizationSurface(visibleSurface) {
 }
 
 const ORDERED_RENDERER_REGISTRY = [
+    { predicate: (step) => Boolean(step.mathReplayView), surface: "treeView", render: (step) => { renderMathReplay(step); } },
     { predicate: (step) => Boolean(step.digitSum4000View), surface: "treeView", render: (step) => { renderLargestDigitSum4000(step); } },
     { predicate: (step) => Boolean(step.palindrome5View), surface: "treeView", render: (step) => { renderPalindrome5(step); } },
     { predicate: (step) => Boolean(step.addTwoNumbers2View), surface: "treeView", render: (step) => { renderAddTwoNumbers2(step); } },

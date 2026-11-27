@@ -9,6 +9,7 @@ function illustratedLessonStep(direction) {
 
 // All drawings consume executed snapshots. No answer is predicted by the scene.
 function renderIllustratedLesson(v, language) {
+  if(v.id===4123&&typeof mathPicture==='function')return mathPicture(v,language);
   if(v.id===3946&&typeof renderSaleItems3946==='function')return renderSaleItems3946(v,language);
   const vi = language === 'vi', t = (a,b) => vi ? a : b;
   const esc = value => String(value ?? '∅').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
