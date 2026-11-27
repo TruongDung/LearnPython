@@ -60786,8 +60786,8 @@
       "paid_counts",
       "free_counts"
     ],
-    "prelude": "import collections, functools, itertools, heapq, bisect, math, operator, re, string, statistics, random\nfrom collections import *\nfrom functools import *\nfrom itertools import *\nfrom heapq import *\nfrom bisect import *\nfrom math import *\nfrom typing import *\nfrom sortedcontainers import SortedList, SortedSet, SortedDict\nfrom copy import deepcopy\nfrom string import ascii_lowercase,ascii_uppercase\nfrom builtins import pow\n\n\nimport numpy as np\nfrom operator import xor,or_,and_\n",
-    "engine": "native",
+    "prelude": "",
+    "engine": "wasm",
     "classes": [
       "Solution"
     ],
@@ -60801,7 +60801,7 @@
       "origin": "doocs/leetcode",
       "license": "CC-BY-SA-4.0",
       "url": "https://github.com/doocs/leetcode/blob/main/solution/3900-3999/3946.Maximum Number of Items From Sale I/README_EN.md",
-      "modifications": "Expanded the adapted 0/1-knapsack implementation into executed loops, recorded immutable purchase witnesses, then reconstructed paid/free copies and actual spending for the teaching scene. Equal maxima may retain a later witness."
+      "modifications": "Expanded the adapted 0/1-knapsack implementation into executed loops, recorded immutable purchase witnesses, then reconstructed paid/free copies and actual spending for the teaching scene. Equal maxima may retain a later witness. Runs using the bundled WebAssembly Python runtime; no native Python environment or external Python packages are required."
     },
     "maxEvents": 20000
   },

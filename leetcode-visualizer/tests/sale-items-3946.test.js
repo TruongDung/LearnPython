@@ -4,6 +4,28 @@ const p=require('../problems').SUPPORTED[3946];
 const solve=(items,budget)=>p.builder(JSON.stringify([items,budget]));
 const line=text=>p.code.findIndex(s=>s.trim()===text)+1;
 
+test('3946 runs from the bundled WebAssembly runtime without a native Python installation',()=>{
+ const {spawnSync}=require('node:child_process'),path=require('node:path'),os=require('node:os');
+ const source=`
+  const assert=require('node:assert/strict');
+  const Module=require('node:module'),resolve=Module._resolveFilename;
+  Module._resolveFilename=function(request,...args){
+   if(request.includes('picture-native-worker'))throw new Error('Native Python is unavailable in this deployment');
+   return resolve.call(this,request,...args);
+  };
+  const p=require(${JSON.stringify(require.resolve('../problems'))}).SUPPORTED[3946];
+  assert.equal(p.__catalog.engine,'wasm');assert.equal(p.__catalog.prelude,'');
+  const first=p.builder(p.defaultInput);
+  const second=p.builder(JSON.stringify([[[2,4],[3,2],[4,1],[6,4],[12,4]],8]));
+  assert.equal(first.answer,4);assert.equal(second.answer,10);
+  assert.equal(first.steps.at(-1).catalogLessonView.trace.truncated,false);
+  assert.equal(second.steps.at(-1).catalogLessonView.trace.truncated,false);
+  console.log(JSON.stringify({answers:[first.answer,second.answer],steps:first.steps.length}));
+ `;
+ const result=spawnSync(process.execPath,['-e',source],{encoding:'utf8',windowsHide:true,timeout:30000,env:{...process.env,LEETCODE_PYTHON_NATIVE:path.join(os.tmpdir(),'unavailable-sale-3946-python')}});
+ assert.equal(result.status,0,result.stderr||result.error?.message);assert.deepEqual(JSON.parse(result.stdout).answers,[4,10]);
+});
+
 function enumerate(items,budget){
  let best=0;
  function visit(i,left,paid){
