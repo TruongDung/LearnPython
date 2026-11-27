@@ -136,7 +136,7 @@ function renderIllustratedLesson(v, language) {
     return `<svg class="iv-points" viewBox="0 0 420 400" role="img" aria-label="${esc(t('Hình chữ nhật và các đĩa tròn cản đường','Rectangle and circular obstacles'))}"><rect class="iv-region" x="40" y="${py(height)}" width="${width*scale}" height="${height*scale}"/>${circles.map(([a,b,r],i)=>`<circle class="iv-obstacle ${x.i===i?'active':''}" cx="${px(a)}" cy="${py(b)}" r="${r*scale}"/>`).join('')}<circle cx="40" cy="350" r="5"/><circle cx="${px(width)}" cy="${py(height)}" r="5"/><text x="40" y="375">(0,0)</text><text x="${px(width)}" y="${py(height)-12}">(${width},${height})</text></svg>`;
   }
   function ring(name) {
-    const items=value(name);
+    const raw=value(name),items=typeof raw==='string'?[...raw]:raw;
     if(!Array.isArray(items)||!items.length||items.length>24)return '';
     const at=i=>({x:220+140*Math.cos(-Math.PI/2+i*2*Math.PI/items.length),y:160+115*Math.sin(-Math.PI/2+i*2*Math.PI/items.length)});
     return `<svg class="iv-graph" viewBox="0 0 440 320" role="img" aria-label="${esc(t('Mảng vòng tròn: ô cuối nối ô đầu','Circular array: the last cell joins the first'))}">${items.map((_,i)=>{const a=at(i),b=at((i+1)%items.length);return `<path class="iv-edge" d="M${a.x},${a.y} L${b.x},${b.y}"/>`;}).join('')}${items.map((item,i)=>{const p=at(i);return `<g class="${[x.i,x.index,x.start].includes(i)?'current':''}"><circle cx="${p.x}" cy="${p.y}" r="22"/><text x="${p.x}" y="${p.y+5}" text-anchor="middle">${esc(item)}</text><text x="${p.x}" y="${p.y+40}" text-anchor="middle">${i}</text></g>`;}).join('')}</svg>`;
@@ -162,7 +162,9 @@ function renderIllustratedLesson(v, language) {
   const primaryNames=['grid','matrix','board','nums','s','arr','colors','word','text','values','heights','nums1','cost','digitSum','time','points','stream','pattern'];
   let primary=v.teaching.scene.primary||primaryNames.find(name=>v.names.includes(name))||v.names.find(name=>Array.isArray(arg(name))||typeof arg(name)==='string')||v.names[0];
   let art='',heroName=primary;
-  if(kind==='binary-subsequence'&&typeof renderBinarySubsequence3998==='function'){art=renderBinarySubsequence3998(v,language);heroName=t('Biến đổi chuỗi','String transformation');}
+  const rangeScene=typeof renderRange4000Scene==='function'&&v.id>=4000&&v.id<=5000?renderRange4000Scene(v,language):null;
+  if(rangeScene){art=rangeScene.html;heroName=rangeScene.name;}
+  else if(kind==='binary-subsequence'&&typeof renderBinarySubsequence3998==='function'){art=renderBinarySubsequence3998(v,language);heroName=t('Biến đổi chuỗi','String transformation');}
   else if(kind==='parity-rotation'&&typeof renderRotationGroups3999==='function'){art=renderRotationGroups3999(v,language);heroName=t('Quay vòng chẵn / lẻ','Even / odd rotations');}
   else if(kind==='chess'){art=chess();heroName=t('Bàn cờ','Chessboard');}
   else if(kind==='circles'){art=circles();heroName=t('Vùng bị chắn','Blocked regions');}
@@ -183,7 +185,7 @@ function renderIllustratedLesson(v, language) {
   if(kind==='dp'&&x.dp&&typeof x.dp==='object'){heroName='dp';art=picture(x.dp,'dp');}
   if(!art&&primary)art=picture(value(primary),primary);
   if(!art)art='<span class="iv-empty">'+t('Chờ dữ liệu của bước đầu','Waiting for the first step')+'</span>';
-  const ignored=new Set(['self','connection','query','statement','definitions','placeholders','columns','pendingTimers',heroName]);
+  const ignored=new Set(['self','connection','query','statement','definitions','placeholders','columns','pendingTimers',heroName,...(v.id===4096?['before']:[])]);
   const candidates=[...new Set([...(v.changed||[]),...(v.teaching.focus||[]),'dp','counts','count','heap','queue','stack','parent'])].filter(name=>!ignored.has(name)&&x[name]!==undefined&&x[name]!==null&&typeof x[name]==='object'&&!ref(x[name]));
   const states=['parity-rotation','binary-subsequence'].includes(kind)?[]:candidates.filter(name=>!(kind==='list'&&Array.isArray(x[name])&&x[name].every(ref))).slice(0,2);
   // Keep the current command visible even when its object has no stored fields yet.

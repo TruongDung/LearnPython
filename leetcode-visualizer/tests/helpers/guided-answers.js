@@ -5,6 +5,11 @@ const canonical=value=>JSON.stringify(value&&typeof value==='object'&&!Array.isA
 function pathCount(grid){const dp=Array(grid[0].length).fill(0);dp[0]=1;for(const row of grid)for(let c=0;c<row.length;c++)dp[c]=row[c]==='#'?0:dp[c]+(c?dp[c-1]:0);return dp.at(-1);}
 function verifyAnswer(entry,answer,args=entry.sample){
  const validation=entry.validation;
+ if(validation==='prime-subset'){
+  const[n,s]=args,prime=v=>Number.isInteger(v)&&v>=2&&Array.from({length:Math.max(0,Math.floor(Math.sqrt(v))-1)},(_,i)=>i+2).every(d=>v%d!==0);
+  assert.equal(new Set(answer).size,answer.length);assert.ok(answer.every(v=>prime(v)&&v<=n));assert.ok(answer.reduce((a,b)=>a+b,0)<=s);
+  let total=0,count=0;for(let p=2;p<=n;p++)if(prime(p)){if(total+p>s)break;total+=p;count++;}assert.equal(answer.length,count);return;
+ }
  if(validation==='unordered-values'){assert.deepEqual([...answer].sort((a,b)=>a-b),[...entry.expected].sort((a,b)=>a-b));return;}
  if(validation==='unordered-chars'){assert.equal([...answer].sort().join(''),[...entry.expected].sort().join(''));return;}
  if(validation==='factor-partition'){assert.equal(answer.length,args[1]);assert.ok(answer.every(v=>Number.isInteger(v)&&v>0));assert.equal(answer.reduce((a,b)=>a*b,1),args[0]);assert.equal(Math.max(...answer)-Math.min(...answer),Math.max(...entry.expected)-Math.min(...entry.expected));return;}

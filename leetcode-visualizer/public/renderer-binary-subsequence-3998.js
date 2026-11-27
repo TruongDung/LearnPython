@@ -5,10 +5,10 @@ function renderBinarySubsequence3998(v,language){
  const x=v.locals||{},[s,patterns]=v.args,line=v.line;
  const query=Number.isInteger(x.query_index)?x.query_index:-1,pattern=query>=0?patterns[query]:null;
  const answers=Array.isArray(x.answer)?x.answer:[];
- const building=!!pattern&&line>=10,checking=!!pattern&&line>=19&&line<=24,witness=!!pattern&&line>=25;
+ const building=!!pattern&&line>=10,checking=!!pattern&&(line>=19&&line<=24||line>=25&&x.possible===false),witness=!!pattern&&line>=25;
  const target=building&&Array.isArray(x.target)?x.target:[];
  const current=witness&&Array.isArray(x.current)?x.current:[...s];
- const cursor=Number.isInteger(x.index)&&(line>=11&&line<=24||line>=28&&line<=32)?x.index:null;
+ const cursor=Number.isInteger(x.index)&&(line>=11&&line<=24||checking||line>=28&&line<=32)?x.index:null;
  const pair=witness&&line>=30&&line<=32&&Number.isInteger(x.zero_index)?[x.index,x.zero_index]:null;
  const pending=!!pattern&&line>=13&&line<=14&&pattern[x.index]==='?'?x.index:null;
  const width=s.length*42;

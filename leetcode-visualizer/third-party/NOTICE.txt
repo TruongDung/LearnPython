@@ -1,5 +1,5 @@
 The guided lessons in problems/guided-2000-3000.json and
-problems/guided-3000-4000.json include adapted algorithm
+problems/guided-3000-4000.json and problems/guided-4000-5000.json include adapted algorithm
 implementations. Each entry records its origin and license in `provenance`.
 
 MIT entries: LeetCode solutions by Peng-Yu Chen (walkccc) and contributors.
