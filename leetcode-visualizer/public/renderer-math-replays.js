@@ -33,7 +33,7 @@ function mathPicture(v,language){
  }else if(v.id===60){
   title=t('Chọn theo khối giai thừa','Choose factorial blocks');body=equation(`n = ${a[0]} <b>·</b> k = ${a[1]}`);
   body+=section(t('Các chữ số còn lại','Available digits'),row((x.available||[]).map((n,i)=>tile(n,i,i===x.index&&v.line>=9&&v.line<=11?'current':''))));
-  if(x.block!==undefined&&v.line>=8&&v.line<=13)body+=section(t('Mỗi khối có block hoán vị','Each block has block permutations'),row((x.available||[]).map((n,i)=>tile(n,`${i*x.block}…${(i+1)*x.block-1}`,i===x.index&&v.line>=9&&v.line<=11?'current':''))));
+  if(x.block!==undefined&&v.line>=8&&v.line<=11)body+=section(t('Mỗi khối có block hoán vị','Each block has block permutations'),row((x.available||[]).map((n,i)=>tile(n,`${i*x.block}…${(i+1)*x.block-1}`,i===x.index&&v.line>=9&&v.line<=11?'current':''))));
   body+=row([number(t('Thứ tự từ 0','Zero-based rank'),x.rank),number(t('Cỡ khối','Block size'),x.block),number(t('Khối chọn','Chosen block'),x.index)]);
   body+=section(t('Tiền tố đã ghép','Committed prefix'),row([...(x.answer||'')].map(c=>tile(c,'✓','plus'))));
  }else if(v.id===166){
@@ -54,7 +54,7 @@ function mathPicture(v,language){
   if(x.shifted!==undefined&&v.line>=5)body+=equation(`${fmt(x.shifted)} <b>+</b> ${x.digit} ${v.line>=6?'<b>=</b> '+fmt(x.answer):''}`);
  }else if(v.id===172){
   title=t('Số 0 tận cùng · đếm thừa số 5','Trailing zeroes · count factors of 5');body+=equation(`2 × 5 = 10 <b>→</b> …0`);
-  body+=section(t('Mỗi bội của power cho thêm một thừa số 5','Each multiple of power supplies another factor of 5'),row([tile(x.power,'power','current'),tile(x.groups,t('Số nhóm đã tính','Computed groups'),'next')]));
+  body+=section(t('Mỗi bội của power cho thêm một thừa số 5','Each multiple of power supplies another factor of 5'),row([tile(x.power,'power','current'),tile(x.groups,x.groups===undefined?'groups':`⌊${a[0]} / ${v.line===6||v.line===7?x.power:h.at(-1)?.power??x.power}⌋`,'next')]));
   body+=row(h.map(c=>tile('+'+c.groups,`⌊${a[0]} / ${c.power}⌋`,'plus')));
   body+=number(t('Số chữ số 0','Trailing zero count'),x.zeros);
  }else if(v.id===204){
@@ -63,7 +63,7 @@ function mathPicture(v,language){
   body+=section(t('Chưa gạch = ứng viên · gạch bội số từ p²','Uncrossed = candidate · cross multiples from p²'),`<div class="mp-sieve">${flags.map((prime,i)=>`<div class="${i===x.p&&v.line<14?'current':''} ${i===active?'focus':''} ${prime===false?'crossed':''} ${v.final&&prime&&i>=2?'plus':''}">${prime===false?'<s>'+i+'</s>':i}</div>`).join('')}</div>`);
   body+=row([number('p',x.p),number(t('Bội đang gạch','Current multiple'),x.multiple),number(t('Đã đếm','Counted primes'),x.count)]);
  }else if(v.id===4123){
-  title=t('Xét đoạn xóa · chỉ tính hai đầu','Consider a deletion · pay only for endpoints');const nums=a[0],left=x.left,end=x.end,right=x.right;
+  title=t('Xét đoạn xóa · chỉ tính hai đầu','Consider a deletion · pay only for endpoints');const nums=a[0],left=x.left,right=x.right,end=Number.isInteger(x.end)&&x.end>left&&x.end<=right?x.end:undefined;
   body+=section(t('Đoạn đang xét','Current interval'),row(nums.map((n,i)=>tile(n,i,`${i===left||i===end?'current':''} ${i>=left&&i<=right?'next':''}`))));
   if(Number.isInteger(left)&&Number.isInteger(end))body+=equation(`${nums[left]} <b>+</b> ${nums[end]} <b>=</b> ${nums[left]+nums[end]}`);
   for(const[name,label]of[['full',t('Xóa hết đoạn','Delete the whole interval')],['free',t('Cho phép giữ lại','May retain interior items')]])if(Array.isArray(x[name]))body+=section(label,`<div class="mp-scroll"><div class="mp-matrix" style="--mp-cols:${nums.length}">${x[name].flatMap((row,i)=>row.map((n,j)=>`<div class="${i===left&&j===right?'current':''} ${j<i?'unused':''}"><small>${i},${j}</small><b>${esc(n)}</b></div>`)).join('')}</div></div>`);
