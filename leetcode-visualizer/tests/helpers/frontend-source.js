@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-mountain-4124.js',
   'renderer-math-replays.js',
   'renderer-sale-items-3946.js',
   'renderer-guided-4000-5000.js',
@@ -262,6 +263,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'mountain-4124.css',
   'math-replays.css',
   'sale-items-3946.css',
   'guided-4000-5000.css',
