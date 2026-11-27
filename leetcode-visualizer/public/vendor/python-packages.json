@@ -1,0 +1,55 @@
+{
+  "pyodideVersion": "0.26.4",
+  "source": "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/",
+  "packages": [
+    {
+      "name": "numpy",
+      "version": "1.26.4",
+      "file": "numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl",
+      "sha256": "4a2f5303a88a0747c5e6c80701e0ff4ff5667e487c0c9f9c73875e4d88f4cf9a",
+      "bytes": 11959269
+    },
+    {
+      "name": "six",
+      "version": "1.16.0",
+      "file": "six-1.16.0-py2.py3-none-any.whl",
+      "sha256": "f359c3850331f250d1a5e394aae58193774c6358676340aba992718589b9dcf1",
+      "bytes": 38737
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "file": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "sha256": "302d74af893af51ee8b52e2c06a1fc2bc73cfe645eed3f35a17f082cdf101c7d",
+      "bytes": 444927
+    },
+    {
+      "name": "pytz",
+      "version": "2024.1",
+      "file": "pytz-2024.1-py2.py3-none-any.whl",
+      "sha256": "561652a008b98ef7b66a6acf816e3f4d1c0e17e8ed9eb8dbb993037413cda597",
+      "bytes": 1083571
+    },
+    {
+      "name": "pandas",
+      "version": "2.2.0",
+      "file": "pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl",
+      "sha256": "ae979af0f0be1e8c482408d838ea1366d187f3f057f47b429910e66dbba60673",
+      "bytes": 23759073
+    },
+    {
+      "name": "sqlite3",
+      "version": "1.0.0",
+      "file": "sqlite3-1.0.0.zip",
+      "sha256": "e05c4defc15eac256607c87c3533af267fc072f3a1749a4f6b8bfe074e1be7f6",
+      "bytes": 1454039
+    },
+    {
+      "name": "sortedcontainers",
+      "version": "2.4.0",
+      "file": "sortedcontainers-2.4.0-py2.py3-none-any.whl",
+      "sha256": "5783a606c1be930949245afeae64401b9be3cb038fc24d851d3eaf8913555d6e",
+      "bytes": 134477
+    }
+  ]
+}
