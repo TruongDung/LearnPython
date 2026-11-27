@@ -90,7 +90,7 @@ def check(id, args, expected):
     checks[id] += 1
 
 
-@functools.cache
+@functools.lru_cache(maxsize=None)
 def xor_bfs(state):
     q = collections.deque([(state, 0)])
     seen = {state}
@@ -241,7 +241,7 @@ for _ in range(200):
     check(4096, [grid], settle(grid))
 
 
-@functools.cache
+@functools.lru_cache(maxsize=None)
 def deletion(a):
     if not a:
         return 0
@@ -266,7 +266,7 @@ for _ in range(150):
     check(4081, [n, s], min(subsets, key=lambda a: (-sum(a), len(a), a)))
 
 
-@functools.cache
+@functools.lru_cache(maxsize=None)
 def remove_groups(a, sizes):
     if not a:
         return True
@@ -320,7 +320,7 @@ for _ in range(180):
 for _ in range(150):
     a = [rng.randrange(1, 6) for _ in range(rng.randrange(1, 5))]
     tables = []
-    limit = math.lcm(*a)
+    limit = functools.reduce(lambda left, right: left // math.gcd(left, right) * right, a, 1)
     for start in a:
         dist = {start: 0}
         q = collections.deque([start])
