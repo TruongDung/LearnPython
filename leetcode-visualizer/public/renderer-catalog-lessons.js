@@ -233,4 +233,8 @@ function renderCatalogLesson(step) {
   host.innerHTML=html;
   host.querySelectorAll?.('[data-catalog-jump]').forEach(button=>button.addEventListener('click',()=>catalogLessonJump(button.dataset.catalogJump)));
   host.querySelectorAll?.('[data-iv-step]').forEach(button=>button.addEventListener('click',()=>illustratedLessonStep(Number(button.dataset.ivStep))));
+  if(v.id===887){
+    const current=host.querySelector?.('.egg887-array .current,.egg887-array .answer'),strip=current?.closest('.pd-scroll');
+    if(strip){const cell=current.getBoundingClientRect(),viewport=strip.getBoundingClientRect();if(cell.left<viewport.left||cell.right>viewport.right)strip.scrollLeft+=cell.left-viewport.left-(viewport.width-cell.width)/2;}
+  }
 }

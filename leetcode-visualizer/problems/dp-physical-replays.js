@@ -46,6 +46,7 @@ function create(originals){
   v.egg887={previous:[...(context.before||[])],updated:[...context.updated],history:context.history.slice(-6).map(row=>({...row})),complete:context.complete??true};
  });
  egg.extraParams=[{key:'n',type:'number',label:bi('n (số tầng)','n (floors)'),min:0,max:200,default:6}];
+ egg.__catalog.provenance={origin:'User-provided Python source',license:'local',url:'https://leetcode.com/problems/super-egg-drop/'};
  egg.codeLabel=bi('Python · DP 1 chiều · phải → trái','Python · 1D DP · right → left');
  egg.complexity={time:'O(k × moves)',space:'O(k)',note:bi('Không tính lịch sử debug; code giữ đúng một mảng dp.','Excludes replay history; the source stores one dp array.')};
  result[887]=egg;
