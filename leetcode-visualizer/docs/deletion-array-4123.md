@@ -1,29 +1,31 @@
 # 4123 · Minimum Cost to Delete Array
 
-The drawing follows the existing executed interval-DP source. A deletion removes
-at least two adjacent items in the current array and charges its two endpoints;
-interior items contribute no extra cost. Negative costs are retained.
+The executable source is the user-supplied `minCost` implementation, including
+`dravolqeni` and the simultaneous tuple assignment. It takes O(n) time and
+O(1) auxiliary space, excluding visualization snapshots and endpoint paths.
 
-During execution, endpoint, inside and tail regions have separate colors and
-symbols. Cost cards appear only after the corresponding statement has run.
-The `full` and `free` states remain visible; complete tables are optional details.
-The existing external source pane and forward/backward line controls are used.
+The two outer endpoints must be charged. Every operation charges two endpoints,
+so an even number of interior elements must also be selected. `even` / `odd`
+store the minimum cost for an even / odd number of selected interior endpoints.
+Skipping an item preserves parity; selecting x switches parity and adds x.
 
-At the final frame, `deletion4123Plan` backtracks the completed `full` / `free`
-tables, matching their recurrence and retaining original indices. It displays
-one optimal sequence with each before/after array, endpoint charge and running
-total. It does not predict a plan from incomplete tables or modify snapshots.
-Different tied plans may give the same minimum cost.
+The picture shows both old states and the crossed transitions. The first RHS
+line reveals only the new-even candidate, the second reveals new-odd, and the
+tuple-assignment frame commits both together. Both RHS expressions use the old
+values. The loop frame never reads the stale x from the previous iteration.
 
-The renderer supports Vietnamese and US English, light/dark themes, and narrow
-screens. Wide arrays scroll inside the drawing. The source remains an O(n³),
-O(n²) teaching model limited to 12 values, not a solution for the problem's
-full 100,000-element constraint.
+`deletion-4123-replay.js` attaches endpoint paths to the executed cost snapshots.
+A tie chooses the first min argument (skip), and both new paths read the old
+paths. Final pictures pair selected interior endpoints, delete those intervals,
+then delete the remaining outer segment. Original indices preserve identity
+for duplicate values. No final plan appears before execution finishes.
+
+The external source pane and forward/backward controls remain the line debugger.
+Pictures support Vietnamese / US English, light / dark themes and mobile widths.
+The visual replay accepts 2–80 integers in [-10⁹, 10⁹]. Oversized inputs fail
+before tracing; the submitted Python source remains unchanged.
 
 Validation: `node --test tests/deletion-4123.test.js tests/math-replays.test.js`.
-The dedicated tests verify 1,244 signed arrays, including repeated values and
-12-item cases, legal adjacency after concatenation, endpoint-only charges,
-independent exhaustive optima for small arrays, and reversible source snapshots.
-
-The visual input cap is 12 because dense line snapshots at 18 values exceeded
-the serverless trace time budget; oversized inputs are rejected before tracing.
+Tests cover 1,244 signed arrays, independent exhaustive deletion optima for small
+arrays, legal reconstructed operations, old-value tuple semantics, reversible
+snapshots and an 80-value replay through the bundled Vercel Python runtime.

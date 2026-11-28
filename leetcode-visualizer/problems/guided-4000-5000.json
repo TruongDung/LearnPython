@@ -6763,14 +6763,14 @@
     "url": "https://leetcode.com/problems/minimum-cost-to-delete-array",
     "tags": [],
     "difficulty": "hard",
-    "code": "class Solution:\n    def run(self, nums):\n        n=len(nums)\n        if not 2<=n<=12:\n            raise ValueError('Visual interval-DP limit: 2-12 values / Nhập từ 2 đến 12 số.')\n        full=[[inf]*n for _ in nums]\n        free=[[0]*n for _ in nums]\n        for length in range(2,n+1):\n            for left in range(n-length+1):\n                right=left+length-1\n                for end in range(left+1,right+1):\n                    inside=free[left+1][end-1] if end>left+1 else 0\n                    tail=full[end+1][right] if end<right else 0\n                    full[left][right]=min(full[left][right],nums[left]+nums[end]+inside+tail)\n                free[left][right]=free[left+1][right]\n                for end in range(left+1,right+1):\n                    tail=free[end+1][right] if end<right else 0\n                    free[left][right]=min(free[left][right],full[left][end]+tail)\n        return full[0][-1]\n",
+    "code": "class Solution:\n    def minCost(self, nums: List[int]) -> int:\n        even = 0\n        odd = float(\"inf\")\n\n        dravolqeni = nums\n\n        for i in range(1, len(nums) - 1):\n            x = dravolqeni[i]\n\n            even, odd = (\n                min(even, odd + x),\n                min(odd, even + x)\n            )\n\n        return nums[0] + nums[-1] + even\n",
     "license": "local",
-    "method": "run",
+    "method": "minCost",
     "names": [
       "nums"
     ],
-    "guideVi": "Một bảng xóa hết đoạn, bảng kia cho phép giữ lại phần trong; phí chỉ lấy ở hai đầu mỗi lần xóa.",
-    "guideEn": "One table deletes a whole interval; another may leave interior items for a later deletion, charging only endpoints.",
+    "guideVi": "Hai đầu luôn trả phí. Mỗi số ở giữa: bỏ qua hoặc chọn làm đầu xóa; even/odd là chi phí nhỏ nhất khi số đầu đã chọn là chẵn/lẻ.",
+    "guideEn": "Both outer endpoints are always charged. Skip or select each interior value as a paid endpoint; even/odd track the cheapest even/odd number selected.",
     "maxEvents": 50000,
     "group": "math",
     "sample": [
@@ -6783,11 +6783,11 @@
     ],
     "expected": -7,
     "focus": [
-      "left",
-      "right",
-      "n",
-      "full",
-      "free"
+      "i",
+      "x",
+      "even",
+      "odd",
+      "dravolqeni"
     ],
     "kinds": [
       null
@@ -6807,7 +6807,7 @@
       "source": "https://leetcode.com/problems/minimum-cost-to-delete-array",
       "license": "local",
       "authors": "Project contributors",
-      "modifications": "Independent executable teaching model.",
+      "modifications": "User-supplied linear parity DP, with executed endpoint paths for visualization.",
       "referenceTree": "776cc2e543ada8140b27977f863a6328af2207c6"
     },
     "reference": "https://leetcode.com/problems/minimum-cost-to-delete-array"

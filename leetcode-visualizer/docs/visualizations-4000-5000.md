@@ -44,7 +44,7 @@ own renderers and regression checks.
 
 The shared argument parser limits JSON size and arrays to keep replay usable.
 Some exact teaching models impose additional explicit limits: 4009 and 4029
-accept up to 12 requests/cars; 4058 and 4123 accept up to 18 values; 4081 accepts
+accept up to 12 requests/cars; 4058 accepts up to 18 values; 4123 uses the user-supplied linear parity DP and accepts up to 80 values; 4081 accepts
 n and s up to 1000; 4082 accepts 15 nodes with value span at most 80; 4118
 accepts 30 values with max(nums)+n at most 160. These models demonstrate exact
 execution on small inputs rather than serving as full-constraint judge runners.
