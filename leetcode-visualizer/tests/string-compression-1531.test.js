@@ -25,11 +25,9 @@ function bruteForce(s, k) {
 
 function createRenderer(language) {
   const host = { innerHTML: "" };
-  const context = { escapeHtml: value => String(value ?? "") };
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-string-compression-1531.js"), "utf8"), context);
-  const Visualizer = vm.runInContext("StringCompression1531Visualizer", context);
-  return { host, visualizer: new Visualizer({ host, language }) };
+  const context = vm.createContext({});
+  vm.runInContext(fs.readFileSync(require.resolve("../public/renderer-physical-dp.js"), "utf8"), context);
+  return { host, visualizer: { render(step) { host.innerHTML = context.renderPhysicalDp(step.catalogLessonView, language); } } };
 }
 
 test("1531 DP matches brute-force deletion choices and reconstructs an optimal RLE", () => {
@@ -53,7 +51,7 @@ test("1531 DP matches brute-force deletion choices and reconstructs an optimal R
     const run = problem.builder(s, { k });
     const answer = bruteForce(s, k);
     assert.equal(run.answer, answer, `${s}, k=${k}`);
-    const final = run.steps.at(-1).stringCompression1531View;
+    const final = run.steps.at(-1).catalogLessonView.physicalDp.plan;
     assert.equal(final.compressed.length, answer, `${s}, k=${k}: ${final.compressed}`);
     assert.ok(final.kept.length >= s.length - k);
   }
@@ -61,20 +59,20 @@ test("1531 DP matches brute-force deletion choices and reconstructs an optimal R
 
 test("1531 renderer shows the current string, branch comparison and final deletion result", () => {
   const run = problem.builder("aaabcccd", { k: 2 });
-  const comparison = run.steps.find(step => step.stringCompression1531View.phase === "compare");
+  const comparison = run.steps.find(step => step.catalogLessonView.line === 19);
   const final = run.steps.at(-1);
 
   for (const language of ["en", "vi"]) {
     const { host, visualizer } = createRenderer(language);
     visualizer.render(comparison);
-    assert.match(host.innerHTML, /sc1531-viz/);
-    assert.match(host.innerHTML, /sc1531-char/);
-    assert.match(host.innerHTML, /sc1531-choices/);
-    assert.match(host.innerHTML, /sc1531-budget/);
+    assert.match(host.innerHTML, /pd-scene/);
+    assert.match(host.innerHTML, /pd-tile/);
+    assert.match(host.innerHTML, /pd-counts/);
+    assert.match(host.innerHTML, /Deletions left|Lượt xóa còn lại/);
     visualizer.render(final);
-    assert.match(host.innerHTML, /sc1531-result/);
+    assert.match(host.innerHTML, /data-physical-result="4"/);
     assert.match(host.innerHTML, /a3c3/);
-    assert.match(host.innerHTML, /<output>4<\/output>/);
+    assert.match(host.innerHTML, /data-physical-result="4"/);
     assert.doesNotMatch(host.innerHTML, /undefined|NaN/);
   }
 });
@@ -85,5 +83,6 @@ test("1531 dedicated assets are lazy-loaded and registered for its custom view",
   assert.match(html, /renderer-string-compression-1531\.js/);
   assert.match(html, /string-compression-1531\.css/);
   assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g, ""), /renderer-string-compression-1531\.(?:js|css)/);
-  assert.match(source, /Boolean\(step\.stringCompression1531View\)/);
+  assert.match(source, /step\.catalogLessonView/);
+  assert.match(html, /renderer-physical-dp\.js/);
 });

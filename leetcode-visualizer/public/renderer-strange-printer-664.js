@@ -489,6 +489,7 @@ function renderStrangePrinter664View(step) {
     ? document.getElementById("treeView")
     : typeof $ === "function" ? $("treeView") : null;
   if (!host) return;
+  if(typeof renderIntervalPhysical==='function'){host.innerHTML=renderIntervalPhysical(step,typeof lang==='undefined'?'en':lang);return;}
   const locale = sp664Locale();
   const copy = SP664_TEXT[locale];
   const state = sp664Normalize(step);

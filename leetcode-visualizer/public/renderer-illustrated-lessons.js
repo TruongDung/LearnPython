@@ -9,6 +9,7 @@ function illustratedLessonStep(direction) {
 
 // All drawings consume executed snapshots. No answer is predicted by the scene.
 function renderIllustratedLesson(v, language) {
+  if(v.physicalDp&&typeof renderPhysicalDp==='function')return renderPhysicalDp(v,language);
   if(v.id===413&&typeof renderArithmetic413==='function')return renderArithmetic413(v,language);
   if(v.id===3948&&typeof renderMex3948==='function')return renderMex3948(v,language);
   if(v.id===3962&&typeof renderSubarraySwaps3962==='function')return renderSubarraySwaps3962(v,language);

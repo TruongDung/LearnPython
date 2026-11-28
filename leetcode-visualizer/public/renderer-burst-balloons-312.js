@@ -670,6 +670,7 @@ function renderBurstBalloons312View(step) {
     ? document.getElementById("treeView")
     : typeof $ === "function" ? $("treeView") : null;
   if (!host) return;
+  if(typeof renderIntervalPhysical==='function'){host.innerHTML=renderIntervalPhysical(step,typeof lang==='undefined'?'en':lang);return;}
   const locale = bb312Locale();
   const copy = BB312_TEXT[locale];
   const state = bb312Normalize(step);

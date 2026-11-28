@@ -4,6 +4,7 @@ const path = require('node:path');
 const PUBLIC_DIRECTORY = path.join(__dirname, '..', '..', 'public');
 
 const JAVASCRIPT_ASSETS = Object.freeze([
+  'renderer-physical-dp.js',
   'renderer-mex-3948.js',
   'renderer-subarray-swaps-3962.js',
   'renderer-arithmetic-slices-413.js',
@@ -267,6 +268,7 @@ const JAVASCRIPT_ASSETS = Object.freeze([
 ]);
 
 const STYLESHEET_ASSETS = Object.freeze([
+  'physical-dp.css',
   'mex-3948.css',
   'subarray-swaps-3962.css',
   'arithmetic-slices-413.css',

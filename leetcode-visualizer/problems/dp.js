@@ -27634,3 +27634,5 @@ Object.assign(module.exports, {
     builder2: buildSteps552Matrix,
   },
 });
+
+Object.assign(module.exports, require("./dp-physical-replays")(module.exports));

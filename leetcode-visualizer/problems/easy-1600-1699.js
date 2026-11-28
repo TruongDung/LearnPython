@@ -996,4 +996,5 @@ class Solution:
             groups[pair] = (count+1,duration+call['duration'])
         return [{'person1':a,'person2':b,'call_count':count,'total_duration':duration} for (a,b),(count,duration) in sorted(groups.items())]
 `,'Chuẩn hóa cặp người thành (ID nhỏ,ID lớn) để hai chiều gọi vào cùng một nhóm. Cộng cả số cuộc gọi và tổng thời lượng.','O(rows+groups log groups)','O(groups)');
+lessons[1659]=require('./dp-physical-replays').gridLesson(lessons[1659]);
 module.exports=lessons;
