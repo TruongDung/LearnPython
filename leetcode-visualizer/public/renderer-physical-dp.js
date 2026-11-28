@@ -13,10 +13,11 @@ function renderPhysicalDp(v,language){
  const{t,esc,tile,row,panel,count,result,shell}=physicalDpTools(language),x=v.locals||{},id=v.id,args=v.args,plan=v.physicalDp.plan;
  let html='';
  if(id===546){
+  const box=(value,label,cls='')=>tile(value,label,'box '+cls).replace('class=',`style="--pd-hue:${value*137.508%360}" class=`);
   const boxes=args[0],valid=Number.isInteger(x.l)&&Number.isInteger(x.r)&&x.l<=x.r;
-  html+=panel(t('Xóa t hộp cùng màu liền nhau → t² điểm','Remove t adjacent equal boxes → t² points'),row(boxes.map((n,i)=>tile(n,i,valid&&i>=x.l&&i<=x.r?'selected':valid?'muted':'')).join('')));
-  if(valid&&!v.final){html+=`<div class="pd-equation">dp(${x.l}, ${x.r}, ${x.k})</div>`;html+=panel(t('k hộp cùng màu đã được gom bên trái','k matching boxes carried on the left'),row(Array.from({length:x.k},()=>tile(boxes[x.l],'k','ghost')).join('')+'<b>+</b>'+tile(boxes[x.l],x.l,'focus')));html+=`<div class="pd-equation">(${x.k} + 1)² = ${(x.k+1)**2}</div>`;if(Number.isInteger(x.m)&&x.m>x.l&&x.m<=x.r&&boxes[x.m]===boxes[x.l])html+=panel(t('Xóa phần giữa → ghép cùng màu','Clear the gap → join matching colors'),row(tile(boxes[x.l],x.l,'focus')+'<strong>← … →</strong>'+tile(boxes[x.m],x.m,'focus')));html+=count('res',x.res??v.returned);}
-  if(v.final){html+=`<div class="pd-timeline">${plan.map((op,index)=>panel(`${index+1} · ${op.indices.length}² = +${op.points}`,row(op.before.map(i=>tile(boxes[i],i,op.indices.includes(i)?'remove':'')).join(''))+'<div class="pd-down">↓</div>'+row(op.after.map(i=>tile(boxes[i],i)).join('')||'<b>∅</b>')+`<small class="pd-total">Σ ${op.total}</small>`)).join('')}</div>`;html+=result(id,v.result);}
+  html+=panel(t('Xóa t hộp cùng màu liền nhau → t² điểm','Remove t adjacent equal boxes → t² points'),row(boxes.map((n,i)=>box(n,i,valid&&i>=x.l&&i<=x.r?'selected':valid?'muted':'')).join('')));
+  if(valid&&!v.final){html+=`<div class="pd-equation">dp(${x.l}, ${x.r}, ${x.k})</div>`;html+=panel(t('k hộp cùng màu đã được gom bên trái','k matching boxes carried on the left'),row(Array.from({length:x.k},()=>box(boxes[x.l],'k','ghost')).join('')+'<b>+</b>'+box(boxes[x.l],x.l,'focus')));html+=`<div class="pd-equation">(${x.k} + 1)² = ${(x.k+1)**2}</div>`;if(Number.isInteger(x.m)&&x.m>x.l&&x.m<=x.r&&boxes[x.m]===boxes[x.l])html+=panel(t('Xóa phần giữa → ghép cùng màu','Clear the gap → join matching colors'),row(box(boxes[x.l],x.l,'focus')+'<strong>← … →</strong>'+box(boxes[x.m],x.m,'focus')));html+=count('res',x.res??v.returned);}
+  if(v.final){html+=`<div class="pd-timeline">${plan.map((op,index)=>panel(`${index+1} · ${op.indices.length}² = +${op.points}`,row(op.before.map(i=>box(boxes[i],i,op.indices.includes(i)?'remove':'')).join(''))+'<div class="pd-down">↓</div>'+row(op.after.map(i=>box(boxes[i],i)).join('')||'<b>∅</b>')+`<small class="pd-total">Σ ${op.total}</small>`)).join('')}</div>`;html+=result(id,v.result);}
  }
  if(id===1000){
   const[stones,k]=args,valid=Number.isInteger(x.i)&&Number.isInteger(x.j)&&x.j===x.i+x.length-1;
@@ -59,7 +60,7 @@ function renderIntervalPhysical(step,language){
  const{t,esc,tile,row,panel,count,result,shell}=physicalDpTools(language);let html='';
  if(step.strangePrinter664View){const v=step.strangePrinter664View,s=v.input.s,i=v.cursors.i,j=v.cursors.j,k=v.cursors.k;
   html+=panel(t('Một lượt in một ký tự lên một đoạn, có thể ghi đè','One turn paints one character across an interval; overwriting is allowed'),row([...s].map((c,p)=>tile(c,p,Number.isInteger(i)&&p>=i&&p<=j?'selected':'')).join('')));
-  if(Number.isInteger(k)&&Number.isInteger(j))html+=panel(t('Cùng ký tự → dùng chung lượt in','Matching characters → share a printing turn'),row(tile(s[k],k,'focus')+'<strong>← … →</strong>'+tile(s[j],j,s[k]===s[j]?'focus':'remove')));
+  if(Number.isInteger(k)&&Number.isInteger(j))html+=panel(t('Cùng ký tự → dùng chung lượt in','Matching characters → share a printing turn'),row(tile(s[k],k,'focus')+'<strong>← … →</strong>'+tile(s[j],j,s[k]===s[j]?'focus':'mismatch')));
   if(v.interval){const[a,b]=v.interval;html+=`<div class="pd-counts">${count(t('In riêng','Separate'),v.baseline?.value)}${count(t('Ghép lượt','Merge'),v.candidate?.value)}${count(`dp[${a}][${b}]`,v.computedMask[a][b]?v.dp[a][b]:undefined)}</div>`;}
   if(v.witness){html+=`<div class="pd-timeline">${v.witness.turns.map(turn=>panel(`${turn.turn} · ${t('In','Print')} ${esc(turn.char)} [${turn.left}…${turn.right}]`,row(turn.postCanvas.map((c,p)=>tile(c??'·',p,p>=turn.left&&p<=turn.right?'focus':'')).join('')))).join('')}</div>`;}
   if(v.final)html+=result(664,v.answer);return shell(664,html);
