@@ -1,5 +1,76 @@
 "use strict";
+// Backtrack only completed, executed DP tables. Indices stay in the original
+// array so repeated values cannot change which endpoint an operation removes.
+function deletion4123Plan(nums,full,free){
+ const pairs=[],cost=(table,l,r,empty=0)=>l>r?empty:table[l][r];
+ function visit(l,r,optional){
+  if(l>r||optional&&l===r)return;
+  if(optional&&free[l][r]===free[l+1][r]){visit(l+1,r,true);return;}
+  for(let e=l+1;e<=r;e++){
+   if(optional){
+    if(free[l][r]===full[l][e]+cost(free,e+1,r)){visit(l,e,false);visit(e+1,r,true);return;}
+   }else if(full[l][r]===nums[l]+nums[e]+cost(free,l+1,e-1)+cost(full,e+1,r)){
+    visit(l+1,e-1,true);visit(e+1,r,false);pairs.push([l,e]);return;
+   }
+  }
+  throw new Error('No matching executed deletion state');
+ }
+ visit(0,nums.length-1,false);
+ let remaining=nums.map((_,i)=>i),total=0;
+ return pairs.map(([left,end])=>{
+  const start=remaining.indexOf(left),stop=remaining.indexOf(end),before=[...remaining];
+  if(start<0||stop<=start)throw new Error('Invalid deletion endpoints');
+  const removed=remaining.splice(start,stop-start+1),charge=nums[left]+nums[end];total+=charge;
+  return {before,removed,after:[...remaining],left,end,charge,total};
+ });
+}
+function deletion4123Picture(v,language){
+ const vi=language==='vi',t=(a,b)=>vi?a:b,nums=v.args[0],x=v.locals||{};
+ const esc=value=>String(value??'·').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const value=n=>esc(n===Infinity?'∞':n),sum=(...terms)=>terms.every(Number.isFinite)?terms.reduce((a,b)=>a+b,0):'∞';
+ const optional=v.line>=15&&v.line<=18,phase=v.final?'done':optional?'free':'full';
+ const l=x.left,r=x.right,interval=Number.isInteger(l)&&Number.isInteger(r)&&r===l+x.length-1&&r<nums.length;
+ const selecting=interval&&(v.line>=11&&v.line<=14||v.line>=16&&v.line<=18);
+ const end=selecting&&Number.isInteger(x.end)&&x.end>l&&x.end<=r?x.end:null;
+ const cells=(indices,style=()=>'',symbol=()=>'',small=false)=>`<div class="del4123-scroll"><div class="del4123-rail ${small?'compact':''}">${indices.length?indices.map(i=>`<div class="del4123-cell ${style(i)}" data-original-index="${i}"><small>${i}</small><b>${esc(nums[i])}</b><span>${esc(symbol(i))||'&nbsp;'}</span></div>`).join('<i aria-hidden="true">—</i>'):`<div class="del4123-empty">∅ <small>${t('Rỗng','Empty')}</small></div>`}</div></div>`;
+ const panel=(label,html)=>`<section class="del4123-panel"><h4>${label}</h4>${html}</section>`;
+ const part=(label,n,cls)=>`<div class="del4123-part ${cls}"><small>${label}</small><b>${value(n)}</b></div>`;
+ let body='';
+ if(v.final){
+  const plan=deletion4123Plan(nums,x.full,x.free);
+  body+=`<div class="del4123-summary"><span>${t('Xóa hết mảng','Delete the entire array')}</span><strong>${plan.length} <small>${t('lần xóa','deletions')}</small></strong></div>`;
+  body+=`<div class="del4123-plan">${plan.map((op,index)=>`<section class="del4123-operation" data-deletion-operation="${index}" data-cost="${op.charge}"><header><b>${index+1}</b><span>${t('Chỉ trả phí hai đầu','Pay only for the endpoints')}</span><strong>${esc(nums[op.left])} + (${esc(nums[op.end])}) = <em>${op.charge}</em></strong></header>${cells(op.before,i=>i===op.left||i===op.end?'endpoint removed':op.removed.includes(i)?'removed':'kept',i=>i===op.left||i===op.end?'◎':op.removed.includes(i)?'×':'✓',true)}<div class="del4123-down" aria-hidden="true">↓ <span>${t('Xóa → nối lại','Delete → join')}</span></div>${cells(op.after,()=> 'kept',()=> '✓',true)}<footer>${t('Tổng','Total')} <b>${op.total}</b></footer></section>`).join('')}</div>`;
+  body+=`<footer class="mp-final" data-deletion-result="${value(v.result)}"><small>✓ ${t('Chi phí nhỏ nhất','Minimum cost')}</small><strong>${value(v.result)}</strong></footer>`;
+ }else{
+  body+=`<div class="del4123-stages"><span class="${optional?'':'active'}">① ${t('Xóa hết đoạn','Delete all')}</span><span class="${optional?'active':''}">② ${t('Có thể giữ lại','May keep items')}</span></div>`;
+  const mode=i=>!interval?'':i<l||i>r?'outside':end!==null?(optional?i<=end?'deleting':'tail':i===l||i===end?'endpoint':i<end?'inside':'tail'):optional&&v.line===15&&i===l?'kept':'selected';
+  const symbol=i=>end!==null&&i>=l&&i<=r?optional?(i<=end?'×':'…'):i===l||i===end?'◎':i<end?'…':'→':optional&&v.line===15&&i===l?'✓':'';
+  body+=panel(interval?`${t('Đoạn','Interval')} [${l}…${r}] · ${r-l+1} ${t('số','items')}`:t('Chọn một đoạn dài ít nhất 2','Choose at least two adjacent items'),cells(nums.map((_,i)=>i),mode,symbol));
+  if(end!==null){
+   body+=`<div class="del4123-legend">${optional?`<span class="red">× ${t('Xóa hết','Delete all')}</span>`:`<span class="gold">◎ ${t('Hai đầu trả phí','Paid endpoints')}</span><span class="blue">… ${t('Bên trong: có thể xóa trước','Inside: may delete first')}</span>`}<span class="purple">→ ${t('Phần đuôi','Tail')}</span></div>`;
+   if(optional){
+    body+=`<div class="del4123-parts">${part(`full[${l}][${end}]`,x.full[l][end],'red')}${part(`free[${end+1}][${r}]`,v.line>=17?x.tail:undefined,'purple')}</div>`;
+   }else{
+    body+=`<div class="del4123-parts">${part(`${nums[l]} + (${nums[end]})`,nums[l]+nums[end],'gold')}${part(t('Bên trong','Inside'),v.line>=12?x.inside:undefined,'blue')}${part(t('Đuôi','Tail'),v.line>=13?x.tail:undefined,'purple')}</div>`;
+   }
+   const ready=optional?v.line>=17:v.line>=13;
+   if(ready){
+    const candidate=optional?sum(x.full[l][end],x.tail):sum(nums[l],nums[end],x.inside,x.tail),table=optional?'free':'full',committed=optional?v.line===18:v.line===14;
+    const before=committed?(v.oldValues?.[table]?.[l]?.[r]??x[table][l][r]):x[table][l][r];
+    body+=`<div class="del4123-compare" data-deletion-candidate="${value(candidate)}">${part(t('Đang thử','Trying'),candidate,'blue')}<span>${committed?'→ min':'vs'}</span>${part(committed?t('Đã giữ','Stored best'):t('Tốt nhất đang có','Best so far'),x[table][l][r],'green')}${committed?`<small>${value(before)} → ${value(x[table][l][r])}</small>`:''}</div>`;
+   }
+  }else if(optional&&v.line===15){
+   body+=`<div class="del4123-keep">✓ ${t('Giữ lại ô đầu · xét phần còn lại','Keep the first item · consider the rest')}<b>free[${l}][${r}] ← ${value(x.free[l][r])}</b></div>`;
+  }else body+=`<p class="del4123-caption">◎ + ◎ = ${t('phí xóa · các ô ở giữa không cộng thêm','deletion cost · interior items add no extra charge')}</p>`;
+  if(interval&&x.full&&x.free){
+   body+=`<div class="del4123-states">${part(`full[${l}][${r}] · ${t('xóa hết','delete all')}`,x.full[l][r],'red')}${part(`free[${l}][${r}] · ${t('có thể giữ','may keep')}`,x.free[l][r],'blue')}</div>`;
+   body+=`<details class="del4123-table"><summary>${t('Bảng DP','DP tables')}</summary>${['full','free'].map(name=>`<h4>${name}</h4><div class="mp-scroll"><div class="mp-matrix" style="--mp-cols:${nums.length}">${x[name].flatMap((row,i)=>row.map((n,j)=>`<div class="${i===l&&j===r?'current':''} ${j<i?'unused':''}"><small>${i},${j}</small><b>${value(n)}</b></div>`)).join('')}</div></div>`).join('')}</details>`;
+  }
+ }
+ return `<section class="mp-scene del4123" data-math-id="4123" data-deletion-phase="${phase}"><h3>${t('Xóa đoạn · tính phí hai đầu','Delete a segment · pay its endpoints')}</h3>${body}</section>`;
+}
 function mathPicture(v,language){
+ if(v.id===4123)return deletion4123Picture(v,language);
  const vi=language==='vi',t=(a,b)=>vi?a:b,x=v.locals||{},a=v.args,h=v.history||[];
  const esc=n=>String(n??'·').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fmt=n=>typeof n==='number'?(Number.isFinite(n)?Math.abs(n)!==0&&(Math.abs(n)>=1e9||Math.abs(n)<0.0001)?n.toExponential(5):Number(n.toPrecision(9)):String(n)):esc(n);
@@ -62,11 +133,6 @@ function mathPicture(v,language){
   const flags=x.prime||Array(a[0]).fill(null),active=v.line>=14?x.value:x.multiple;
   body+=section(t('Chưa gạch = ứng viên · gạch bội số từ p²','Uncrossed = candidate · cross multiples from p²'),`<div class="mp-sieve">${flags.map((prime,i)=>`<div class="${i===x.p&&v.line<14?'current':''} ${i===active?'focus':''} ${prime===false?'crossed':''} ${v.final&&prime&&i>=2?'plus':''}">${prime===false?'<s>'+i+'</s>':i}</div>`).join('')}</div>`);
   body+=row([number('p',x.p),number(t('Bội đang gạch','Current multiple'),x.multiple),number(t('Đã đếm','Counted primes'),x.count)]);
- }else if(v.id===4123){
-  title=t('Xét đoạn xóa · chỉ tính hai đầu','Consider a deletion · pay only for endpoints');const nums=a[0],left=x.left,right=x.right,end=Number.isInteger(x.end)&&x.end>left&&x.end<=right?x.end:undefined;
-  body+=section(t('Đoạn đang xét','Current interval'),row(nums.map((n,i)=>tile(n,i,`${i===left||i===end?'current':''} ${i>=left&&i<=right?'next':''}`))));
-  if(Number.isInteger(left)&&Number.isInteger(end))body+=equation(`${nums[left]} <b>+</b> ${nums[end]} <b>=</b> ${nums[left]+nums[end]}`);
-  for(const[name,label]of[['full',t('Xóa hết đoạn','Delete the whole interval')],['free',t('Cho phép giữ lại','May retain interior items')]])if(Array.isArray(x[name]))body+=section(label,`<div class="mp-scroll"><div class="mp-matrix" style="--mp-cols:${nums.length}">${x[name].flatMap((row,i)=>row.map((n,j)=>`<div class="${i===left&&j===right?'current':''} ${j<i?'unused':''}"><small>${i},${j}</small><b>${esc(n)}</b></div>`)).join('')}</div></div>`);
  }
  const result=v.final?`<footer class="mp-final"><small>✓ ${t('Kết quả','Result')}</small><strong>${fmt(v.result)}</strong></footer>`:'';
  return `<section class="mp-scene" data-math-id="${v.id}"><h3>${title}</h3>${body}${result}</section>`;
