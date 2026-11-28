@@ -1,5 +1,6 @@
 "use strict";
 const { define } = require("./catalog-lesson");
+const {attachArithmeticReplay}=require('./sequence-picture-replays');
 const lessons={};
 const add=(id,title,group,sample,expected,source,options={})=>lessons[id]=define(id,title,group,sample,expected,source,options);
 add(400,"Nth Digit","math",[11],0,`
@@ -107,7 +108,8 @@ class Solution:
                 ending = 0
             answer += ending
         return answer
-`,{time:"O(n)",space:"O(1)",description:"Count arithmetic subarrays of length at least three ending at each position; equal differences extend every previous slice."});
+`,{time:"O(n)",space:"O(1)",engine:'wasm',teaching:{mode:'guided',scene:{compact:true,debug:true,kind:'arithmetic-slices'}},guideVi:'Hai hiệu liên tiếp bằng nhau: thêm một đoạn mới và nối dài các đoạn trước; ending đếm các đoạn kết thúc tại i.',guide:'Equal adjacent differences create one new slice and extend previous ones; ending counts slices finishing at i.',description:"Count arithmetic subarrays of length at least three ending at each position; equal differences extend every previous slice."});
+attachArithmeticReplay(lessons[413]);
 add(414,"Third Maximum Number","array",[[2,2,3,1]],1,`
 class Solution:
     def thirdMax(self, nums):

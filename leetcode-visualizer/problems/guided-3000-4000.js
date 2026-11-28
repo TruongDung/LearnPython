@@ -1,9 +1,11 @@
 'use strict';
 const {defineEasy}=require('./easy-lesson');const lessons={};
 const {parseArguments}=require('./catalog-lesson');
+const {attachMexReplay,attachSwapReplay}=require('./sequence-picture-replays');
 const ideas={};
 for(const entry of require('./guided-3000-4000.json')){
  const options={engine:entry.engine,harness:entry.harness,prelude:entry.prelude,method:entry.method,names:entry.names,kinds:entry.kinds,answerKind:entry.returnKind||undefined,difficulty:entry.difficulty,focus:entry.focus,description:entry.description,reference:entry.reference,stateClasses:entry.classes||[],objectClasses:(entry.classes||[]).filter(name=>name!=='Solution'),captureClasses:entry.captureClasses||[],exposeState:true,traceOptions:{maxEvents:entry.maxEvents||12000,summarizeLocals:entry.summarizeLocals||{}},teachingMode:'guided',scene:entry.scene||{compact:true,debug:true},guide:entry.guideEn,provenance:entry.provenance};
+ if(entry.id===3948||entry.id===3962){options.engine='wasm';options.prelude=entry.id===3962?'from math import inf':'';options.maxArrayLength=entry.id===3948?60:12;}
  const lesson=defineEasy(entry.id,entry.title,entry.group,entry.sample,entry.expected,entry.code,ideas[entry.id]||entry.guideVi,'Xem các vòng lặp và kích thước trạng thái trong code','Không tính lịch sử mô phỏng',options);
  if(entry.engine==='javascript'){
   lesson.codeLabel={vi:'JavaScript · chạy thật · đồng hồ ảo',en:'JavaScript · actual execution · virtual clock'};
@@ -40,6 +42,8 @@ for(const entry of require('./guided-3000-4000.json')){
   lesson.approach=[{vi:'cnt[f] đếm số loại có hệ số f.',en:'cnt[f] counts item types with factor f.'},{vi:'gain[f] cộng cnt ở các bội của f, gồm bản mua đầu và quà.',en:'gain[f] sums counts at multiples of f, including the first paid copy and gifts.'},{vi:'Khởi tạo mua rẻ nhất, rồi cập nhật ngân sách từ phải sang trái.',en:'Start with cheapest copies, then update budgets from right to left.'}];
   lesson.complexity={time:'O(m log m + n × B)',space:'O(m + B)',note:{vi:'m = 1500. Không tính lịch sử debug; ô 0 được gom trong hình. Giới hạn hình: 10 loại, ngân sách 60.',en:'m = 1500. Excludes debug history; zero cells are compressed in the picture. Visual limit: 10 types, budget 60.'}};
  }
+ if(entry.id===3948)attachMexReplay(lesson);
+ if(entry.id===3962)attachSwapReplay(lesson);
  lessons[entry.id]=lesson;
 }
 module.exports=lessons;
