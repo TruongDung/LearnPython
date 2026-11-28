@@ -1,0 +1,1 @@
+"class Solution:\n    def superEggDrop(self, k: int, n: int) -> int:\n        dp = [0 for _ in range(k + 1)]\n        moves = 0\n\n        while dp[k] < n:\n            moves += 1\n            for i in range(k, 0, -1):\n                dp[i] = 1 + dp[i] + dp[i - 1]\n\n        return moves\n"

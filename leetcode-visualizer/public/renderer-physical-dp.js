@@ -9,6 +9,21 @@ function physicalDpTools(language){
  const shell=(id,html)=>`<section class="pd-scene" data-physical-id="${id}">${html}</section>`;
  return{t,esc,tile,row,panel,count,result,shell};
 }
+function renderEggDrop887(v,language){
+ const{t,esc,panel,count,result,shell}=physicalDpTools(language),x=v.locals||{},p=v.egg887,[K,N]=v.args,dp=x.dp||[],moves=x.moves;
+ const active=(v.line===8&&v.branch===true||v.line===9)&&Number.isInteger(x.i),e=active?x.i:K,oldSame=p.previous[e]??0,oldLower=p.previous[e-1]??0,coverage=dp[K]??0;
+ const wrote=active&&v.line===9,newValue=wrote?dp[e]:v.final?dp[K]:null;
+ let html=`<header class="egg887-head"><b>${t('Một mảng dp · cập nhật phải → trái','One dp array · update right → left')}</b><span>O(k × moves) · O(k)</span></header><div class="pd-counts">${count(t('Trứng','Eggs'),K)}${count(t('Mục tiêu số tầng','Target floors'),N)}${count('moves',moves)}</div>`;
+ html+=panel(t('dp[e] = số tầng tối đa với e trứng','dp[e] = maximum floors with e eggs'),`<div class="egg887-direction">← i = ${K}, …, 1</div><div class="pd-scroll"><div class="egg887-array">${dp.map((value,i)=>`<div class="${active&&i===e?'current':''} ${active&&i===e-1?'read':''} ${p.updated.includes(i)?'updated':'old'} ${i===0?'zero':''}" data-egg-index="${i}" data-egg-value="${value}"><small>🥚 × ${i}</small><b>${value}</b><span>${i===0?'0':p.updated.includes(i)?t('mới','new'):t('cũ','old')}</span></div>`).join('')}</div></div><p class="pd-caption">${t('Đi từ phải sang trái để dp[i−1] còn là giá trị lượt trước.','Right to left keeps dp[i−1] from the previous move.')}</p>`);
+ if(active||v.final&&moves>0){
+  html+=panel(`${t('Lượt','Move')} ${moves} · ${t('xét','update')} i = ${e}`,`<div class="egg887-coverage"><div class="broken"><b>◇ ${t('Vỡ','Broken')}</b><small>${e-1} ${t('trứng','eggs')}</small><strong data-egg-old-lower="${oldLower}">${oldLower}</strong><span>${t('tầng phía dưới','floors below')}</span><code>dp[${e-1}] ${t('cũ','old')}</code></div><b>+</b><div class="drop"><b>🥚 ↓</b><strong>1</strong><span>${t('tầng thử','test floor')}</span></div><b>+</b><div class="survived"><b>🥚 ${t('Không vỡ','Survives')}</b><small>${e} ${t('trứng','eggs')}</small><strong data-egg-old-same="${oldSame}">${oldSame}</strong><span>${t('tầng phía trên','floors above')}</span><code>dp[${e}] ${t('cũ','old')}</code></div></div><div class="pd-equation" data-egg-new-value="${newValue??'pending'}">1 + ${oldSame} + ${oldLower} ${newValue===null?'→ ?':'= '+newValue}</div><p class="pd-caption">${wrote?'✓ '+t('Chỉ ô i vừa đổi; các ô nhỏ hơn vẫn cũ.','Only cell i changed; smaller indices are still old.'):v.final?t('Hai nhánh dùng năng lực của lượt trước.','Both branches use the previous move’s capacity.'):t('Đang đọc hai ô cũ · chưa ghi dp[i].','Reading two old cells · dp[i] is not written yet.')}</p>`);
+ }
+ html+=`<section class="egg887-progress"><header><b data-egg-coverage="${coverage}">${coverage}</b><span>/ ${N} ${t('tầng cần phủ','floors to cover')}</span></header><div role="progressbar" aria-valuemin="0" aria-valuemax="${Math.max(1,N)}" aria-valuenow="${Math.min(N,coverage)}"><i style="width:${N?Math.min(100,coverage/N*100):100}%"></i></div><small>${coverage>=N?'✓ '+t('Đủ phủ mục tiêu','Target covered'):t('Chưa đủ → cần thêm lượt','Not enough → another move')}${!p.complete&&coverage>=N?' · '+t('đang hoàn tất vòng for','finishing the for loop'):''}</small></section>`;
+ if(p.history.length){const maximum=Math.max(1,...p.history.map(row=>row.coverage));html+=panel(t('Các lượt đã hoàn tất','Completed moves'),`<div class="egg887-history">${p.history.map(row=>`<div data-completed-move="${row.moves}"><b>${row.coverage}</b><i style="height:${10+row.coverage/maximum*60}px"></i><small>${t('Lượt','Move')} ${row.moves}</small></div>`).join('')}</div>`);}
+ if(v.final){if(N>0)html+=`<p class="pd-caption">🥚 ↓ ${t('Có thể bắt đầu thả ở tầng','One optimal first drop is floor')} <b data-egg-first-drop="${Math.min(N,oldLower+1)}">${Math.min(N,oldLower+1)}</b></p>`;html+=result(887,v.result);}
+ if(typeof steps!=='undefined'&&typeof stepIndex!=='undefined'&&!v.final){const next=steps.findIndex((step,i)=>i>stepIndex&&step.catalogLessonView?.id===887&&step.catalogLessonView.line===8&&step.catalogLessonView.branch===false);if(next>stepIndex)html+=`<button type="button" class="egg887-next" data-iv-step="${next-stepIndex}">${t('Hoàn tất lượt này','Complete this move')} ↓</button>`;}
+ return shell(887,html);
+}
 function renderPhysicalDp(v,language){
  const{t,esc,tile,row,panel,count,result,shell}=physicalDpTools(language),x=v.locals||{},id=v.id,args=v.args,plan=v.physicalDp.plan;
  let html='';
@@ -43,17 +58,7 @@ function renderPhysicalDp(v,language){
   if(!v.final){html+=`<div class="pd-counts">${count('gain · '+t('ô đang thử','trial cell'),v.line>=16&&v.line<=20?x.gain:undefined)}${count('answer · '+t('từ trạng thái này','from this state'),x.answer)}</div>`;if(preview)html+=`<div class="pd-equation">${preview===1?'● 120':'☺ 40'} + ${t('ảnh hưởng hai chiều','mutual neighbor effects')}</div>`;}
   else{const Iused=cells.filter(c=>c===1).length,Eused=cells.filter(c=>c===2).length;let effects=0;for(let p=0;p<cells.length;p++)for(const q of[p%n<n-1?p+1:-1,p+n<cells.length?p+n:-1])if(q>=0&&cells[p]&&cells[q])effects+=(cells[p]===1?-30:20)+(cells[q]===1?-30:20);html+=`<div class="pd-equation">${Iused} × 120 + ${Eused} × 40 + (${effects}) = ${v.result}</div>`+result(id,v.result);}
  }
- if(id===887){
-  const[K,N]=args,fast=v.physicalDp.approach===2,final=v.final,m=x.m??0,e=x.e??K,f=v.final?N:(x.f??N);let probe=!fast&&!v.final&&v.line>=9&&v.line<=13?x.x:null;
-  if(v.final&&N>0){if(fast)probe=Math.min(N,(x.dp?.[m-1]?.[K-1]??0)+1);else if(K===1)probe=1;else for(let q=1;q<=N;q++)if(1+Math.max(x.dp[K-1][q-1],x.dp[K][N-q])===v.result){probe=q;break;}}
-  const shown=f>18&&probe?[...new Set([f,f-1,f-2,probe+2,probe+1,probe,probe-1,probe-2,2,1].filter(n=>n>=1&&n<=f))].sort((a,b)=>b-a):Array.from({length:Math.min(f,18)},(_,i)=>f-i);
-  html+=`<div class="pd-counts">${count(t('Trứng','Eggs'),K)}${count(t('Tầng','Floors'),N)}</div>`;
-  html+=panel(t('Thả ở tầng vàng · vỡ xuống dưới / sống lên trên','Drop at gold floor · broken below / survives above'),`<div class="pd-egg-layout"><div class="pd-tower">${shown.map(floor=>`<div class="${floor===probe?'focus':probe&&floor<probe?'broken':probe&&floor>probe?'survived':''}"><span>${floor}</span><b>${floor===probe?'🥚 ↓':''}</b></div>`).join('')}${f>18?'<div>⋮</div>':''}${!f?'<div>0</div>':''}</div><div class="pd-branches"><div class="broken"><b>◇ ${t('Vỡ','Broken')}</b><span>${Math.max(0,e-1)} ${t('trứng','eggs')}</span><strong>${fast?x.dp?.[Math.max(0,m-1)]?.[Math.max(0,e-1)]??'·':final?x.dp?.[K-1]?.[Math.max(0,(probe??1)-1)]??0:v.line>=10&&v.line<=13?x.broken:'·'}</strong><small>${fast?t('tầng bao phủ','floors covered'):t('lượt còn cần','drops remaining')}</small></div><div class="survived"><b>🥚 ${t('Không vỡ','Survives')}</b><span>${e} ${t('trứng','eggs')}</span><strong>${fast?x.dp?.[Math.max(0,m-1)]?.[e]??'·':final?x.dp?.[K]?.[Math.max(0,N-(probe??0))]??0:v.line>=11&&v.line<=13?x.survived:'·'}</strong><small>${fast?t('tầng bao phủ','floors covered'):t('lượt còn cần','drops remaining')}</small></div></div></div>`);
-  if(fast)html+=`<div class="pd-equation">${x.dp?.[Math.max(0,m-1)]?.[Math.max(0,e-1)]??0} + 1 + ${x.dp?.[Math.max(0,m-1)]?.[e]??0} → ${x.dp?.[m]?.[e]??0} ${t('tầng','floors')}</div>`+count(t('Số lượt đã dùng','Moves used'),m);
-  else if(!final)html+=count('1 + max('+t('vỡ, không vỡ','broken, survived')+')',v.line>=12&&v.line<=13?x.worst:undefined);
-  if(final&&!fast&&N>0)html+=`<div class="pd-equation">1 + max(${x.dp[K-1][Math.max(0,probe-1)]}, ${x.dp[K][N-probe]}) = ${v.result}</div>`;
-  if(final)html+=result(id,v.result);
- }
+ if(id===887)return renderEggDrop887(v,language);
  return shell(id,html);
 }
 function renderIntervalPhysical(step,language){
