@@ -17,10 +17,13 @@ Different tied plans may give the same minimum cost.
 
 The renderer supports Vietnamese and US English, light/dark themes, and narrow
 screens. Wide arrays scroll inside the drawing. The source remains an O(n³),
-O(n²) teaching model limited to 18 values, not a solution for the problem's
+O(n²) teaching model limited to 12 values, not a solution for the problem's
 full 100,000-element constraint.
 
 Validation: `node --test tests/deletion-4123.test.js tests/math-replays.test.js`.
 The dedicated tests verify 1,244 signed arrays, including repeated values and
-18-item cases, legal adjacency after concatenation, endpoint-only charges,
+12-item cases, legal adjacency after concatenation, endpoint-only charges,
 independent exhaustive optima for small arrays, and reversible source snapshots.
+
+The visual input cap is 12 because dense line snapshots at 18 values exceeded
+the serverless trace time budget; oversized inputs are rejected before tracing.

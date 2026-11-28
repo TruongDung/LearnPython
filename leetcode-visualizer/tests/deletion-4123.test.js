@@ -15,7 +15,7 @@ test('pictures reconstruct legal optimal deletions from executed DP states, incl
  for(let n=2;n<=6;n++)enumerate([],n);
  let seed=4123;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};
  for(let i=0;i<150;i++)cases.push(Array.from({length:2+random(7)},()=>random(15)-7));
- cases.push([2,-7,3,-5],[4,0,-5,2],[7,-8,1],[1e9,-1e9,1e9,-1e9],Array(18).fill(-1));
+ cases.push([2,-7,3,-5],[4,0,-5,2],[7,-8,1],[1e9,-1e9,1e9,-1e9],Array(12).fill(-1));
  const script='import json,sys,math\np=json.load(sys.stdin)\nscope={"inf":math.inf}\nexec(p["source"],scope)\nstate={}\ndef capture(frame,event,arg):\n if event=="return" and frame.f_code.co_name=="run":\n  state.update({"full":frame.f_locals["full"],"free":frame.f_locals["free"]})\nanswers=[]\nfor nums in p["cases"]:\n sys.setprofile(capture)\n answer=scope["Solution"]().run(nums)\n sys.setprofile(None)\n answers.append({"answer":answer,"full":[[x if math.isfinite(x) else "∞" for x in row] for row in state["full"]],"free":state["free"]})\nprint(json.dumps(answers))';
  const local=path.resolve(__dirname,'../.viz-python',process.platform==='win32'?'Scripts/python.exe':'bin/python'),python=fs.existsSync(local)?local:process.platform==='win32'?'python':'python3';
  const result=spawnSync(python,['-c',script],{input:JSON.stringify({source:problem.code.join('\n'),cases}),encoding:'utf8',windowsHide:true,maxBuffer:12*1024*1024,timeout:30000});assert.equal(result.status,0,result.stderr);
@@ -23,7 +23,7 @@ test('pictures reconstruct legal optimal deletions from executed DP states, incl
  cases.forEach((nums,i)=>{
   const {answer,full,free}=answers[i],plan=ctx.deletion4123Plan(nums,full,free);let remaining=nums.map((_,i)=>i),total=0;
   for(const op of plan){assert.deepEqual(Array.from(op.before),remaining);const l=remaining.indexOf(op.left),r=remaining.indexOf(op.end);assert.ok(r>l);const removed=remaining.splice(l,r-l+1);assert.deepEqual(Array.from(op.removed),removed);assert.deepEqual(Array.from(op.after),remaining);assert.equal(op.charge,nums[op.left]+nums[op.end]);total+=op.charge;assert.equal(op.total,total);}
-  assert.equal(remaining.length,0);assert.equal(total,answer);if(nums.length<=8)assert.equal(answer,brute(nums),JSON.stringify(nums));else assert.equal(answer,-18);
+  assert.equal(remaining.length,0);assert.equal(total,answer);if(nums.length<=8)assert.equal(answer,brute(nums),JSON.stringify(nums));else assert.equal(answer,-12);
  });
  process.stdout.write(`Verified ${cases.length} optimal deletion pictures\n`);
 });
@@ -42,4 +42,5 @@ test('every source line renders reversible signed snapshots without premature ca
   const first=ctx.mathPicture(run.steps[0].catalogLessonView,'vi');ctx.mathPicture(run.steps.at(-1).catalogLessonView,'vi');assert.equal(ctx.mathPicture(run.steps[0].catalogLessonView,'vi'),first);assert.equal(JSON.stringify(run),saved);
  }
  assert.equal(problem.debugMode,'line-by-line');
+ for(const nums of[[],[1],Array(13).fill(0)])assert.throws(()=>problem.builder(JSON.stringify([nums])));
 });
